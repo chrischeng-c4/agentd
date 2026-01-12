@@ -260,10 +260,15 @@ set -euo pipefail
 
 CHANGE_ID="$1"
 
+# Get the project root (parent of scripts dir)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "🔍 Analyzing proposal with Codex: $CHANGE_ID"
 
-# Call Codex CLI with pre-defined prompt
-codex specter-challenge "$CHANGE_ID" --output-format json
+# Use Specter's AGENTS.md to override any existing context
+codex -c experimental_instructions_file="$PROJECT_ROOT/specter/AGENTS.md" \
+      specter-challenge "$CHANGE_ID" --output-format json
 "#;
 
     let codex_verify = r#"#!/bin/bash
@@ -273,10 +278,15 @@ set -euo pipefail
 
 CHANGE_ID="$1"
 
+# Get the project root (parent of scripts dir)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "🧪 Generating tests with Codex: $CHANGE_ID"
 
-# Call Codex CLI with pre-defined prompt
-codex specter-verify "$CHANGE_ID" --output-format json
+# Use Specter's AGENTS.md to override any existing context
+codex -c experimental_instructions_file="$PROJECT_ROOT/specter/AGENTS.md" \
+      specter-verify "$CHANGE_ID" --output-format json
 "#;
 
     std::fs::write(scripts_dir.join("gemini-proposal.sh"), gemini_proposal)?;
