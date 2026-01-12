@@ -21,6 +21,10 @@ const GEMINI_SETTINGS: &str = include_str!("../../templates/gemini/settings.json
 const CODEX_CHALLENGE: &str = include_str!("../../templates/codex/prompts/specter-challenge.md");
 const CODEX_VERIFY: &str = include_str!("../../templates/codex/prompts/specter-verify.md");
 
+// AI Context Files
+const SPECTER_GEMINI_MD: &str = include_str!("../../templates/GEMINI.md");
+const SPECTER_AGENTS_MD: &str = include_str!("../../templates/AGENTS.md");
+
 pub async fn run(name: Option<&str>) -> Result<()> {
     let project_root = env::current_dir()?;
 
@@ -47,6 +51,13 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     std::fs::create_dir_all(specter_dir.join("changes"))?;
     std::fs::create_dir_all(specter_dir.join("archive"))?;
     std::fs::create_dir_all(specter_dir.join("scripts"))?;
+
+    // Install AI context files
+    println!("{}", "📝 Installing AI context files...".cyan());
+    std::fs::write(specter_dir.join("GEMINI.md"), SPECTER_GEMINI_MD)?;
+    println!("   ✓ specter/GEMINI.md (Gemini instructions)");
+    std::fs::write(specter_dir.join("AGENTS.md"), SPECTER_AGENTS_MD)?;
+    println!("   ✓ specter/AGENTS.md (Codex instructions)");
 
     // Create Claude Code skills directory
     let skills_dir = claude_dir.join("skills");
@@ -90,12 +101,14 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     println!();
     println!("{}", "📁 Structure:".cyan());
     println!("   specter/                   - Main Specter directory");
+    println!("   specter/GEMINI.md          - Gemini context (via GEMINI_SYSTEM_MD)");
+    println!("   specter/AGENTS.md          - Codex context");
     println!("   specter/specs/             - Main specifications");
     println!("   specter/changes/           - Active changes");
     println!("   specter/archive/           - Completed changes");
     println!("   .claude/skills/            - 6 Skills installed");
-    println!("   .gemini/commands/specter/  - 2 Gemini commands (project-specific)");
-    println!("   ~/.codex/prompts/          - 2 Codex prompts (user-space)");
+    println!("   .gemini/commands/specter/  - 2 Gemini commands");
+    println!("   ~/.codex/prompts/          - 2 Codex prompts");
     println!();
 
     println!("{}", "🤖 AI Commands Installed:".cyan().bold());
@@ -184,7 +197,14 @@ set -euo pipefail
 CHANGE_ID="$1"
 DESCRIPTION="$2"
 
+# Get the project root (parent of scripts dir)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "🤖 Generating proposal with Gemini: $CHANGE_ID"
+
+# Use Specter's GEMINI.md to override any existing context
+export GEMINI_SYSTEM_MD="$PROJECT_ROOT/specter/GEMINI.md"
 
 # Build context for Gemini
 CONTEXT=$(cat << EOF
@@ -195,7 +215,7 @@ ${CHANGE_ID}
 ${DESCRIPTION}
 
 ## Instructions
-Create proposal files in changes/${CHANGE_ID}/.
+Create proposal files in specter/changes/${CHANGE_ID}/.
 EOF
 )
 
@@ -210,7 +230,14 @@ set -euo pipefail
 
 CHANGE_ID="$1"
 
+# Get the project root (parent of scripts dir)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "🔄 Refining proposal with Gemini: $CHANGE_ID"
+
+# Use Specter's GEMINI.md to override any existing context
+export GEMINI_SYSTEM_MD="$PROJECT_ROOT/specter/GEMINI.md"
 
 # Build context for Gemini
 CONTEXT=$(cat << EOF
@@ -218,7 +245,7 @@ CONTEXT=$(cat << EOF
 ${CHANGE_ID}
 
 ## Instructions
-Read changes/${CHANGE_ID}/CHALLENGE.md and fix all HIGH and MEDIUM severity issues.
+Read specter/changes/${CHANGE_ID}/CHALLENGE.md and fix all HIGH and MEDIUM severity issues.
 EOF
 )
 
