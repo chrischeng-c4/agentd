@@ -100,57 +100,55 @@ cargo fmt -- --check
 - `IMPLEMENTATION.md`: Implementation notes (Claude)
 - `VERIFICATION.md`: Test results (Codex)
 
-**SpecterConfig**: Project configuration in `.specter/config.toml`:
+**SpecterConfig**: Project configuration in `specter/config.toml`:
 - AI CLI commands (gemini, codex, claude)
 - Scripts directory path
 - Project metadata
 
-**ScriptRunner**: Executes shell scripts in `.specter/scripts/` that integrate with AI tools. Scripts receive change_id and other args, return structured output.
+**ScriptRunner**: Executes shell scripts in `specter/scripts/` that integrate with AI tools. Scripts receive change_id and other args, return structured output.
 
 ### Directory Layout
 ```
-.specter/
-  config.toml          # Configuration
-  scripts/             # AI integration scripts
+specter/                # Main Specter directory (visible)
+  config.toml           # Configuration
+  specs/                # Main specifications
+    auth/spec.md
+    api/spec.md
+  changes/              # Active change proposals
+    add-oauth/
+      proposal.md
+      tasks.md
+      diagrams.md
+      specs/
+      CHALLENGE.md
+      IMPLEMENTATION.md
+      VERIFICATION.md
+  archive/              # Completed changes
+  scripts/              # AI integration scripts
     gemini-proposal.sh
     gemini-reproposal.sh
     codex-challenge.sh
     codex-verify.sh
     claude-implement.sh
 
-.gemini/               # Gemini Commands (project-specific)
+.gemini/                # Gemini Commands (project-specific, hidden)
   commands/specter/
-    proposal.toml      # Proposal generation prompt
-    reproposal.toml    # Reproposal refinement prompt
-  settings.json        # Tools and auto-approvals
+    proposal.toml       # Proposal generation prompt
+    reproposal.toml     # Reproposal refinement prompt
+  settings.json         # Tools and auto-approvals
 
-~/.codex/              # Codex Prompts (user-space, global)
+~/.codex/               # Codex Prompts (user-space, global)
   prompts/
     specter-challenge.md  # Code review prompt
     specter-verify.md     # Test generation prompt
 
-.claude/skills/        # Claude Code Skills (installed by init)
+.claude/skills/         # Claude Code Skills (installed by init, hidden)
   specter-proposal/
   specter-challenge/
   specter-reproposal/
   specter-implement/
   specter-verify/
   specter-archive/
-
-specs/                 # Main specifications
-  auth/spec.md
-  api/spec.md
-
-changes/              # Active change proposals
-  add-oauth/
-    proposal.md
-    tasks.md
-    diagrams.md
-    specs/
-    CHALLENGE.md
-    IMPLEMENTATION.md
-    VERIFICATION.md
-  archive/            # Completed changes
 ```
 
 ## AI CLI Commands Integration
@@ -190,13 +188,13 @@ specter challenge test-change
 
 **Gemini (project-specific)**:
 1. **Claude Code Skill** → calls Specter CLI
-2. **Specter CLI** → executes `.specter/scripts/gemini-proposal.sh`
+2. **Specter CLI** → executes `specter/scripts/gemini-proposal.sh`
 3. **Script** → calls `gemini specter:proposal`
 4. **Gemini CLI** → reads `.gemini/commands/specter/proposal.toml` and executes
 
 **Codex (user-space)**:
 1. **Claude Code Skill** → calls Specter CLI
-2. **Specter CLI** → executes `.specter/scripts/codex-challenge.sh`
+2. **Specter CLI** → executes `specter/scripts/codex-challenge.sh`
 3. **Script** → calls `codex specter-challenge`
 4. **Codex CLI** → reads `~/.codex/prompts/specter-challenge.md` and executes
 
@@ -258,17 +256,3 @@ Key crates:
 - **Git**: `git2`
 - **Async**: `tokio` (process execution)
 
-## Known Issues (Current Diagnostics)
-
-The following warnings need cleanup:
-- `challenge.rs:1:38`: Remove unused import `ChangePhase`
-- `challenge.rs:21:9`: Remove unnecessary `mut` on variable
-- `script_runner.rs:3:17`: Remove unused import `Path`
-- `proposal.rs:4:5`: Remove unused import `std::path::PathBuf`
-- `reproposal.rs:27:9`: Prefix unused variable `output` with underscore: `_output`
-
-To fix these automatically:
-```bash
-cargo clippy --fix --allow-dirty
-cargo fmt
-```
