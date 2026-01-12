@@ -24,18 +24,25 @@ Specter orchestrates **three AI tools** to enable cost-effective, high-quality s
 
 ### Installation
 
+**Option 1: Install from source (Recommended)**
+
 ```bash
-# Clone and build
+# Clone and install
 git clone https://github.com/your-repo/specter
 cd specter
-cargo build --release
-
-# Install binary
 cargo install --path .
 
-# Or use directly
-alias specter="./target/release/specter"
+# Verify installation
+specter --version
 ```
+
+**Option 2: One-line install script**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/your-repo/specter/main/install.sh | sh
+```
+
+📖 **[Complete installation guide](INSTALL.md)** - Including Docker, Rust setup, troubleshooting, etc.
 
 ### Initialize Project
 
