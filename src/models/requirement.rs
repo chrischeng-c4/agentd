@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::Scenario;
+use serde::{Deserialize, Serialize};
 
 /// Represents a requirement with scenarios
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -66,10 +66,7 @@ pub enum RequirementDelta {
     },
 
     /// Requirement renamed
-    Renamed {
-        from: String,
-        to: String,
-    },
+    Renamed { from: String, to: String },
 }
 
 impl RequirementDelta {

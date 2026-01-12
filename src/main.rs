@@ -97,13 +97,22 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Proposal { change_id, description } => {
-            println!("{}", "🤖 Generating proposal with Gemini (2M context)...".cyan());
+        Commands::Proposal {
+            change_id,
+            description,
+        } => {
+            println!(
+                "{}",
+                "🤖 Generating proposal with Gemini (2M context)...".cyan()
+            );
             specter::cli::proposal::run(&change_id, &description).await?;
         }
 
         Commands::Challenge { change_id } => {
-            println!("{}", format!("🔍 Challenging proposal: {}", change_id).cyan());
+            println!(
+                "{}",
+                format!("🔍 Challenging proposal: {}", change_id).cyan()
+            );
             specter::cli::challenge::run(&change_id).await?;
         }
 
@@ -112,7 +121,10 @@ async fn main() -> Result<()> {
             specter::cli::reproposal::run(&change_id).await?;
         }
 
-        Commands::Refine { change_id, requirements } => {
+        Commands::Refine {
+            change_id,
+            requirements,
+        } => {
             println!("{}", format!("✨ Refining proposal: {}", change_id).cyan());
             specter::cli::refine::run(&change_id, &requirements).await?;
         }
@@ -123,7 +135,10 @@ async fn main() -> Result<()> {
         }
 
         Commands::Verify { change_id } => {
-            println!("{}", format!("🧪 Verifying implementation: {}", change_id).cyan());
+            println!(
+                "{}",
+                format!("🧪 Verifying implementation: {}", change_id).cyan()
+            );
             specter::cli::verify::run(&change_id).await?;
         }
 

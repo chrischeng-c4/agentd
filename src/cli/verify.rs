@@ -1,5 +1,8 @@
-use crate::{Result, models::{Change, SpecterConfig}};
 use crate::orchestrator::ScriptRunner;
+use crate::{
+    models::{Change, SpecterConfig},
+    Result,
+};
 use colored::Colorize;
 use std::env;
 

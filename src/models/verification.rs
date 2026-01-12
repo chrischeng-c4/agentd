@@ -185,7 +185,11 @@ impl Verification {
         if self.tests.is_empty() {
             return 0.0;
         }
-        let passed = self.tests.iter().filter(|t| t.status == TestStatus::Pass).count();
+        let passed = self
+            .tests
+            .iter()
+            .filter(|t| t.status == TestStatus::Pass)
+            .count();
         passed as f64 / self.tests.len() as f64
     }
 
@@ -199,7 +203,11 @@ impl Verification {
         if self.tasks.is_empty() {
             return 0;
         }
-        let completed = self.tasks.iter().filter(|t| t.status == TaskStatus::Completed).count();
+        let completed = self
+            .tasks
+            .iter()
+            .filter(|t| t.status == TaskStatus::Completed)
+            .count();
         ((completed as f64 / self.tasks.len() as f64) * 100.0) as u8
     }
 }

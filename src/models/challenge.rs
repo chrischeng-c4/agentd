@@ -124,14 +124,28 @@ impl Challenge {
 
     /// Count issues by severity
     pub fn count_by_severity(&self) -> (usize, usize, usize) {
-        let high = self.issues.iter().filter(|i| i.severity == IssueSeverity::High).count();
-        let medium = self.issues.iter().filter(|i| i.severity == IssueSeverity::Medium).count();
-        let low = self.issues.iter().filter(|i| i.severity == IssueSeverity::Low).count();
+        let high = self
+            .issues
+            .iter()
+            .filter(|i| i.severity == IssueSeverity::High)
+            .count();
+        let medium = self
+            .issues
+            .iter()
+            .filter(|i| i.severity == IssueSeverity::Medium)
+            .count();
+        let low = self
+            .issues
+            .iter()
+            .filter(|i| i.severity == IssueSeverity::Low)
+            .count();
         (high, medium, low)
     }
 
     /// Check if there are critical issues (High severity)
     pub fn has_critical_issues(&self) -> bool {
-        self.issues.iter().any(|i| i.severity == IssueSeverity::High)
+        self.issues
+            .iter()
+            .any(|i| i.severity == IssueSeverity::High)
     }
 }

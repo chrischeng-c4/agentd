@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use indicatif::{ProgressBar as IndicatifProgressBar, ProgressStyle};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -40,9 +40,7 @@ impl ScriptRunner {
         }
 
         let mut cmd = Command::new(&script_path);
-        cmd.args(args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
 
         let progress = if show_progress {
             let pb = IndicatifProgressBar::new_spinner();
@@ -59,11 +57,11 @@ impl ScriptRunner {
             None
         };
 
-        let mut child = cmd.spawn()
+        let mut child = cmd
+            .spawn()
             .with_context(|| format!("Failed to spawn script: {:?}", script_path))?;
 
-        let stdout = child.stdout.take()
-            .context("Failed to capture stdout")?;
+        let stdout = child.stdout.take().context("Failed to capture stdout")?;
         let mut reader = BufReader::new(stdout).lines();
 
         let mut output = String::new();
@@ -96,11 +94,7 @@ impl ScriptRunner {
     }
 
     /// Run Gemini proposal generation
-    pub async fn run_gemini_proposal(
-        &self,
-        change_id: &str,
-        description: &str,
-    ) -> Result<String> {
+    pub async fn run_gemini_proposal(&self, change_id: &str, description: &str) -> Result<String> {
         self.run_script(
             "gemini-proposal.sh",
             &[change_id.to_string(), description.to_string()],
@@ -111,22 +105,14 @@ impl ScriptRunner {
 
     /// Run Codex challenge
     pub async fn run_codex_challenge(&self, change_id: &str) -> Result<String> {
-        self.run_script(
-            "codex-challenge.sh",
-            &[change_id.to_string()],
-            true,
-        )
-        .await
+        self.run_script("codex-challenge.sh", &[change_id.to_string()], true)
+            .await
     }
 
     /// Run Gemini reproposal
     pub async fn run_gemini_reproposal(&self, change_id: &str) -> Result<String> {
-        self.run_script(
-            "gemini-reproposal.sh",
-            &[change_id.to_string()],
-            true,
-        )
-        .await
+        self.run_script("gemini-reproposal.sh", &[change_id.to_string()], true)
+            .await
     }
 
     /// Run Claude implementation
@@ -146,11 +132,7 @@ impl ScriptRunner {
 
     /// Run Codex verification
     pub async fn run_codex_verify(&self, change_id: &str) -> Result<String> {
-        self.run_script(
-            "codex-verify.sh",
-            &[change_id.to_string()],
-            true,
-        )
-        .await
+        self.run_script("codex-verify.sh", &[change_id.to_string()], true)
+            .await
     }
 }

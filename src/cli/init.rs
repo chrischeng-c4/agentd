@@ -1,4 +1,4 @@
-use crate::{Result, models::SpecterConfig};
+use crate::{models::SpecterConfig, Result};
 use colored::Colorize;
 use std::env;
 use std::path::{Path, PathBuf};
@@ -13,7 +13,8 @@ const SKILL_ARCHIVE: &str = include_str!("../../templates/skills/specter-archive
 
 // Gemini Commands
 const GEMINI_PROPOSAL: &str = include_str!("../../templates/gemini/commands/specter/proposal.toml");
-const GEMINI_REPROPOSAL: &str = include_str!("../../templates/gemini/commands/specter/reproposal.toml");
+const GEMINI_REPROPOSAL: &str =
+    include_str!("../../templates/gemini/commands/specter/reproposal.toml");
 const GEMINI_SETTINGS: &str = include_str!("../../templates/gemini/settings.json");
 
 // Codex Prompts
@@ -24,7 +25,7 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     let project_root = env::current_dir()?;
 
     // Check if already initialized
-    let specter_dir = project_root.join(".specter");
+    let specter_dir = project_root.join("specter");
     let claude_dir = project_root.join(".claude");
 
     if specter_dir.exists() {
@@ -33,14 +34,18 @@ pub async fn run(name: Option<&str>) -> Result<()> {
         return Ok(());
     }
 
-    println!("{}", "🎭 Initializing Specter for Claude Code...".cyan().bold());
+    println!(
+        "{}",
+        "🎭 Initializing Specter for Claude Code...".cyan().bold()
+    );
     println!();
 
     // Create directory structure
     println!("{}", "📁 Creating directory structure...".cyan());
     std::fs::create_dir_all(&specter_dir)?;
-    std::fs::create_dir_all(project_root.join("specs"))?;
-    std::fs::create_dir_all(project_root.join("changes"))?;
+    std::fs::create_dir_all(specter_dir.join("specs"))?;
+    std::fs::create_dir_all(specter_dir.join("changes"))?;
+    std::fs::create_dir_all(specter_dir.join("archive"))?;
     std::fs::create_dir_all(specter_dir.join("scripts"))?;
 
     // Create Claude Code skills directory
@@ -51,10 +56,8 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     let mut config = SpecterConfig::default();
     if let Some(n) = name {
         config.project_name = n.to_string();
-    } else {
-        if let Some(dir_name) = project_root.file_name() {
-            config.project_name = dir_name.to_string_lossy().to_string();
-        }
+    } else if let Some(dir_name) = project_root.file_name() {
+        config.project_name = dir_name.to_string_lossy().to_string();
     }
     config.scripts_dir = specter_dir.join("scripts");
     config.save(&project_root)?;
@@ -86,39 +89,67 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     println!("{}", "✅ Specter initialized successfully!".green().bold());
     println!();
     println!("{}", "📁 Structure:".cyan());
-    println!("   .specter/                  - Configuration");
+    println!("   specter/                   - Main Specter directory");
+    println!("   specter/specs/             - Main specifications");
+    println!("   specter/changes/           - Active changes");
+    println!("   specter/archive/           - Completed changes");
     println!("   .claude/skills/            - 6 Skills installed");
     println!("   .gemini/commands/specter/  - 2 Gemini commands (project-specific)");
     println!("   ~/.codex/prompts/          - 2 Codex prompts (user-space)");
-    println!("   specs/                     - Main specifications");
-    println!("   changes/                   - Active changes");
     println!();
 
     println!("{}", "🤖 AI Commands Installed:".cyan().bold());
-    println!("   {} - Proposal generation", "gemini specter:proposal".green());
-    println!("   {} - Proposal refinement", "gemini specter:reproposal".green());
+    println!(
+        "   {} - Proposal generation",
+        "gemini specter:proposal".green()
+    );
+    println!(
+        "   {} - Proposal refinement",
+        "gemini specter:reproposal".green()
+    );
     println!("   {} - Code review", "codex specter-challenge".green());
     println!("   {} - Test generation", "codex specter-verify".green());
     println!();
 
-    println!("{}", "🎯 Available Skills (use in Claude Code):".cyan().bold());
-    println!("   {} - Generate proposal with Gemini", "/specter:proposal".green());
-    println!("   {} - Challenge proposal with Codex", "/specter:challenge".green());
-    println!("   {} - Refine based on feedback", "/specter:reproposal".green());
-    println!("   {} - Implement with Claude", "/specter:implement".green());
+    println!(
+        "{}",
+        "🎯 Available Skills (use in Claude Code):".cyan().bold()
+    );
+    println!(
+        "   {} - Generate proposal with Gemini",
+        "/specter:proposal".green()
+    );
+    println!(
+        "   {} - Challenge proposal with Codex",
+        "/specter:challenge".green()
+    );
+    println!(
+        "   {} - Refine based on feedback",
+        "/specter:reproposal".green()
+    );
+    println!(
+        "   {} - Implement with Claude",
+        "/specter:implement".green()
+    );
     println!("   {} - Verify with tests", "/specter:verify".green());
-    println!("   {} - Archive completed change", "/specter:archive".green());
+    println!(
+        "   {} - Archive completed change",
+        "/specter:archive".green()
+    );
     println!();
 
     println!("{}", "⏭️  Next Steps:".yellow().bold());
     println!("   1. In Claude Code, run:");
-    println!("      {}", "/specter:proposal my-feature \"Add awesome feature\"".cyan());
+    println!(
+        "      {}",
+        "/specter:proposal my-feature \"Add awesome feature\"".cyan()
+    );
     println!();
     println!("   2. Configure API keys (optional):");
-    println!("      Edit .specter/scripts/config.sh");
+    println!("      Edit specter/scripts/config.sh");
     println!();
     println!("   3. Read the guide:");
-    println!("      cat .specter/README.md");
+    println!("      cat specter/README.md");
 
     Ok(())
 }
@@ -242,8 +273,13 @@ echo "⚠️  This script is a placeholder - implementation happens via Claude C
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        for script in &["gemini-proposal.sh", "gemini-reproposal.sh", "codex-challenge.sh",
-                       "codex-verify.sh", "claude-implement.sh"] {
+        for script in &[
+            "gemini-proposal.sh",
+            "gemini-reproposal.sh",
+            "codex-challenge.sh",
+            "codex-verify.sh",
+            "claude-implement.sh",
+        ] {
             let path = scripts_dir.join(script);
             let mut perms = std::fs::metadata(&path)?.permissions();
             perms.set_mode(0o755);
@@ -284,7 +320,10 @@ fn install_codex_prompts(prompts_dir: &Path) -> Result<()> {
 
     if challenge_exists || verify_exists {
         println!();
-        println!("   {} Codex prompts already exist in ~/.codex/prompts/", "⚠️".yellow());
+        println!(
+            "   {} Codex prompts already exist in ~/.codex/prompts/",
+            "⚠️".yellow()
+        );
 
         use dialoguer::Confirm;
         let overwrite = Confirm::new()

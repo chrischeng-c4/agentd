@@ -9,7 +9,8 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     println!("{}", format!("📦 Archiving: {}", change_id).cyan());
 
-    let change_dir = project_root.join("changes").join(change_id);
+    let specter_dir = project_root.join("specter");
+    let change_dir = specter_dir.join("changes").join(change_id);
     if !change_dir.exists() {
         anyhow::bail!("Change '{}' not found", change_id);
     }
@@ -17,7 +18,7 @@ pub async fn run(change_id: &str) -> Result<()> {
     // Create archive directory with timestamp
     let timestamp = chrono::Local::now().format("%Y-%m-%d");
     let archive_name = format!("{}-{}", timestamp, change_id);
-    let archive_dir = project_root.join("changes/archive").join(&archive_name);
+    let archive_dir = specter_dir.join("archive").join(&archive_name);
 
     std::fs::create_dir_all(&archive_dir)?;
 

@@ -1,5 +1,8 @@
-use crate::{Result, models::{Change, ChangePhase, SpecterConfig}};
 use crate::orchestrator::ScriptRunner;
+use crate::{
+    models::{Change, SpecterConfig},
+    Result,
+};
 use colored::Colorize;
 use std::env;
 
@@ -12,22 +15,24 @@ pub async fn run(change_id: &str) -> Result<()> {
     let config = SpecterConfig::load(&project_root)?;
 
     // Check if change exists
-    let change_dir = project_root.join("changes").join(change_id);
+    let change_dir = project_root.join("specter/changes").join(change_id);
     if !change_dir.exists() {
-        anyhow::bail!("Change '{}' not found. Run 'specter proposal {}' first.", change_id, change_id);
+        anyhow::bail!(
+            "Change '{}' not found. Run 'specter proposal {}' first.",
+            change_id,
+            change_id
+        );
     }
 
     // Create Change object and validate
-    let mut change = Change::new(change_id, "");
+    let change = Change::new(change_id, "");
     change.validate_structure(&project_root)?;
 
-    println!("{}", format!("🔍 Analyzing proposal with Codex...").cyan());
+    println!("{}", "🔍 Analyzing proposal with Codex...".cyan());
 
     // Run Codex script
     let script_runner = ScriptRunner::new(config.scripts_dir);
-    let output = script_runner
-        .run_codex_challenge(change_id)
-        .await?;
+    let output = script_runner.run_codex_challenge(change_id).await?;
 
     println!("\n{}", "📊 Challenge Report Generated".green().bold());
 
@@ -83,9 +88,13 @@ fn display_challenge_summary(content: &str) {
     // Try to extract first high-severity issue
     if high_count > 0 {
         if let Some(issue_start) = content.find("**Severity**: High") {
-            let section = &content[issue_start.saturating_sub(200)..issue_start.saturating_add(400).min(content.len())];
+            let section = &content[issue_start.saturating_sub(200)
+                ..issue_start.saturating_add(400).min(content.len())];
 
-            println!("\n{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+            println!(
+                "\n{}",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
+            );
             println!("{}", "🔴 HIGH SEVERITY ISSUE (first)".red().bold());
 
             // Try to extract title
@@ -96,7 +105,10 @@ fn display_challenge_summary(content: &str) {
                 }
             }
 
-            println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+            println!(
+                "{}",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
+            );
         }
     }
 }

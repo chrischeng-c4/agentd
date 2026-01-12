@@ -7,7 +7,8 @@ pub async fn run(archived: bool) -> Result<()> {
 
     println!("{}", "📋 Listing changes...".cyan());
 
-    let changes_dir = project_root.join("changes");
+    let specter_dir = project_root.join("specter");
+    let changes_dir = specter_dir.join("changes");
     if !changes_dir.exists() {
         println!("{}", "No changes found. Run 'specter init' first.".yellow());
         return Ok(());
@@ -19,7 +20,7 @@ pub async fn run(archived: bool) -> Result<()> {
         for entry in std::fs::read_dir(&changes_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.is_dir() && path.file_name().unwrap() != "archive" {
+            if path.is_dir() {
                 if let Some(name) = path.file_name() {
                     println!("   • {}", name.to_string_lossy());
                 }
@@ -27,7 +28,7 @@ pub async fn run(archived: bool) -> Result<()> {
         }
     } else {
         // List archived changes
-        let archive_dir = changes_dir.join("archive");
+        let archive_dir = specter_dir.join("archive");
         if archive_dir.exists() {
             println!("\n{}", "Archived changes:".green().bold());
             for entry in std::fs::read_dir(&archive_dir)? {

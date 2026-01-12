@@ -1,7 +1,9 @@
-use crate::{Result, models::{Change, ChangePhase, SpecterConfig}};
 use crate::orchestrator::ScriptRunner;
+use crate::{
+    models::{Change, ChangePhase, SpecterConfig},
+    Result,
+};
 use colored::Colorize;
-use std::path::PathBuf;
 use std::env;
 
 pub struct ProposalCommand;
@@ -13,7 +15,7 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
     let config = SpecterConfig::load(&project_root)?;
 
     // Create change directory
-    let changes_dir = project_root.join("changes");
+    let changes_dir = project_root.join("specter/changes");
     std::fs::create_dir_all(&changes_dir)?;
 
     let change_dir = changes_dir.join(change_id);
@@ -54,7 +56,10 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
             println!("   2. Run: specter challenge {}", change_id);
         }
         Err(e) => {
-            println!("\n{}", "⚠️  Warning: Proposal structure incomplete".yellow());
+            println!(
+                "\n{}",
+                "⚠️  Warning: Proposal structure incomplete".yellow()
+            );
             println!("   {}", e);
             println!("\n   The Gemini script may need adjustment.");
         }

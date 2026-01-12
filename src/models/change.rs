@@ -1,6 +1,6 @@
+use super::{Challenge, RequirementDelta, Verification};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use super::{RequirementDelta, Challenge, Verification};
 
 /// Phase of a change
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -88,7 +88,7 @@ impl Change {
 
     /// Get the path to this change's directory
     pub fn path(&self, project_root: &Path) -> PathBuf {
-        project_root.join("changes").join(&self.id)
+        project_root.join("specter/changes").join(&self.id)
     }
 
     /// Get path to proposal.md
@@ -184,15 +184,15 @@ impl Default for SpecterConfig {
             gemini_command: "gemini".to_string(),
             claude_command: "claude".to_string(),
             codex_command: "codex".to_string(),
-            scripts_dir: PathBuf::from(".specter/scripts"),
+            scripts_dir: PathBuf::from("specter/scripts"),
         }
     }
 }
 
 impl SpecterConfig {
-    /// Load config from .specter/config.toml
+    /// Load config from specter/config.toml
     pub fn load(project_root: &Path) -> anyhow::Result<Self> {
-        let config_path = project_root.join(".specter/config.toml");
+        let config_path = project_root.join("specter/config.toml");
         if !config_path.exists() {
             return Ok(Self::default());
         }
@@ -202,9 +202,9 @@ impl SpecterConfig {
         Ok(config)
     }
 
-    /// Save config to .specter/config.toml
+    /// Save config to specter/config.toml
     pub fn save(&self, project_root: &Path) -> anyhow::Result<()> {
-        let config_path = project_root.join(".specter/config.toml");
+        let config_path = project_root.join("specter/config.toml");
         std::fs::create_dir_all(config_path.parent().unwrap())?;
 
         let content = toml::to_string_pretty(self)?;

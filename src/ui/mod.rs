@@ -1,7 +1,7 @@
+pub mod colors;
 pub mod progress;
 pub mod tables;
-pub mod colors;
 
+pub use colors::ColorScheme;
 pub use progress::ProgressBar;
 pub use tables::Table;
-pub use colors::ColorScheme;
