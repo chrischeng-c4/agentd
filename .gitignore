@@ -1,0 +1,21 @@
+# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Specter generated
+.specter/cache/
+changes/*/IMPLEMENTATION.md
+changes/*/VERIFICATION.md
+changes/*/CHALLENGE.md
