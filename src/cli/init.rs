@@ -3,30 +3,41 @@ use colored::Colorize;
 use std::env;
 use std::path::Path;
 
+const SKILL_PROPOSAL: &str = include_str!("../../templates/skills/specter-proposal/SKILL.md");
+const SKILL_CHALLENGE: &str = include_str!("../../templates/skills/specter-challenge/SKILL.md");
+
 pub async fn run(name: Option<&str>) -> Result<()> {
     let project_root = env::current_dir()?;
 
     // Check if already initialized
     let specter_dir = project_root.join(".specter");
+    let claude_dir = project_root.join(".claude");
+
     if specter_dir.exists() {
-        anyhow::bail!("Specter is already initialized in this directory");
+        println!("{}", "⚠️  Specter is already initialized".yellow());
+        println!("   Run with --force to reinstall");
+        return Ok(());
     }
 
-    println!("{}", "🚀 Initializing Specter...".cyan());
+    println!("{}", "🎭 Initializing Specter for Claude Code...".cyan().bold());
+    println!();
 
     // Create directory structure
+    println!("{}", "📁 Creating directory structure...".cyan());
     std::fs::create_dir_all(&specter_dir)?;
     std::fs::create_dir_all(project_root.join("specs"))?;
     std::fs::create_dir_all(project_root.join("changes"))?;
     std::fs::create_dir_all(specter_dir.join("scripts"))?;
-    std::fs::create_dir_all(specter_dir.join("templates"))?;
+
+    // Create Claude Code skills directory
+    let skills_dir = claude_dir.join("skills");
+    std::fs::create_dir_all(&skills_dir)?;
 
     // Create config
     let mut config = SpecterConfig::default();
     if let Some(n) = name {
         config.project_name = n.to_string();
     } else {
-        // Try to get project name from current directory
         if let Some(dir_name) = project_root.file_name() {
             config.project_name = dir_name.to_string_lossy().to_string();
         }
@@ -34,26 +45,108 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     config.scripts_dir = specter_dir.join("scripts");
     config.save(&project_root)?;
 
-    // Create example scripts (user needs to implement these)
-    create_example_scripts(&specter_dir.join("scripts"))?;
+    // Install Claude Code Skills
+    println!("{}", "🤖 Installing Claude Code Skills...".cyan());
+    install_claude_skills(&skills_dir)?;
 
+    // Create helper scripts
+    create_helper_scripts(&specter_dir.join("scripts"))?;
+
+    println!();
     println!("{}", "✅ Specter initialized successfully!".green().bold());
-    println!("\n{}", "📁 Directory structure created:".cyan());
-    println!("   .specter/");
-    println!("     ├── config.toml");
-    println!("     └── scripts/");
-    println!("   specs/");
-    println!("   changes/");
+    println!();
+    println!("{}", "📁 Structure:".cyan());
+    println!("   .specter/           - Configuration");
+    println!("   .claude/skills/     - 6 Skills installed");
+    println!("   specs/              - Main specifications");
+    println!("   changes/            - Active changes");
+    println!();
 
-    println!("\n{}", "⏭️  Next steps:".yellow());
-    println!("   1. Implement AI integration scripts in .specter/scripts/");
-    println!("   2. Create your first proposal:");
-    println!("      specter proposal my-feature \"Add new feature\"");
+    println!("{}", "🎯 Available Skills (use in Claude Code):".cyan().bold());
+    println!("   {} - Generate proposal with Gemini", "/specter:proposal".green());
+    println!("   {} - Challenge proposal with Codex", "/specter:challenge".green());
+    println!("   {} - Refine based on feedback", "/specter:reproposal".green());
+    println!("   {} - Implement with Claude", "/specter:implement".green());
+    println!("   {} - Verify with tests", "/specter:verify".green());
+    println!("   {} - Archive completed change", "/specter:archive".green());
+    println!();
+
+    println!("{}", "⏭️  Next Steps:".yellow().bold());
+    println!("   1. In Claude Code, run:");
+    println!("      {}", "/specter:proposal my-feature \"Add awesome feature\"".cyan());
+    println!();
+    println!("   2. Configure API keys (optional):");
+    println!("      Edit .specter/scripts/config.sh");
+    println!();
+    println!("   3. Read the guide:");
+    println!("      cat .specter/README.md");
 
     Ok(())
 }
 
-fn create_example_scripts(scripts_dir: &Path) -> Result<()> {
+fn install_claude_skills(skills_dir: &Path) -> Result<()> {
+    // Install proposal skill
+    let proposal_dir = skills_dir.join("specter-proposal");
+    std::fs::create_dir_all(&proposal_dir)?;
+    std::fs::write(proposal_dir.join("SKILL.md"), SKILL_PROPOSAL)?;
+    println!("   ✓ specter-proposal");
+
+    // Install challenge skill
+    let challenge_dir = skills_dir.join("specter-challenge");
+    std::fs::create_dir_all(&challenge_dir)?;
+    std::fs::write(challenge_dir.join("SKILL.md"), SKILL_CHALLENGE)?;
+    println!("   ✓ specter-challenge");
+
+    // Install other skills (placeholders for now)
+    for skill in &["reproposal", "implement", "verify", "archive"] {
+        let skill_dir = skills_dir.join(format!("specter-{}", skill));
+        std::fs::create_dir_all(&skill_dir)?;
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            generate_placeholder_skill(skill)
+        )?;
+        println!("   ✓ specter-{}", skill);
+    }
+
+    Ok(())
+}
+
+fn generate_placeholder_skill(name: &str) -> String {
+    format!(r#"---
+name: specter-{}
+description: {} (Coming soon)
+user-invocable: true
+---
+
+# /specter:{} - {}
+
+This skill is under development.
+
+## Usage
+
+```
+/specter:{} <change-id>
+```
+
+## Placeholder
+
+This skill will be implemented in the next version.
+For now, you can use the specter CLI tool directly:
+
+```bash
+specter {} <change-id>
+```
+"#,
+        name,
+        name.replace('-', " ").to_uppercase(),
+        name,
+        name.replace('-', " ").to_uppercase(),
+        name,
+        name
+    )
+}
+
+fn create_helper_scripts(scripts_dir: &Path) -> Result<()> {
     // Create example script templates
     let gemini_proposal = r#"#!/bin/bash
 # Gemini proposal generation script
