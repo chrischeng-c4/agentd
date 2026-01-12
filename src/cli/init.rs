@@ -260,15 +260,35 @@ set -euo pipefail
 
 CHANGE_ID="$1"
 
-# Get the project root (parent of scripts dir)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
 echo "🔍 Analyzing proposal with Codex: $CHANGE_ID"
 
-# Use Specter's AGENTS.md to override any existing context
-codex -c experimental_instructions_file="$PROJECT_ROOT/specter/AGENTS.md" \
-      specter-challenge "$CHANGE_ID" --output-format json
+# Build prompt with context
+PROMPT=$(cat << EOF
+# Specter Challenge Task
+
+Analyze the proposal at specter/changes/${CHANGE_ID}/ and create a challenge report.
+
+## Instructions
+1. Read all files in specter/changes/${CHANGE_ID}/:
+   - proposal.md
+   - tasks.md
+   - diagrams.md
+   - specs/*.md
+
+2. Explore the existing codebase for conflicts and inconsistencies
+
+3. Create specter/changes/${CHANGE_ID}/CHALLENGE.md with:
+   - HIGH severity issues (blockers)
+   - MEDIUM severity issues (important)
+   - LOW severity issues (suggestions)
+   - Summary with APPROVE or REQUEST_CHANGES recommendation
+
+Be thorough and constructive. Reference specific files and provide actionable recommendations.
+EOF
+)
+
+# Run non-interactively with full auto mode
+codex exec --full-auto "$PROMPT"
 "#;
 
     let codex_verify = r#"#!/bin/bash
@@ -278,15 +298,29 @@ set -euo pipefail
 
 CHANGE_ID="$1"
 
-# Get the project root (parent of scripts dir)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+echo "🧪 Verifying implementation with Codex: $CHANGE_ID"
 
-echo "🧪 Generating tests with Codex: $CHANGE_ID"
+# Build prompt with context
+PROMPT=$(cat << EOF
+# Specter Verify Task
 
-# Use Specter's AGENTS.md to override any existing context
-codex -c experimental_instructions_file="$PROJECT_ROOT/specter/AGENTS.md" \
-      specter-verify "$CHANGE_ID" --output-format json
+Verify the implementation for specter/changes/${CHANGE_ID}/.
+
+## Instructions
+1. Read the specs in specter/changes/${CHANGE_ID}/specs/
+2. Check if the implementation meets all requirements
+3. Run existing tests or create new tests as needed
+4. Create specter/changes/${CHANGE_ID}/VERIFICATION.md with:
+   - Test results
+   - Spec compliance status
+   - VERIFIED or FAILED verdict
+
+Be thorough and test all requirements.
+EOF
+)
+
+# Run non-interactively with full auto mode
+codex exec --full-auto "$PROMPT"
 "#;
 
     std::fs::write(scripts_dir.join("gemini-proposal.sh"), gemini_proposal)?;
