@@ -1,14 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cargo test:*)",
-      "Bash(cargo check:*)",
-      "Bash(cargo clippy:*)",
-      "Bash(cargo fmt:*)",
-      "Bash(cargo build:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(/Users/chrischeng/projects/specter/target/release/specter proposal test-feature:*)",
+      "Bash(timeout 60:*)",
+      "Bash(bash -x:*)",
+      "Bash(codex --help:*)",
+      "Bash(codex exec:*)",
+      "Bash(gemini:*)",
+      "Bash(chmod:*)",
+      "Bash(/Users/chrischeng/projects/specter/target/release/specter list:*)",
+      "Bash(/Users/chrischeng/projects/specter/target/release/specter challenge test-feature:*)",
+      "Bash(./specter/scripts/codex-challenge.sh:*)",
+      "Bash(git init:*)",
+      "Bash(/Users/chrischeng/projects/specter/target/release/specter fix:*)"
     ]
   }
 }
