@@ -135,4 +135,10 @@ impl ScriptRunner {
         self.run_script("codex-verify.sh", &[change_id.to_string()], true)
             .await
     }
+
+    /// Run Claude fix (fix issues from verification)
+    pub async fn run_claude_fix(&self, change_id: &str) -> Result<String> {
+        self.run_script("claude-fix.sh", &[change_id.to_string()], true)
+            .await
+    }
 }

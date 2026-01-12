@@ -1,5 +1,6 @@
 pub mod archive;
 pub mod challenge;
+pub mod fix;
 pub mod implement;
 pub mod init;
 pub mod list;

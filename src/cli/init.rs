@@ -9,6 +9,7 @@ const SKILL_CHALLENGE: &str = include_str!("../../templates/skills/specter-chall
 const SKILL_REPROPOSAL: &str = include_str!("../../templates/skills/specter-reproposal/SKILL.md");
 const SKILL_IMPLEMENT: &str = include_str!("../../templates/skills/specter-implement/SKILL.md");
 const SKILL_VERIFY: &str = include_str!("../../templates/skills/specter-verify/SKILL.md");
+const SKILL_FIX: &str = include_str!("../../templates/skills/specter-fix/SKILL.md");
 const SKILL_ARCHIVE: &str = include_str!("../../templates/skills/specter-archive/SKILL.md");
 
 // Gemini Commands
@@ -106,7 +107,7 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     println!("   specter/specs/             - Main specifications");
     println!("   specter/changes/           - Active changes");
     println!("   specter/archive/           - Completed changes");
-    println!("   .claude/skills/            - 6 Skills installed");
+    println!("   .claude/skills/            - 7 Skills installed");
     println!("   .gemini/commands/specter/  - 2 Gemini commands");
     println!("   ~/.codex/prompts/          - 2 Codex prompts");
     println!();
@@ -145,6 +146,7 @@ pub async fn run(name: Option<&str>) -> Result<()> {
         "/specter:implement".green()
     );
     println!("   {} - Verify with tests", "/specter:verify".green());
+    println!("   {} - Fix verification failures", "/specter:fix".green());
     println!(
         "   {} - Archive completed change",
         "/specter:archive".green()
@@ -174,6 +176,7 @@ fn install_claude_skills(skills_dir: &Path) -> Result<()> {
         ("reproposal", SKILL_REPROPOSAL),
         ("implement", SKILL_IMPLEMENT),
         ("verify", SKILL_VERIFY),
+        ("fix", SKILL_FIX),
         ("archive", SKILL_ARCHIVE),
     ];
 
@@ -340,6 +343,18 @@ echo "⚠️  This script is a placeholder - implementation happens via Claude C
 "#;
     std::fs::write(scripts_dir.join("claude-implement.sh"), claude_implement)?;
 
+    // Placeholder for claude-fix.sh (not updated yet)
+    let claude_fix = r#"#!/bin/bash
+# Claude fix script
+# Usage: ./claude-fix.sh <change-id>
+
+CHANGE_ID="$1"
+
+echo "🔧 Fixing issues: $CHANGE_ID"
+echo "⚠️  This script is a placeholder - fixing happens via Claude Code Skills"
+"#;
+    std::fs::write(scripts_dir.join("claude-fix.sh"), claude_fix)?;
+
     // Make scripts executable on Unix
     #[cfg(unix)]
     {
@@ -350,6 +365,7 @@ echo "⚠️  This script is a placeholder - implementation happens via Claude C
             "codex-challenge.sh",
             "codex-verify.sh",
             "claude-implement.sh",
+            "claude-fix.sh",
         ] {
             let path = scripts_dir.join(script);
             let mut perms = std::fs::metadata(&path)?.permissions();

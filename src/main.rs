@@ -61,6 +61,12 @@ enum Commands {
         change_id: String,
     },
 
+    /// Fix issues found during verification with Claude
+    Fix {
+        /// Change ID to fix
+        change_id: String,
+    },
+
     /// Archive completed change
     Archive {
         /// Change ID to archive
@@ -140,6 +146,11 @@ async fn main() -> Result<()> {
                 format!("🧪 Verifying implementation: {}", change_id).cyan()
             );
             specter::cli::verify::run(&change_id).await?;
+        }
+
+        Commands::Fix { change_id } => {
+            println!("{}", format!("🔧 Fixing issues: {}", change_id).cyan());
+            specter::cli::fix::run(&change_id).await?;
         }
 
         Commands::Archive { change_id } => {
