@@ -8,17 +8,18 @@ A Rust-powered spec-driven development tool with **iterative proposal refinement
 
 ## 🎯 Core Concept
 
-Specter orchestrates **three AI tools** to enable cost-effective, high-quality spec-driven development:
+**Specter installs Skills into Claude Code** so you can orchestrate multiple AI tools without leaving your interactive session:
 
-- 🤖 **Gemini CLI** (2M context, low cost) - Code exploration & proposal generation
-- 🔍 **Codex CLI** (code specialist) - Challenge proposals & generate tests
-- 🎨 **Claude Code** (high quality) - Precise implementation
+- 🤖 **Gemini** (2M context, low cost) - Code exploration & proposal generation
+- 🔍 **Codex** (code specialist) - Challenge proposals & generate tests
+- 🎨 **Claude** (you!) - Precise implementation and workflow orchestration
 
 ## ✨ Key Innovations
 
-1. **Challenge Phase** - AI automatically reviews proposals (Codex analyzes against existing code)
-2. **Iterative Refinement** - proposal → challenge → reproposal loop until satisfied
-3. **Automated Verification** - Codex generates tests from specs and verifies implementation
+1. **Claude Code Skills** - Work entirely in Claude Code interactive mode, no bash switching
+2. **Challenge Phase** - AI automatically reviews proposals (Codex analyzes against existing code)
+3. **Iterative Refinement** - proposal → challenge → reproposal loop until satisfied
+4. **Automated Verification** - Codex generates tests from specs and verifies implementation
 
 ## 🚀 Quick Start
 
@@ -51,92 +52,80 @@ cd your-project
 specter init
 ```
 
-This creates:
+This installs **6 Claude Code Skills**:
 ```
-.specter/
-  ├── config.toml
-  └── scripts/
-specs/
-changes/
-```
+.claude/skills/
+  ├── specter-proposal/
+  ├── specter-challenge/
+  ├── specter-reproposal/
+  ├── specter-implement/
+  ├── specter-verify/
+  └── specter-archive/
 
-### Implement AI Scripts
-
-Specter requires you to implement AI integration scripts in `.specter/scripts/`:
-
-1. `gemini-proposal.sh` - Call Gemini CLI to generate proposals
-2. `codex-challenge.sh` - Call Codex CLI to challenge proposals
-3. `gemini-reproposal.sh` - Call Gemini CLI to refine proposals
-4. `claude-implement.sh` - Call Claude Code to implement
-5. `codex-verify.sh` - Call Codex CLI to generate and run tests
-
-Example `gemini-proposal.sh`:
-```bash
-#!/bin/bash
-CHANGE_ID="$1"
-DESCRIPTION="$2"
-
-# Call gemini-cli with your prompt
-gemini /openspec:proposal "$CHANGE_ID" "$DESCRIPTION" \
-  --output-format stream-json \
-  --context "changes/$CHANGE_ID"
+.specter/              # Configuration
+specs/                 # Main specifications
+changes/               # Active changes
 ```
 
-## 📖 Workflow
+### Usage in Claude Code
 
-```bash
-# 1. Generate proposal (Gemini)
-specter proposal add-oauth "Add OAuth authentication"
+After `specter init`, you can use these skills directly in **Claude Code interactive mode**:
 
-# 2. Challenge the proposal (Codex)
-specter challenge add-oauth
+```
+You: /specter:proposal add-oauth "Add OAuth authentication"
 
-# 3. Refine based on feedback (Gemini, automatic)
-specter reproposal add-oauth
+Claude: 🤖 Generating proposal with Gemini (2M context)...
+        [Explores codebase, analyzes architecture...]
+        ✅ Proposal created: changes/add-oauth/
 
-# 4. Re-challenge to verify fixes (optional)
-specter challenge add-oauth
+        📄 Files generated:
+           • proposal.md - Why, what, impact
+           • tasks.md - Implementation checklist
+           • diagrams.md - 4 Mermaid diagrams
+           • specs/auth/spec.md - Requirements with WHEN/THEN scenarios
 
-# 5. Implement the proposal (Claude)
-specter implement add-oauth
+You: /specter:challenge add-oauth
 
-# 6. Verify with tests (Codex)
-specter verify add-oauth
+Claude: 🔍 Analyzing proposal with Codex...
+        [Compares with existing codebase...]
 
-# 7. Archive when complete
-specter archive add-oauth
+        📊 Found 2 HIGH severity issues:
+           🔴 Architecture conflict in tasks.md
+           🔴 Missing migration path
+
+        💡 Recommendation: Run /specter:reproposal to fix automatically
+
+You: /specter:reproposal add-oauth
+
+Claude: 🔄 Refining proposal based on feedback...
+        [Reads CHALLENGE.md, fixes issues...]
+        ✅ Proposal updated
+
+        ⏭️  Next: /specter:implement add-oauth
 ```
 
-## 🎨 Interactive UI Example
+## 📖 Complete Workflow
 
-```bash
-$ specter challenge add-oauth
+**All commands run in Claude Code** - no bash switching needed!
 
-🔍 Analyzing proposal with Codex...
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% (23s)
+```
+1. /specter:proposal <id> "<description>"
+   └─> Gemini explores codebase, generates proposal
 
-📊 Challenge Report Generated
+2. /specter:challenge <id>
+   └─> Codex analyzes against existing code
 
-📊 Summary:
-   🔴 High:    2 issues
-   🟡 Medium:  3 issues
-   🟢 Low:     1 issue
+3. /specter:reproposal <id>
+   └─> Gemini fixes issues automatically
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔴 HIGH SEVERITY ISSUE (first)
+4. /specter:implement <id>
+   └─> Claude (you!) implements the tasks
 
-Architecture Conflict in tasks.md:1.2
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. /specter:verify <id>
+   └─> Codex generates and runs tests
 
-⏭️  Next steps:
-   1. Review full report:
-      cat changes/add-oauth/CHALLENGE.md
-
-   2. Address issues automatically:
-      specter reproposal add-oauth
-
-   3. Or edit manually and re-challenge:
-      specter challenge add-oauth
+6. /specter:archive <id>
+   └─> Archive completed change
 ```
 
 ## 📁 Project Structure
