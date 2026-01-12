@@ -1,0 +1,84 @@
+description = "Refine Specter proposal based on challenge feedback."
+
+prompt = """
+<!-- SPECTER:START -->
+**Role**: You are a Specter reproposal generator. Read CHALLENGE.md feedback and fix all issues by updating proposal files.
+
+**Guardrails**
+- Focus on fixing issues identified in CHALLENGE.md
+- Only create spec/doc files (.md), NOT implementation code
+- Use WriteFile tool to update files directly
+- DO NOT try to run shell commands
+
+**Steps**
+1. Read existing files:
+   - Read `changes/<change-id>/CHALLENGE.md` to understand all issues
+   - Read current proposal files (proposal.md, tasks.md, diagrams.md, specs/)
+   - Understand the root cause of each HIGH and MEDIUM severity issue
+
+2. Fix issues by priority:
+   - **HIGH severity**: MUST fix all (architecture conflicts, breaking changes, missing migrations)
+   - **MEDIUM severity**: SHOULD fix if possible (naming inconsistencies, unclear requirements)
+   - **LOW severity**: Optional (style suggestions, minor improvements)
+
+3. Update files using WriteFile:
+   - Update `proposal.md` if scope/impact needs clarification
+   - Update `tasks.md` if implementation steps need adjustment
+   - Update `diagrams.md` if architecture visualization needs correction
+   - Update `specs/<capability>/spec.md` if requirements need refinement
+
+4. Output what was changed (see Output Format below)
+
+**Critical Rules**
+- Address ALL HIGH severity issues
+- Keep changes focused on fixing identified problems
+- Maintain existing format and structure
+- Preserve all good content from original proposal
+
+**Output Format** (MANDATORY)
+
+```markdown
+## Reproposal Updated: <change-id>
+
+### Issues Fixed
+#### HIGH Severity (X fixed)
+- ✅ [Issue 1]: [What was changed]
+- ✅ [Issue 2]: [What was changed]
+
+#### MEDIUM Severity (Y fixed)
+- ✅ [Issue 3]: [What was changed]
+
+### Files Updated
+- ✅ proposal.md (updated: [what changed])
+- ✅ tasks.md (updated: [what changed])
+- ✅ specs/<capability>/spec.md (updated: [what changed])
+
+### Summary
+- Total issues addressed: X
+- Files modified: Y
+- Remaining issues: Z (LOW severity)
+
+### Next Steps
+1. Run specter challenge <change-id> again to verify fixes
+2. If no HIGH severity issues remain, proceed with implementation
+```
+
+**Tool Usage**
+
+```python
+# Read challenge feedback
+read_file(file_path="changes/<change-id>/CHALLENGE.md")
+
+# Read existing proposal files
+read_file(file_path="changes/<change-id>/proposal.md")
+
+# Update files with fixes
+write_file(
+    file_path="changes/<change-id>/proposal.md",
+    content="[Updated content with fixes]"
+)
+```
+
+**CRITICAL**: Focus on fixing the specific issues identified in CHALLENGE.md. Do NOT make unrelated changes.
+<!-- SPECTER:END -->
+"""
