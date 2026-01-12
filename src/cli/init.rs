@@ -5,6 +5,10 @@ use std::path::Path;
 
 const SKILL_PROPOSAL: &str = include_str!("../../templates/skills/specter-proposal/SKILL.md");
 const SKILL_CHALLENGE: &str = include_str!("../../templates/skills/specter-challenge/SKILL.md");
+const SKILL_REPROPOSAL: &str = include_str!("../../templates/skills/specter-reproposal/SKILL.md");
+const SKILL_IMPLEMENT: &str = include_str!("../../templates/skills/specter-implement/SKILL.md");
+const SKILL_VERIFY: &str = include_str!("../../templates/skills/specter-verify/SKILL.md");
+const SKILL_ARCHIVE: &str = include_str!("../../templates/skills/specter-archive/SKILL.md");
 
 pub async fn run(name: Option<&str>) -> Result<()> {
     let project_root = env::current_dir()?;
@@ -85,65 +89,23 @@ pub async fn run(name: Option<&str>) -> Result<()> {
 }
 
 fn install_claude_skills(skills_dir: &Path) -> Result<()> {
-    // Install proposal skill
-    let proposal_dir = skills_dir.join("specter-proposal");
-    std::fs::create_dir_all(&proposal_dir)?;
-    std::fs::write(proposal_dir.join("SKILL.md"), SKILL_PROPOSAL)?;
-    println!("   ✓ specter-proposal");
+    let skills = vec![
+        ("proposal", SKILL_PROPOSAL),
+        ("challenge", SKILL_CHALLENGE),
+        ("reproposal", SKILL_REPROPOSAL),
+        ("implement", SKILL_IMPLEMENT),
+        ("verify", SKILL_VERIFY),
+        ("archive", SKILL_ARCHIVE),
+    ];
 
-    // Install challenge skill
-    let challenge_dir = skills_dir.join("specter-challenge");
-    std::fs::create_dir_all(&challenge_dir)?;
-    std::fs::write(challenge_dir.join("SKILL.md"), SKILL_CHALLENGE)?;
-    println!("   ✓ specter-challenge");
-
-    // Install other skills (placeholders for now)
-    for skill in &["reproposal", "implement", "verify", "archive"] {
-        let skill_dir = skills_dir.join(format!("specter-{}", skill));
+    for (name, content) in skills {
+        let skill_dir = skills_dir.join(format!("specter-{}", name));
         std::fs::create_dir_all(&skill_dir)?;
-        std::fs::write(
-            skill_dir.join("SKILL.md"),
-            generate_placeholder_skill(skill)
-        )?;
-        println!("   ✓ specter-{}", skill);
+        std::fs::write(skill_dir.join("SKILL.md"), content)?;
+        println!("   ✓ specter-{}", name);
     }
 
     Ok(())
-}
-
-fn generate_placeholder_skill(name: &str) -> String {
-    format!(r#"---
-name: specter-{}
-description: {} (Coming soon)
-user-invocable: true
----
-
-# /specter:{} - {}
-
-This skill is under development.
-
-## Usage
-
-```
-/specter:{} <change-id>
-```
-
-## Placeholder
-
-This skill will be implemented in the next version.
-For now, you can use the specter CLI tool directly:
-
-```bash
-specter {} <change-id>
-```
-"#,
-        name,
-        name.replace('-', " ").to_uppercase(),
-        name,
-        name.replace('-', " ").to_uppercase(),
-        name,
-        name
-    )
 }
 
 fn create_helper_scripts(scripts_dir: &Path) -> Result<()> {

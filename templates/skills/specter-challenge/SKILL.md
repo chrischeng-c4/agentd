@@ -1,90 +1,38 @@
 ---
 name: specter-challenge
-description: Challenge proposal with Codex code analysis
+description: Challenge proposal with Codex analysis
 user-invocable: true
 ---
 
-# /specter:challenge - Challenge Proposal
+# /specter:challenge
 
-Analyze proposal against existing codebase using Codex to identify potential issues, conflicts, and improvements.
+Analyze proposal against existing codebase.
 
 ## Usage
 
-```
-/specter:challenge <change-id>
-```
-
-**Example**:
-```
-/specter:challenge add-oauth
+```bash
+specter challenge <change-id>
 ```
 
-## What This Skill Does
-
-1. **Load Proposal** - Read proposal, tasks, and spec deltas
-2. **Analyze Code** - Use Codex to compare proposal with existing codebase
-3. **Identify Issues** - Find conflicts, inconsistencies, and improvements
-4. **Generate Report** - Create `CHALLENGE.md` with detailed findings
-5. **Display Summary** - Show issue count and severity
-
-## Steps
-
-### 1. Validate Change Exists
+## Example
 
 ```bash
-CHANGE_DIR="changes/$CHANGE_ID"
-if [ ! -d "$CHANGE_DIR" ]; then
-    echo "❌ Error: Change '$CHANGE_ID' not found"
-    echo "Run: /specter:proposal $CHANGE_ID \"description\""
-    exit 1
-fi
+specter challenge add-oauth
 ```
 
-### 2. Read Proposal Files
+## What it does
 
-```bash
-PROPOSAL="$CHANGE_DIR/proposal.md"
-TASKS="$CHANGE_DIR/tasks.md"
-SPECS="$CHANGE_DIR/specs"
-
-if [ ! -f "$CHANGE_DIR/proposal.md" ]; then
-    echo "❌ Error: proposal.md not found"
-    exit 1
-fi
-```
-
-### 3. Call Codex for Challenge Analysis
-
-**Option A: Using codex-cli**:
-```bash
-codex challenge \
-    --proposal "$CHANGE_DIR/proposal.md" \
-    --tasks "$CHANGE_DIR/tasks.md" \
-    --specs "$CHANGE_DIR/specs" \
-    --existing-code "src/" \
-    --output "$CHANGE_DIR/CHALLENGE.md"
-```
-
-**Option B: Use Claude (you!) to analyze**:
-
-As Claude, you should:
-1. Read the proposal files
-2. Analyze against existing codebase
-3. Identify issues:
+1. Reads proposal from `changes/<change-id>/`
+2. Calls Codex to analyze against existing code
+3. Generates `CHALLENGE.md` with:
+   - Issues found (HIGH/MEDIUM/LOW severity)
    - Architecture conflicts
    - Naming inconsistencies
    - Missing migration paths
-   - Potential bugs
-4. Generate CHALLENGE.md with issues and suggestions
+4. Shows summary
 
-## Recommendation
+## Next step
 
-Since you're using Claude Code interactively, I recommend:
+If issues found: `/specter:reproposal <change-id>` to fix automatically.
 
-**修改 `specter init` 來生成 Skills**，然後你就可以在 Claude Code 中使用：
-- `/specter:proposal`
-- `/specter:challenge`
-- `/specter:reproposal`
-- 等等
-
-讓我修改 `cli/init.rs` 來實現這個功能。要繼續嗎？
+If looks good: `/specter:implement <change-id>` to start implementation.
