@@ -121,6 +121,11 @@ impl Change {
         self.path(project_root).join("IMPLEMENTATION.md")
     }
 
+    /// Get path to REVIEW.md
+    pub fn review_path(&self, project_root: &Path) -> PathBuf {
+        self.path(project_root).join("REVIEW.md")
+    }
+
     /// Get path to VERIFICATION.md
     pub fn verification_path(&self, project_root: &Path) -> PathBuf {
         self.path(project_root).join("VERIFICATION.md")

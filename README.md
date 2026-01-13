@@ -1,49 +1,49 @@
-# Specter - Spec-driven Development Orchestrator 🎭
+# Specter
 
-**Specter** = **Spec** + Orches**ter** (Orchestrator)
+**Spec**-driven Development Orches**ter** (Orchestrator)
 
-A Rust-powered spec-driven development tool with **iterative proposal refinement** through AI orchestration.
+A Rust-based tool for spec-driven development with AI-assisted iterative proposal refinement.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 🎯 Core Concept
+## Overview
 
-**Specter installs Skills into Claude Code** so you can orchestrate multiple AI tools without leaving your interactive session:
+Specter orchestrates multiple AI tools to optimize cost and quality in software development:
 
-- 🤖 **Gemini** (2M context, low cost) - Code exploration & proposal generation
-- 🔍 **Codex** (code specialist) - Challenge proposals & generate tests
-- 🎨 **Claude** (you!) - Precise implementation and workflow orchestration
+- **Gemini** (2M context, cost-effective) - Codebase exploration and proposal generation
+- **Codex** (code-specialized) - Proposal review and test generation
+- **Claude** - Precise implementation
 
-## ✨ Key Innovations
+The tool integrates with Claude Code via Skills, enabling complete workflow management within interactive sessions.
 
-1. **Claude Code Skills** - Work entirely in Claude Code interactive mode, no bash switching
-2. **Challenge Phase** - AI automatically reviews proposals (Codex analyzes against existing code)
-3. **Iterative Refinement** - proposal → challenge → reproposal loop until satisfied
-4. **Automated Verification** - Codex generates tests from specs and verifies implementation
+## Key Features
 
-## 🚀 Quick Start
+- **Automated Challenge Phase**: AI reviews proposals against existing codebase before implementation
+- **Iterative Refinement**: Proposal → Challenge → Reproposal loop with session caching
+- **Conflict Resolution**: Automatic change-id conflict detection and resolution before LLM calls
+- **Cost Optimization**: 70-75% cost reduction compared to single-AI approaches
+- **Verification**: Automated test generation and validation
 
-### Installation
+## Installation
 
-**Option 1: Install from source (Recommended)**
+### From Source (Recommended)
 
 ```bash
-# Clone and install
 git clone https://github.com/your-repo/specter
 cd specter
 cargo install --path .
-
-# Verify installation
 specter --version
 ```
 
-**Option 2: One-line install script**
+### Quick Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/your-repo/specter/main/install.sh | sh
 ```
 
-📖 **[Complete installation guide](INSTALL.md)** - Including Docker, Rust setup, troubleshooting, etc.
+See [INSTALL.md](INSTALL.md) for detailed installation instructions.
+
+## Quick Start
 
 ### Initialize Project
 
@@ -52,162 +52,189 @@ cd your-project
 specter init
 ```
 
-This installs **6 Claude Code Skills**:
+This creates:
 ```
-.claude/skills/
-  ├── specter-proposal/
-  ├── specter-challenge/
-  ├── specter-reproposal/
-  ├── specter-implement/
-  ├── specter-verify/
-  └── specter-archive/
-
-.specter/              # Configuration
-specs/                 # Main specifications
-changes/               # Active changes
+.claude/skills/         # 6 Claude Code Skills
+specter/
+  ├── config.toml       # Configuration
+  ├── specs/            # Specifications
+  ├── changes/          # Active changes
+  └── scripts/          # AI integration
 ```
 
-### Usage in Claude Code
+### Basic Usage
 
-After `specter init`, you can use these skills directly in **Claude Code interactive mode**:
-
-```
-You: /specter:proposal add-oauth "Add OAuth authentication"
-
-Claude: 🤖 Generating proposal with Gemini (2M context)...
-        [Explores codebase, analyzes architecture...]
-        ✅ Proposal created: changes/add-oauth/
-
-        📄 Files generated:
-           • proposal.md - Why, what, impact
-           • tasks.md - Implementation checklist
-           • diagrams.md - 4 Mermaid diagrams
-           • specs/auth/spec.md - Requirements with WHEN/THEN scenarios
-
-You: /specter:challenge add-oauth
-
-Claude: 🔍 Analyzing proposal with Codex...
-        [Compares with existing codebase...]
-
-        📊 Found 2 HIGH severity issues:
-           🔴 Architecture conflict in tasks.md
-           🔴 Missing migration path
-
-        💡 Recommendation: Run /specter:reproposal to fix automatically
-
-You: /specter:reproposal add-oauth
-
-Claude: 🔄 Refining proposal based on feedback...
-        [Reads CHALLENGE.md, fixes issues...]
-        ✅ Proposal updated
-
-        ⏭️  Next: /specter:implement add-oauth
-```
-
-## 📖 Complete Workflow
-
-**All commands run in Claude Code** - no bash switching needed!
+Run commands directly in Claude Code:
 
 ```
-1. /specter:proposal <id> "<description>"
-   └─> Gemini explores codebase, generates proposal
-
-2. /specter:challenge <id>
-   └─> Codex analyzes against existing code
-
-3. /specter:reproposal <id>
-   └─> Gemini fixes issues automatically
-
-4. /specter:implement <id>
-   └─> Claude (you!) implements the tasks
-
-5. /specter:verify <id>
-   └─> Codex generates and runs tests
-
-6. /specter:archive <id>
-   └─> Archive completed change
+/specter:proposal add-oauth "Add OAuth authentication"
+/specter:challenge add-oauth
+/specter:reproposal add-oauth
+/specter:implement add-oauth
+/specter:verify add-oauth
+/specter:archive add-oauth
 ```
 
-## 📁 Project Structure
+Or via CLI:
+
+```bash
+specter proposal add-oauth "Add OAuth authentication"
+specter challenge add-oauth
+specter reproposal add-oauth
+```
+
+## Workflow
+
+### 1. Proposal Generation
+```bash
+specter proposal <change-id> "<description>"
+```
+- Gemini explores codebase with 2M context window
+- Generates proposal.md, tasks.md, diagrams.md, and spec deltas
+- Intelligent conflict resolution for duplicate change-ids
+
+### 2. Challenge Phase
+```bash
+specter challenge <change-id>
+```
+- Codex analyzes proposal against existing code
+- Identifies internal inconsistencies (HIGH priority)
+- Notes code alignment issues (MEDIUM/LOW priority)
+- Generates CHALLENGE.md with severity-tagged issues
+
+### 3. Reproposal (Optional)
+```bash
+specter reproposal <change-id>
+```
+- Automatically fixes issues identified in challenge
+- One automatic iteration with session resumption
+- 41% token savings via cached context
+
+### 4. Implementation
+```bash
+specter implement <change-id>
+```
+- Claude implements tasks from refined proposal
+- Records progress in IMPLEMENTATION.md
+
+### 5. Verification
+```bash
+specter verify <change-id>
+```
+- Codex generates tests from specifications
+- Runs tests and reports results in VERIFICATION.md
+
+### 6. Archive
+```bash
+specter archive <change-id>
+```
+- Archives completed change with timestamp
+
+## Project Structure
 
 ```
 project/
-├── .specter/
-│   ├── config.toml          # Specter configuration
-│   └── scripts/             # AI integration scripts
-├── specs/                   # Main specifications
-│   ├── auth/
-│   │   └── spec.md
-│   └── api/
-│       └── spec.md
-└── changes/                 # Change proposals
-    ├── add-oauth/
-    │   ├── proposal.md      # Gemini generated
-    │   ├── tasks.md         # Gemini generated
-    │   ├── diagrams.md      # Gemini generated
-    │   ├── specs/           # Spec deltas
-    │   ├── CHALLENGE.md     # Codex generated
-    │   ├── IMPLEMENTATION.md # Claude record
-    │   └── VERIFICATION.md  # Codex generated
-    └── archive/
+├── specter/
+│   ├── config.toml              # Configuration
+│   ├── specs/                   # Main specifications
+│   │   └── auth/spec.md
+│   ├── changes/                 # Active changes
+│   │   └── add-oauth/
+│   │       ├── proposal.md      # Why, what, impact
+│   │       ├── tasks.md         # Implementation checklist
+│   │       ├── diagrams.md      # Architecture diagrams
+│   │       ├── specs/           # Spec deltas
+│   │       ├── CHALLENGE.md     # Review feedback
+│   │       ├── IMPLEMENTATION.md # Implementation notes
+│   │       └── VERIFICATION.md  # Test results
+│   ├── archive/                 # Completed changes
+│   └── scripts/                 # AI integration scripts
+├── .claude/
+│   └── skills/                  # Claude Code Skills
+└── .gemini/
+    └── commands/specter/        # Gemini command definitions
 ```
 
-## 💡 Cost Comparison
-
-| Task | Pure Claude | Specter (Mixed) | Savings |
-|------|-------------|-----------------|---------|
-| Proposal generation (100+ files) | $$$$ | $ | 80% |
-| Code challenge/review | $$$ | $ | 75% |
-| Implementation | $$ | $$ | 0% |
-| Test generation | $$ | $ | 60% |
-| **Total** | **$15-20** | **$4-5** | **70-75%** |
-
-## 🔧 Commands
+## Commands
 
 ### Core Commands
 
-- `specter proposal <id> <description>` - Generate proposal with Gemini
-- `specter challenge <id>` - Challenge proposal with Codex
-- `specter reproposal <id>` - Refine proposal based on challenge
-- `specter implement <id>` - Implement with Claude
-- `specter verify <id>` - Generate tests and verify with Codex
-- `specter archive <id>` - Archive completed change
+| Command | Description |
+|---------|-------------|
+| `specter init` | Initialize Specter in current directory |
+| `specter proposal <id> "<desc>"` | Generate proposal with conflict resolution |
+| `specter challenge <id>` | Review proposal with Codex |
+| `specter reproposal <id>` | Auto-fix issues from challenge |
+| `specter implement <id>` | Implement changes |
+| `specter verify <id>` | Generate and run tests |
+| `specter archive <id>` | Archive completed change |
 
 ### Utility Commands
 
-- `specter init` - Initialize Specter in current directory
-- `specter list` - List all active changes
-- `specter list --archived` - List archived changes
-- `specter status <id>` - Show change status
-- `specter refine <id> <requirements>` - Manually add requirements
+| Command | Description |
+|---------|-------------|
+| `specter list` | List active changes |
+| `specter list --archived` | List archived changes |
+| `specter status <id>` | Show change status |
+| `specter fix <id>` | Fix verification failures |
 
-## 🏗️ Architecture
+## Cost Analysis
 
-Specter is built in Rust for:
-- ⚡ **Performance** - 10-20x faster than Node.js alternatives
-- 🔒 **Type Safety** - Compile-time guarantees
-- 📦 **Single Binary** - No runtime dependencies
-- 🎯 **Reliability** - Robust error handling
+Approximate costs for a typical feature (100+ file codebase):
 
-## 📚 Documentation
+| Phase | Pure Claude | Specter | Savings |
+|-------|-------------|---------|---------|
+| Proposal generation | High | Low | 80% |
+| Code review | High | Low | 75% |
+| Implementation | Medium | Medium | 0% |
+| Test generation | Medium | Low | 60% |
+| **Total** | **$15-20** | **$4-5** | **70-75%** |
 
-See [design document](/tmp/specter-design.md) for detailed architecture.
+## Technical Stack
 
-## 🤝 Contributing
+Built with Rust for:
+- Performance: 10-20x faster than Node.js alternatives
+- Type safety: Compile-time guarantees
+- Portability: Single binary, no runtime dependencies
+- Reliability: Robust error handling with anyhow/thiserror
 
-Contributions welcome! This is an open-source project.
+## Architecture
 
-## 📄 License
+Specter operates through three layers:
 
-MIT License
+1. **CLI Layer**: Command parsing and validation (clap)
+2. **Orchestration Layer**: Script execution and session management (tokio)
+3. **AI Integration Layer**:
+   - Gemini CLI with project-specific commands (.gemini/commands/)
+   - Codex CLI with user-space prompts (~/.codex/prompts/)
+   - Dynamic context generation per change (GEMINI.md, AGENTS.md)
+
+Key optimizations:
+- Session resumption for 41% token savings
+- Skeleton-based generation for 10-15% token savings
+- Change-id conflict resolution before LLM calls (zero token waste)
+
+## Requirements
+
+- Rust 1.70+ (for installation from source)
+- Gemini CLI (for proposal generation)
+- Codex CLI (for challenge and verification)
+- Claude Code (for interactive Skills workflow)
+
+## Documentation
+
+- [Installation Guide](INSTALL.md)
+- [Architecture Documentation](CLAUDE.md)
+- [Design Document](/tmp/specter-design.md)
+
+## Contributing
+
+Contributions are welcome. Please follow standard Rust conventions and include tests for new features.
+
+## License
+
+MIT License - see LICENSE file for details.
 
 ---
 
-**Built for cost-effective, high-quality spec-driven development**
-
-**Key Benefits:**
-- 🎯 Iterative proposal refinement through AI challenge
-- 💰 70-75% cost reduction vs pure Claude approach
-- 🤖 Best tool for each job (Gemini/Codex/Claude orchestration)
-- 📋 Automated testing and verification
-- 🚀 2M context window for large codebase exploration
+**Specter enables cost-effective, AI-assisted spec-driven development through intelligent orchestration and iterative refinement.**

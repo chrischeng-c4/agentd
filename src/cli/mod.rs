@@ -7,5 +7,6 @@ pub mod list;
 pub mod proposal;
 pub mod refine;
 pub mod reproposal;
+pub mod resolve_reviews;
+pub mod review;
 pub mod status;
-pub mod verify;

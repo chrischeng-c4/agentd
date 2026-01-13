@@ -45,7 +45,7 @@ enum Commands {
         requirements: String,
     },
 
-    /// Implement the proposal with Claude
+    /// Implement the proposal with Claude (includes automatic review loop)
     Implement {
         /// Change ID to implement
         change_id: String,
@@ -55,9 +55,15 @@ enum Commands {
         tasks: Option<String>,
     },
 
-    /// Verify implementation with Codex (generate and run tests)
-    Verify {
-        /// Change ID to verify
+    /// Review implementation with Codex (run tests and code review)
+    Review {
+        /// Change ID to review
+        change_id: String,
+    },
+
+    /// Resolve issues found during code review with Claude
+    ResolveReviews {
+        /// Change ID to resolve
         change_id: String,
     },
 
@@ -136,16 +142,18 @@ async fn main() -> Result<()> {
         }
 
         Commands::Implement { change_id, tasks } => {
-            println!("{}", format!("🎨 Implementing: {}", change_id).cyan());
+            // Implement command now includes automatic review loop
             specter::cli::implement::run(&change_id, tasks.as_deref()).await?;
         }
 
-        Commands::Verify { change_id } => {
-            println!(
-                "{}",
-                format!("🧪 Verifying implementation: {}", change_id).cyan()
-            );
-            specter::cli::verify::run(&change_id).await?;
+        Commands::Review { change_id } => {
+            println!("{}", format!("🔍 Reviewing: {}", change_id).cyan());
+            specter::cli::review::run(&change_id).await?;
+        }
+
+        Commands::ResolveReviews { change_id } => {
+            println!("{}", format!("🔧 Resolving reviews: {}", change_id).cyan());
+            specter::cli::resolve_reviews::run(&change_id).await?;
         }
 
         Commands::Fix { change_id } => {

@@ -299,44 +299,109 @@ EOF
 codex exec --full-auto "$PROMPT"
 "#;
 
-    let codex_verify = r#"#!/bin/bash
-# Codex verify script
-# Usage: ./codex-verify.sh <change-id>
+    let codex_review = r#"#!/bin/bash
+# Codex code review script with test execution and security scanning
+# Usage: ./codex-review.sh <change-id> <iteration>
 set -euo pipefail
 
 CHANGE_ID="$1"
+ITERATION="${2:-0}"
 
 # Get the project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-echo "🧪 Verifying implementation with Codex: $CHANGE_ID"
+echo "🔍 Reviewing code with Codex (Iteration $ITERATION): $CHANGE_ID"
 
-# Use change-specific AGENTS.md context (generated dynamically by specter CLI)
-# Note: Set CODEX_INSTRUCTIONS_FILE if your Codex CLI supports it
+# Step 1: Run tests
+echo "🧪 Running tests..."
+TEST_OUTPUT=$(cargo test 2>&1 || true)
+TEST_STATUS=$?
+
+# Step 2: Run security scans
+echo "🔒 Running security scans..."
+
+# Rust: cargo audit (if available)
+AUDIT_OUTPUT=""
+if command -v cargo-audit &> /dev/null; then
+    AUDIT_OUTPUT=$(cargo audit 2>&1 || true)
+fi
+
+# Universal: semgrep (if available)
+SEMGREP_OUTPUT=""
+if command -v semgrep &> /dev/null; then
+    SEMGREP_OUTPUT=$(semgrep --config=auto --json 2>&1 || true)
+fi
+
+# Clippy with security lints
+CLIPPY_OUTPUT=""
+CLIPPY_OUTPUT=$(cargo clippy -- -W clippy::all -W clippy::pedantic 2>&1 || true)
+
+# Step 3: Save outputs to temp files for Codex to read
+TEMP_DIR=$(mktemp -d)
+echo "$TEST_OUTPUT" > "$TEMP_DIR/test_output.txt"
+echo "$AUDIT_OUTPUT" > "$TEMP_DIR/audit_output.txt"
+echo "$SEMGREP_OUTPUT" > "$TEMP_DIR/semgrep_output.txt"
+echo "$CLIPPY_OUTPUT" > "$TEMP_DIR/clippy_output.txt"
+
+# Use change-specific AGENTS.md context
 export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/specter/changes/$CHANGE_ID/AGENTS.md"
 
 # Build prompt with context
 PROMPT=$(cat << EOF
-# Specter Verify Task
+# Specter Code Review Task (Iteration $ITERATION)
 
-Verify the implementation for specter/changes/${CHANGE_ID}/.
+Review the implementation for specter/changes/${CHANGE_ID}/.
+
+## Available Data
+- Test results: $TEMP_DIR/test_output.txt
+- Security audit: $TEMP_DIR/audit_output.txt
+- Semgrep scan: $TEMP_DIR/semgrep_output.txt
+- Clippy output: $TEMP_DIR/clippy_output.txt
 
 ## Instructions
-1. Read the specs in specter/changes/${CHANGE_ID}/specs/
-2. Check if the implementation meets all requirements
-3. Run existing tests or create new tests as needed
-4. Create specter/changes/${CHANGE_ID}/VERIFICATION.md with:
-   - Test results
-   - Spec compliance status
-   - VERIFIED or FAILED verdict
+1. Read proposal.md, tasks.md, specs/ to understand requirements
+2. Read implemented code (search for new/modified files)
+3. **Analyze test results** from test_output.txt:
+   - Parse test pass/fail status
+   - Identify failing tests and reasons
+   - Calculate coverage if available
+4. **Analyze security scan results**:
+   - Parse cargo audit for dependency vulnerabilities
+   - Parse semgrep for security patterns
+   - Parse clippy for code quality and security warnings
+5. Review code quality, best practices, and requirement compliance
+6. Fill specter/changes/${CHANGE_ID}/REVIEW.md with comprehensive findings
 
-Be thorough and test all requirements.
+## Review Focus
+1. **Test Results (HIGH)**: Are all tests passing? Coverage adequate?
+2. **Security (HIGH)**: Any vulnerabilities from tools? Security best practices?
+3. **Best Practices (HIGH)**: Performance, error handling, style
+4. **Requirement Compliance (HIGH)**: Does code match proposal/specs?
+5. **Consistency (MEDIUM)**: Does code follow existing patterns?
+6. **Test Quality (MEDIUM)**: Are tests comprehensive and well-written?
+
+## Severity Guidelines
+- **HIGH**: Failing tests, security vulnerabilities, missing features, wrong behavior
+- **MEDIUM**: Style inconsistencies, missing tests, minor improvements
+- **LOW**: Suggestions, nice-to-haves
+
+## Verdict Guidelines
+- **APPROVED**: All tests pass, no HIGH issues (LOW/MEDIUM issues acceptable)
+- **NEEDS_CHANGES**: Some tests fail or HIGH/MEDIUM issues exist (fixable)
+- **MAJOR_ISSUES**: Many failing tests or critical security issues
+
+Be thorough but fair. Include iteration number in REVIEW.md.
 EOF
 )
 
 # Run non-interactively with full auto mode
 codex exec --full-auto "$PROMPT"
+
+# Cleanup temp files
+rm -rf "$TEMP_DIR"
+
+echo "✅ Review complete (Iteration $ITERATION)"
 "#;
 
     // Create codex-rechallenge.sh for session resumption
@@ -392,21 +457,89 @@ codex resume --last "$PROMPT"
     std::fs::write(scripts_dir.join("gemini-reproposal.sh"), gemini_reproposal)?;
     std::fs::write(scripts_dir.join("codex-challenge.sh"), codex_challenge)?;
     std::fs::write(scripts_dir.join("codex-rechallenge.sh"), codex_rechallenge)?;
-    std::fs::write(scripts_dir.join("codex-verify.sh"), codex_verify)?;
+    std::fs::write(scripts_dir.join("codex-review.sh"), codex_review)?;
 
-    // Placeholder for claude-implement.sh (not updated yet)
+    // Updated claude-implement.sh with emphasis on test writing
     let claude_implement = r#"#!/bin/bash
-# Claude implement script
+# Claude implement script - writes code AND tests
 # Usage: ./claude-implement.sh <change-id>
 
 CHANGE_ID="$1"
+TASKS="${2:-}"
 
-echo "🎨 Implementing: $CHANGE_ID"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+echo "🎨 Implementing with Claude: $CHANGE_ID"
+
+PROMPT=$(cat << EOF
+# Specter Implement Task
+
+Implement the proposal for specter/changes/${CHANGE_ID}/.
+
+## Instructions
+1. Read proposal.md, tasks.md, diagrams.md, and specs/
+2. Implement ALL tasks in tasks.md (or only ${TASKS} if specified)
+3. **Write tests for all implemented features** (unit + integration)
+   - Test all spec scenarios (WHEN/THEN cases)
+   - Include edge cases and error handling
+   - Use existing test framework patterns
+4. Update IMPLEMENTATION.md with progress notes
+
+## Code Quality
+- Follow existing code style and patterns
+- Add proper error handling
+- Include documentation comments where needed
+
+**IMPORTANT**: Write comprehensive tests. Tests are as important as the code itself.
+EOF
+)
+
+# This is a placeholder - actual implementation happens via Claude Code Skills
+# When called from CLI, Claude IDE will handle the implementation
 echo "⚠️  This script is a placeholder - implementation happens via Claude Code Skills"
 "#;
     std::fs::write(scripts_dir.join("claude-implement.sh"), claude_implement)?;
 
-    // Placeholder for claude-fix.sh (not updated yet)
+    // claude-resolve.sh for fixing review issues
+    let claude_resolve = r#"#!/bin/bash
+# Claude resolve script - fixes issues from code review
+# Usage: ./claude-resolve.sh <change-id>
+
+CHANGE_ID="$1"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+echo "🔧 Resolving review issues with Claude: $CHANGE_ID"
+
+PROMPT=$(cat << EOF
+# Specter Resolve Reviews Task
+
+Fix issues identified in code review for specter/changes/${CHANGE_ID}/.
+
+## Instructions
+1. Read REVIEW.md to understand all issues
+2. Fix ALL HIGH and MEDIUM severity issues:
+   - Failing tests
+   - Security vulnerabilities
+   - Missing features
+   - Wrong behavior
+   - Style inconsistencies
+   - Missing tests
+3. Update code, tests, and documentation as needed
+4. Update IMPLEMENTATION.md with resolution notes
+
+Focus on HIGH severity issues first, then MEDIUM.
+EOF
+)
+
+# This is a placeholder - actual resolution happens via Claude Code Skills
+echo "⚠️  This script is a placeholder - resolution happens via Claude Code Skills"
+"#;
+    std::fs::write(scripts_dir.join("claude-resolve.sh"), claude_resolve)?;
+
+    // Placeholder for claude-fix.sh (kept for backward compatibility)
     let claude_fix = r#"#!/bin/bash
 # Claude fix script
 # Usage: ./claude-fix.sh <change-id>
@@ -427,8 +560,9 @@ echo "⚠️  This script is a placeholder - fixing happens via Claude Code Skil
             "gemini-reproposal.sh",
             "codex-challenge.sh",
             "codex-rechallenge.sh",
-            "codex-verify.sh",
+            "codex-review.sh",
             "claude-implement.sh",
+            "claude-resolve.sh",
             "claude-fix.sh",
         ] {
             let path = scripts_dir.join(script);

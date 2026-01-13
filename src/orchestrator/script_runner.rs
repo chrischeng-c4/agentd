@@ -136,6 +136,22 @@ impl ScriptRunner {
         self.run_script("claude-implement.sh", &args, true).await
     }
 
+    /// Run Codex code review with iteration tracking
+    pub async fn run_codex_review(&self, change_id: &str, iteration: u32) -> Result<String> {
+        self.run_script(
+            "codex-review.sh",
+            &[change_id.to_string(), iteration.to_string()],
+            true,
+        )
+        .await
+    }
+
+    /// Run Claude resolve (fix issues from review)
+    pub async fn run_claude_resolve(&self, change_id: &str) -> Result<String> {
+        self.run_script("claude-resolve.sh", &[change_id.to_string()], true)
+            .await
+    }
+
     /// Run Codex verification
     pub async fn run_codex_verify(&self, change_id: &str) -> Result<String> {
         self.run_script("codex-verify.sh", &[change_id.to_string()], true)
