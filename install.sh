@@ -1,6 +1,6 @@
 #!/bin/bash
 # Specter installation script
-# Usage: curl -fsSL https://raw.githubusercontent.com/your-repo/specter/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/your-repo/agentd/main/install.sh | sh
 
 set -e
 
@@ -63,7 +63,7 @@ fi
 echo ""
 
 # Clone or update Specter repository
-SPECTER_DIR="$HOME/.specter-install"
+SPECTER_DIR="$HOME/.agentd-install"
 
 if [ -d "$SPECTER_DIR" ]; then
     echo -e "${CYAN}Updating existing Specter repository...${NC}"
@@ -71,7 +71,7 @@ if [ -d "$SPECTER_DIR" ]; then
     git pull
 else
     echo -e "${CYAN}Cloning Specter repository...${NC}"
-    git clone https://github.com/your-repo/specter.git "$SPECTER_DIR"
+    git clone https://github.com/your-repo/agentd.git "$SPECTER_DIR"
     cd "$SPECTER_DIR"
 fi
 echo ""
@@ -91,7 +91,7 @@ else
 fi
 
 # Verify installation
-INSTALL_PATH="$HOME/.cargo/bin/specter"
+INSTALL_PATH="$HOME/.cargo/bin/agentd"
 if [ -f "$INSTALL_PATH" ]; then
     echo ""
     echo -e "${GREEN}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NC}"
@@ -106,8 +106,8 @@ if [ -f "$INSTALL_PATH" ]; then
         echo -e "${GREEN}✓ $HOME/.cargo/bin is in your PATH${NC}"
         echo ""
         echo "You can now run:"
-        echo -e "  ${CYAN}specter --version${NC}"
-        echo -e "  ${CYAN}specter --help${NC}"
+        echo -e "  ${CYAN}agentd --version${NC}"
+        echo -e "  ${CYAN}agentd --help${NC}"
     else
         echo -e "${YELLOW}⚠ $HOME/.cargo/bin is NOT in your PATH${NC}"
         echo ""
@@ -120,9 +120,9 @@ if [ -f "$INSTALL_PATH" ]; then
 
     echo ""
     echo "Next steps:"
-    echo -e "  1. Initialize a project:  ${CYAN}specter init${NC}"
-    echo -e "  2. Configure AI scripts:  ${CYAN}cp $SPECTER_DIR/examples/scripts/* .specter/scripts/${NC}"
-    echo -e "  3. Read the docs:         ${CYAN}https://github.com/your-repo/specter${NC}"
+    echo -e "  1. Initialize a project:  ${CYAN}agentd init${NC}"
+    echo -e "  2. Configure AI scripts:  ${CYAN}cp $SPECTER_DIR/examples/scripts/* .agentd/scripts/${NC}"
+    echo -e "  3. Read the docs:         ${CYAN}https://github.com/your-repo/agentd${NC}"
     echo ""
 else
     echo -e "${RED}✗ Installation verification failed${NC}"

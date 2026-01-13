@@ -1,4 +1,4 @@
-// Specter - Spec-driven Development Orchestrator
+// Agentd - Spec-driven Development Orchestrator
 // A Rust-powered tool for iterative proposal refinement through AI orchestration
 
 pub mod cli;

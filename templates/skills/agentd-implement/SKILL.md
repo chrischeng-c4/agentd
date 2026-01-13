@@ -1,27 +1,27 @@
 ---
-name: specter-implement
+name: agentd-implement
 description: Implement tasks from proposal
 user-invocable: true
 ---
 
-# /specter:implement
+# /agentd:implement
 
 Implement the approved proposal.
 
 ## Usage
 
 ```bash
-specter implement <change-id> [--tasks=1.1,1.2]
+agentd implement <change-id> [--tasks=1.1,1.2]
 ```
 
 ## Example
 
 ```bash
 # Implement all tasks
-specter implement add-oauth
+agentd implement add-oauth
 
 # Implement specific tasks only
-specter implement add-oauth --tasks=1.1,1.2,2.1
+agentd implement add-oauth --tasks=1.1,1.2,2.1
 ```
 
 ## What it does
@@ -33,4 +33,4 @@ specter implement add-oauth --tasks=1.1,1.2,2.1
 
 ## Next step
 
-Run `/specter:verify <change-id>` to generate and run tests.
+Run `/agentd:verify <change-id>` to generate and run tests.

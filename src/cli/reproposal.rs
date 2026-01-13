@@ -1,6 +1,6 @@
 use crate::orchestrator::ScriptRunner;
 use crate::{
-    models::{Change, SpecterConfig},
+    models::{Change, AgentdConfig},
     Result,
 };
 use colored::Colorize;
@@ -10,7 +10,7 @@ pub struct ReproposalCommand;
 
 pub async fn run(change_id: &str) -> Result<()> {
     let project_root = env::current_dir()?;
-    let config = SpecterConfig::load(&project_root)?;
+    let config = AgentdConfig::load(&project_root)?;
 
     // Check if change and challenge exist
     let change = Change::new(change_id, "");
@@ -18,14 +18,14 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     if !challenge_path.exists() {
         anyhow::bail!(
-            "No challenge found for '{}'. Run 'specter challenge {}' first.",
+            "No challenge found for '{}'. Run 'agentd challenge {}' first.",
             change_id,
             change_id
         );
     }
 
     // Generate GEMINI.md context for this change
-    let change_dir = project_root.join("specter/changes").join(change_id);
+    let change_dir = project_root.join("agentd/changes").join(change_id);
     crate::context::generate_gemini_context(&change_dir)?;
 
     println!(
@@ -39,8 +39,8 @@ pub async fn run(change_id: &str) -> Result<()> {
     println!("\n{}", "✅ Proposal updated!".green().bold());
     println!("\n{}", "⏭️  Next steps:".yellow());
     println!("   1. Review the updated proposal");
-    println!("   2. Re-challenge: specter challenge {}", change_id);
-    println!("   3. Or proceed: specter implement {}", change_id);
+    println!("   2. Re-challenge: agentd challenge {}", change_id);
+    println!("   3. Or proceed: agentd implement {}", change_id);
 
     Ok(())
 }

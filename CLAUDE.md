@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Specter is a Rust-powered spec-driven development orchestrator that installs **Claude Code Skills** for AI-assisted iterative proposal refinement. It orchestrates multiple AI tools (Gemini, Codex, Claude) through a workflow of proposal generation, challenge/review, and implementation.
+Agentd is a Rust-powered spec-driven development orchestrator that installs **Claude Code Skills** for AI-assisted iterative proposal refinement. It orchestrates multiple AI tools (Gemini, Codex, Claude) through a workflow of proposal generation, challenge/review, and implementation.
 
 **Core Workflow**: proposal → challenge → reproposal → implement → verify → archive
 
@@ -19,7 +19,7 @@ cargo build
 cargo build --release
 
 # Run without installing
-./target/release/specter --version
+./target/release/agentd --version
 ```
 
 ### Installation
@@ -28,7 +28,7 @@ cargo build --release
 cargo install --path .
 
 # Verify installation
-specter --version
+agentd --version
 ```
 
 ### Testing
@@ -64,9 +64,9 @@ cargo fmt -- --check
 ### Running Commands Locally
 ```bash
 # After building, test commands directly
-./target/release/specter init
-./target/release/specter proposal test-change "Test description"
-./target/release/specter list
+./target/release/agentd init
+./target/release/agentd proposal test-change "Test description"
+./target/release/agentd list
 ```
 
 ## Architecture
@@ -76,7 +76,7 @@ cargo fmt -- --check
 - **`src/main.rs`**: CLI entry point with clap command parsing
 - **`src/lib.rs`**: Public API re-exports
 - **`src/models/`**: Data structures
-  - `change.rs`: Core `Change` type, `ChangePhase` enum, `SpecterConfig`
+  - `change.rs`: Core `Change` type, `ChangePhase` enum, `AgentdConfig`
   - `requirement.rs`: Requirements and deltas
   - `scenario.rs`: Test scenarios
   - `challenge.rs`: Challenge issues and severity
@@ -100,16 +100,16 @@ cargo fmt -- --check
 - `IMPLEMENTATION.md`: Implementation notes (Claude)
 - `VERIFICATION.md`: Test results (Codex)
 
-**SpecterConfig**: Project configuration in `specter/config.toml`:
+**AgentdConfig**: Project configuration in `agentd/config.toml`:
 - AI CLI commands (gemini, codex, claude)
 - Scripts directory path
 - Project metadata
 
-**ScriptRunner**: Executes shell scripts in `specter/scripts/` that integrate with AI tools. Scripts receive change_id and other args, return structured output.
+**ScriptRunner**: Executes shell scripts in `agentd/scripts/` that integrate with AI tools. Scripts receive change_id and other args, return structured output.
 
 ### Directory Layout
 ```
-specter/                # Main Specter directory (visible)
+agentd/                # Main Agentd directory (visible)
   config.toml           # Configuration
   specs/                # Main specifications
     auth/spec.md
@@ -132,38 +132,38 @@ specter/                # Main Specter directory (visible)
     claude-implement.sh
 
 .gemini/                # Gemini Commands (project-specific, hidden)
-  commands/specter/
+  commands/agentd/
     proposal.toml       # Proposal generation prompt
     reproposal.toml     # Reproposal refinement prompt
   settings.json         # Tools and auto-approvals
 
 ~/.codex/               # Codex Prompts (user-space, global)
   prompts/
-    specter-challenge.md  # Code review prompt
-    specter-verify.md     # Test generation prompt
+    agentd-challenge.md  # Code review prompt
+    agentd-verify.md     # Test generation prompt
 
 .claude/skills/         # Claude Code Skills (installed by init, hidden)
-  specter-proposal/
-  specter-challenge/
-  specter-reproposal/
-  specter-implement/
-  specter-verify/
-  specter-archive/
+  agentd-proposal/
+  agentd-challenge/
+  agentd-reproposal/
+  agentd-implement/
+  agentd-verify/
+  agentd-archive/
 ```
 
 ## AI CLI Commands Integration
 
-Specter provides **pre-defined AI commands** for Gemini and Codex, enabling direct CLI usage and simplified scripts.
+Agentd provides **pre-defined AI commands** for Gemini and Codex, enabling direct CLI usage and simplified scripts.
 
-### Gemini Commands (`.gemini/commands/specter/`)
+### Gemini Commands (`.gemini/commands/agentd/`)
 Project-specific commands defined in TOML format:
 - `proposal.toml` - Generate proposal with 2M context, explore codebase, create spec files
 - `reproposal.toml` - Refine proposal based on CHALLENGE.md feedback
 
 ### Codex Prompts (`~/.codex/prompts/`)
 User-space prompts defined in Markdown format:
-- `specter-challenge.md` - Analyze proposal, identify conflicts and issues
-- `specter-verify.md` - Generate tests from specs, run verification
+- `agentd-challenge.md` - Analyze proposal, identify conflicts and issues
+- `agentd-verify.md` - Generate tests from specs, run verification
 
 ### Settings
 - `.gemini/settings.json` - Allowed tools (write_file, read_file, etc.) and auto-approvals
@@ -171,39 +171,39 @@ User-space prompts defined in Markdown format:
 ### Usage Patterns
 
 ```bash
-# Direct CLI usage (independent of Specter)
-gemini specter:proposal test-change "Add new feature"    # project-specific
-codex specter-challenge test-change                      # user-space
+# Direct CLI usage (independent of Agentd)
+gemini agentd:proposal test-change "Add new feature"    # project-specific
+codex agentd-challenge test-change                      # user-space
 
-# Via Specter CLI (calls the scripts)
-specter proposal test-change "Add new feature"
-specter challenge test-change
+# Via Agentd CLI (calls the scripts)
+agentd proposal test-change "Add new feature"
+agentd challenge test-change
 
 # Via Claude Code Skills (orchestrated workflow)
-/specter:proposal test-change "Add new feature"
-/specter:challenge test-change
+/agentd:proposal test-change "Add new feature"
+/agentd:challenge test-change
 ```
 
 ### Architecture Flow
 
 **Gemini (project-specific)**:
-1. **Claude Code Skill** → calls Specter CLI
-2. **Specter CLI** → executes `specter/scripts/gemini-proposal.sh`
-3. **Script** → calls `gemini specter:proposal`
-4. **Gemini CLI** → reads `.gemini/commands/specter/proposal.toml` and executes
+1. **Claude Code Skill** → calls Agentd CLI
+2. **Agentd CLI** → executes `agentd/scripts/gemini-proposal.sh`
+3. **Script** → calls `gemini agentd:proposal`
+4. **Gemini CLI** → reads `.gemini/commands/agentd/proposal.toml` and executes
 
 **Codex (user-space)**:
-1. **Claude Code Skill** → calls Specter CLI
-2. **Specter CLI** → executes `specter/scripts/codex-challenge.sh`
-3. **Script** → calls `codex specter-challenge`
-4. **Codex CLI** → reads `~/.codex/prompts/specter-challenge.md` and executes
+1. **Claude Code Skill** → calls Agentd CLI
+2. **Agentd CLI** → executes `agentd/scripts/codex-challenge.sh`
+3. **Script** → calls `codex agentd-challenge`
+4. **Codex CLI** → reads `~/.codex/prompts/agentd-challenge.md` and executes
 
 ## Claude Code Skills Integration
 
-Specter **installs Skills into Claude Code** via `specter init`. Skills are markdown files in `.claude/skills/specter-*/SKILL.md` that define prompts for Claude Code to execute workflow steps.
+Agentd **installs Skills into Claude Code** via `agentd init`. Skills are markdown files in `.claude/skills/agentd-*/SKILL.md` that define prompts for Claude Code to execute workflow steps.
 
-When users run `/specter:proposal` in Claude Code, the skill's prompt instructs Claude to:
-1. Call `specter proposal <id> "<description>"`
+When users run `/agentd:proposal` in Claude Code, the skill's prompt instructs Claude to:
+1. Call `agentd proposal <id> "<description>"`
 2. Parse the output
 3. Display results to the user
 
@@ -235,7 +235,7 @@ async fn main() -> Result<()> {
 Uses `clap` derive macros for command-line parsing:
 ```rust
 #[derive(Parser)]
-#[command(name = "specter")]
+#[command(name = "agentd")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

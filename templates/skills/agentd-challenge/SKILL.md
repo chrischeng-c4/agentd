@@ -1,23 +1,23 @@
 ---
-name: specter-challenge
+name: agentd-challenge
 description: Challenge proposal with Codex analysis
 user-invocable: true
 ---
 
-# /specter:challenge
+# /agentd:challenge
 
 Analyze proposal against existing codebase.
 
 ## Usage
 
 ```bash
-specter challenge <change-id>
+agentd challenge <change-id>
 ```
 
 ## Example
 
 ```bash
-specter challenge add-oauth
+agentd challenge add-oauth
 ```
 
 ## What it does
@@ -33,6 +33,6 @@ specter challenge add-oauth
 
 ## Next step
 
-If issues found: `/specter:reproposal <change-id>` to fix automatically.
+If issues found: `/agentd:reproposal <change-id>` to fix automatically.
 
-If looks good: `/specter:implement <change-id>` to start implementation.
+If looks good: `/agentd:implement <change-id>` to start implementation.

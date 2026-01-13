@@ -1,5 +1,5 @@
 use crate::models::{
-    decide_merging_strategy, ArchiveReviewVerdict, DeltaMetrics, MergingStrategy, SpecterConfig,
+    decide_merging_strategy, ArchiveReviewVerdict, DeltaMetrics, MergingStrategy, AgentdConfig,
     ValidationRules,
 };
 use crate::orchestrator::ScriptRunner;
@@ -15,14 +15,14 @@ pub struct ArchiveCommand;
 
 pub async fn run(change_id: &str) -> Result<()> {
     let project_root = env::current_dir()?;
-    let config = SpecterConfig::load(&project_root)?;
+    let config = AgentdConfig::load(&project_root)?;
 
-    println!("{}", "📦 Specter Archive Workflow".cyan().bold());
+    println!("{}", "📦 Agentd Archive Workflow".cyan().bold());
     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
     println!();
 
-    let specter_dir = project_root.join("specter");
-    let change_dir = specter_dir.join("changes").join(change_id);
+    let agentd_dir = project_root.join("agentd");
+    let change_dir = agentd_dir.join("changes").join(change_id);
     if !change_dir.exists() {
         anyhow::bail!("Change '{}' not found", change_id);
     }
@@ -60,7 +60,7 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     for spec_file in &spec_files {
         let relative_path = spec_file.strip_prefix(&specs_dir)?;
-        let main_spec_path = specter_dir.join("specs").join(relative_path);
+        let main_spec_path = agentd_dir.join("specs").join(relative_path);
 
         let metrics = compute_delta_metrics(&main_spec_path, spec_file)?;
         let decision = decide_merging_strategy(&metrics);
@@ -100,7 +100,7 @@ pub async fn run(change_id: &str) -> Result<()> {
         .await?;
 
         println!(
-            "   {} Merged to specter/specs/{}",
+            "   {} Merged to agentd/specs/{}",
             "✅".green(),
             relative_path.display()
         );
@@ -151,7 +151,7 @@ pub async fn run(change_id: &str) -> Result<()> {
             restore_original_specs(&project_root)?;
 
             println!();
-            println!("Fix issues and re-run: specter archive {}", change_id);
+            println!("Fix issues and re-run: agentd archive {}", change_id);
             return Ok(());
         }
         ArchiveReviewVerdict::Unknown => {
@@ -166,7 +166,7 @@ pub async fn run(change_id: &str) -> Result<()> {
             restore_original_specs(&project_root)?;
 
             println!();
-            println!("Check review report and re-run: specter archive {}", change_id);
+            println!("Check review report and re-run: agentd archive {}", change_id);
             return Ok(());
         }
     }
@@ -187,9 +187,9 @@ pub async fn run(change_id: &str) -> Result<()> {
     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
     println!("{}", "✨ Archive complete!".green().bold());
     println!();
-    println!("   Main specs: specter/specs/");
+    println!("   Main specs: agentd/specs/");
     println!("   Archive: {}", archive_path.display());
-    println!("   CHANGELOG: specter/specs/CHANGELOG.md");
+    println!("   CHANGELOG: agentd/specs/CHANGELOG.md");
 
     Ok(())
 }
@@ -317,7 +317,7 @@ async fn merge_spec_with_gemini(
     change_id: &str,
     strategy: &MergingStrategy,
     spec_file: &str,
-    config: &SpecterConfig,
+    config: &AgentdConfig,
 ) -> Result<()> {
     let script_runner = ScriptRunner::new(config.scripts_dir.clone());
 
@@ -332,14 +332,14 @@ async fn merge_spec_with_gemini(
 async fn generate_changelog_entry(
     change_id: &str,
     project_root: &Path,
-    config: &SpecterConfig,
+    config: &AgentdConfig,
 ) -> Result<()> {
     let script_runner = ScriptRunner::new(config.scripts_dir.clone());
 
     script_runner.run_gemini_changelog(change_id).await?;
 
     // Verify CHANGELOG was updated
-    let changelog_path = project_root.join("specter/specs/CHANGELOG.md");
+    let changelog_path = project_root.join("agentd/specs/CHANGELOG.md");
     if !changelog_path.exists() {
         println!("   ⚠️  CHANGELOG.md not found, creating...");
         std::fs::create_dir_all(changelog_path.parent().unwrap())?;
@@ -357,9 +357,9 @@ async fn generate_changelog_entry(
 
 /// Move change to archive directory
 fn move_to_archive(change_id: &str, timestamp: &str, project_root: &Path) -> Result<PathBuf> {
-    let specter_dir = project_root.join("specter");
-    let change_dir = specter_dir.join("changes").join(change_id);
-    let archive_dir = specter_dir
+    let agentd_dir = project_root.join("agentd");
+    let change_dir = agentd_dir.join("changes").join(change_id);
+    let archive_dir = agentd_dir
         .join("archive")
         .join(format!("{}-{}", timestamp, change_id));
 
@@ -376,8 +376,8 @@ fn move_to_archive(change_id: &str, timestamp: &str, project_root: &Path) -> Res
 
 /// Back up current main specs before merging
 fn backup_original_specs(project_root: &Path) -> Result<PathBuf> {
-    let specs_dir = project_root.join("specter/specs");
-    let backup_dir = project_root.join(".specter-backup");
+    let specs_dir = project_root.join("agentd/specs");
+    let backup_dir = project_root.join(".agentd-backup");
 
     if backup_dir.exists() {
         std::fs::remove_dir_all(&backup_dir)?;
@@ -391,8 +391,8 @@ fn backup_original_specs(project_root: &Path) -> Result<PathBuf> {
 
 /// Restore specs from backup if review fails
 fn restore_original_specs(project_root: &Path) -> Result<()> {
-    let specs_dir = project_root.join("specter/specs");
-    let backup_dir = project_root.join(".specter-backup");
+    let specs_dir = project_root.join("agentd/specs");
+    let backup_dir = project_root.join(".agentd-backup");
 
     if !backup_dir.exists() {
         anyhow::bail!("No backup found to restore");
@@ -413,7 +413,7 @@ fn restore_original_specs(project_root: &Path) -> Result<()> {
 
 /// Clean up backup after successful archive
 fn cleanup_backup(project_root: &Path) -> Result<()> {
-    let backup_dir = project_root.join(".specter-backup");
+    let backup_dir = project_root.join(".agentd-backup");
     if backup_dir.exists() {
         std::fs::remove_dir_all(&backup_dir)?;
     }

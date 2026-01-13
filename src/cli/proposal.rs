@@ -1,4 +1,4 @@
-use crate::models::{Change, ChangePhase, ChallengeVerdict, SpecterConfig};
+use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig};
 use crate::orchestrator::ScriptRunner;
 use crate::parser::parse_challenge_verdict;
 use crate::Result;
@@ -11,11 +11,11 @@ pub struct ProposalCommand;
 /// Main entry point for the proposal workflow with automatic challenge-reproposal loop
 pub async fn run(change_id: &str, description: &str) -> Result<()> {
     let project_root = env::current_dir()?;
-    let config = SpecterConfig::load(&project_root)?;
+    let config = AgentdConfig::load(&project_root)?;
 
     println!(
         "{}",
-        "🎭 Specter Proposal Workflow".cyan().bold()
+        "🎭 Agentd Proposal Workflow".cyan().bold()
     );
     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
     println!();
@@ -31,10 +31,10 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
             println!();
             println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
             println!("{}", "✨ Proposal completed and approved!".green().bold());
-            println!("   Location: specter/changes/{}", resolved_change_id);
+            println!("   Location: agentd/changes/{}", resolved_change_id);
             println!();
             println!("{}", "⏭️  Next steps:".yellow());
-            println!("   specter implement {}", resolved_change_id);
+            println!("   agentd implement {}", resolved_change_id);
             return Ok(());
         }
         ChallengeVerdict::NeedsRevision => {
@@ -55,10 +55,10 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
                     println!();
                     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
                     println!("{}", "✨ Fixed and approved!".green().bold());
-                    println!("   Location: specter/changes/{}", resolved_change_id);
+                    println!("   Location: agentd/changes/{}", resolved_change_id);
                     println!();
                     println!("{}", "⏭️  Next steps:".yellow());
-                    println!("   specter implement {}", resolved_change_id);
+                    println!("   agentd implement {}", resolved_change_id);
                     Ok(())
                 }
                 ChallengeVerdict::NeedsRevision => {
@@ -86,7 +86,7 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
                         "{}",
                         "⚠️  Could not parse challenge verdict".yellow()
                     );
-                    println!("   Please review: specter/changes/{}/CHALLENGE.md", resolved_change_id);
+                    println!("   Please review: agentd/changes/{}/CHALLENGE.md", resolved_change_id);
                     Ok(())
                 }
             }
@@ -105,7 +105,7 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
                 "{}",
                 "⚠️  Could not parse challenge verdict".yellow()
             );
-            println!("   Please review: specter/changes/{}/CHALLENGE.md", resolved_change_id);
+            println!("   Please review: agentd/changes/{}/CHALLENGE.md", resolved_change_id);
             Ok(())
         }
     }
@@ -117,12 +117,12 @@ async fn run_proposal_step(
     change_id: &str,
     description: &str,
     project_root: &PathBuf,
-    config: &SpecterConfig,
+    config: &AgentdConfig,
 ) -> Result<String> {
     println!("{}", "🤖 [1/4] Generating proposal with Gemini...".cyan());
 
     // Create change directory
-    let changes_dir = project_root.join("specter/changes");
+    let changes_dir = project_root.join("agentd/changes");
     std::fs::create_dir_all(&changes_dir)?;
 
     // Resolve change-id conflicts before calling LLMs
@@ -168,12 +168,12 @@ async fn run_proposal_step(
 async fn run_challenge_step(
     change_id: &str,
     project_root: &PathBuf,
-    config: &SpecterConfig,
+    config: &AgentdConfig,
 ) -> Result<ChallengeVerdict> {
     println!();
     println!("{}", "🔍 [2/4] Challenging proposal with Codex...".cyan());
 
-    let change_dir = project_root.join("specter/changes").join(change_id);
+    let change_dir = project_root.join("agentd/changes").join(change_id);
 
     // Create Change object and validate
     let change = Change::new(change_id, "");
@@ -209,12 +209,12 @@ async fn run_challenge_step(
 async fn run_rechallenge_step(
     change_id: &str,
     project_root: &PathBuf,
-    config: &SpecterConfig,
+    config: &AgentdConfig,
 ) -> Result<ChallengeVerdict> {
     println!();
     println!("{}", "🔍 [4/4] Re-challenging with Codex (cached session)...".cyan());
 
-    let change_dir = project_root.join("specter/changes").join(change_id);
+    let change_dir = project_root.join("agentd/changes").join(change_id);
 
     // Create Change object and validate
     let change = Change::new(change_id, "");
@@ -250,12 +250,12 @@ async fn run_rechallenge_step(
 async fn run_reproposal_step(
     change_id: &str,
     project_root: &PathBuf,
-    config: &SpecterConfig,
+    config: &AgentdConfig,
 ) -> Result<()> {
     println!();
     println!("{}", "🔄 [3/4] Auto-fixing with Gemini reproposal...".cyan());
 
-    let change_dir = project_root.join("specter/changes").join(change_id);
+    let change_dir = project_root.join("agentd/changes").join(change_id);
 
     // Regenerate GEMINI.md context
     crate::context::generate_gemini_context(&change_dir)?;
@@ -314,7 +314,7 @@ fn display_challenge_summary(content: &str, verdict: &ChallengeVerdict) {
 /// Display remaining issues after auto-fix failed
 fn display_remaining_issues(change_id: &str, project_root: &PathBuf) -> Result<()> {
     let challenge_path = project_root
-        .join("specter/changes")
+        .join("agentd/changes")
         .join(change_id)
         .join("CHALLENGE.md");
 
@@ -348,12 +348,12 @@ fn display_remaining_issues(change_id: &str, project_root: &PathBuf) -> Result<(
     }
 
     println!("   Please manually review and edit:");
-    println!("     specter/changes/{}/proposal.md", change_id);
-    println!("     specter/changes/{}/CHALLENGE.md (full report)", change_id);
+    println!("     agentd/changes/{}/proposal.md", change_id);
+    println!("     agentd/changes/{}/CHALLENGE.md (full report)", change_id);
     println!();
     println!("   Then run:");
-    println!("     specter challenge {}", change_id);
-    println!("     specter reproposal {}  (if needed)", change_id);
+    println!("     agentd challenge {}", change_id);
+    println!("     agentd reproposal {}  (if needed)", change_id);
 
     Ok(())
 }

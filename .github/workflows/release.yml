@@ -42,20 +42,20 @@ jobs:
       - name: Checkout Homebrew tap
         uses: actions/checkout@v4
         with:
-          repository: chrischeng-c4/homebrew-specter
+          repository: chrischeng-c4/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
 
       - name: Update formula
         run: |
-          cat > homebrew-tap/Formula/specter.rb << 'EOF'
-          class Specter < Formula
-            desc "Rust-powered spec-driven development tool with AI orchestration"
-            homepage "https://github.com/chrischeng-c4/specter"
-            url "https://github.com/chrischeng-c4/specter/archive/refs/tags/v${{ steps.version.outputs.VERSION }}.tar.gz"
+          cat > homebrew-tap/Formula/agentd.rb << 'EOF'
+          class Agentd < Formula
+            desc "AI agent orchestrator for spec-driven development"
+            homepage "https://github.com/chrischeng-c4/agentd"
+            url "https://github.com/chrischeng-c4/agentd/archive/refs/tags/v${{ steps.version.outputs.VERSION }}.tar.gz"
             sha256 "${{ steps.sha.outputs.SHA256 }}"
             license "MIT"
-            head "https://github.com/chrischeng-c4/specter.git", branch: "main"
+            head "https://github.com/chrischeng-c4/agentd.git", branch: "main"
 
             depends_on "rust" => :build
 
@@ -64,7 +64,7 @@ jobs:
             end
 
             test do
-              assert_match "specter #{version}", shell_output("#{bin}/specter --version")
+              assert_match "agentd #{version}", shell_output("#{bin}/agentd --version")
             end
           end
           EOF
@@ -74,6 +74,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/specter.rb
-          git commit -m "Update specter to v${{ steps.version.outputs.VERSION }}"
+          git add Formula/agentd.rb
+          git commit -m "Update agentd to v${{ steps.version.outputs.VERSION }}"
           git push

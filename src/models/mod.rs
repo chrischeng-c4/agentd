@@ -12,7 +12,7 @@ pub use archive_review::{
     ArchiveIssueCategory, ArchiveReview, ArchiveReviewIssue, ArchiveReviewVerdict,
 };
 pub use challenge::{Challenge, ChallengeIssue, ChallengeVerdict, IssueSeverity};
-pub use change::{Change, ChangePhase, SpecterConfig};
+pub use change::{Change, ChangePhase, AgentdConfig};
 pub use delta_metrics::{decide_merging_strategy, DeltaMetrics, MergingStrategy, StrategyDecision};
 pub use requirement::{Requirement, RequirementDelta};
 pub use review::{IssueCategory, ReviewIssue, ReviewVerdict};

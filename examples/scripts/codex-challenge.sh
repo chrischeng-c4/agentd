@@ -37,7 +37,7 @@ else
     # claude code analyze-proposal "$CHANGE_DIR" > "$CHANGE_DIR/CHALLENGE.md"
 
     echo "❌ Script not fully configured. Please edit:"
-    echo "   .specter/scripts/codex-challenge.sh"
+    echo "   .agentd/scripts/codex-challenge.sh"
     exit 1
 fi
 

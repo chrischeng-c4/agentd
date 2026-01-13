@@ -18,11 +18,11 @@ Thumbs.db
 .claude/settings.local.json
 
 # Specter generated
-.specter/cache/
+.agentd/cache/
 changes/*/IMPLEMENTATION.md
 changes/*/VERIFICATION.md
 changes/*/CHALLENGE.md
 
 # Dynamic AI context files (generated per change from templates)
-specter/changes/*/GEMINI.md
-specter/changes/*/AGENTS.md
+agentd/changes/*/GEMINI.md
+agentd/changes/*/AGENTS.md

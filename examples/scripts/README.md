@@ -6,12 +6,12 @@ These are example scripts showing how to integrate AI tools with Specter.
 
 1. Copy these scripts to your project:
    ```bash
-   cp examples/scripts/* .specter/scripts/
+   cp examples/scripts/* .agentd/scripts/
    ```
 
 2. Make them executable:
    ```bash
-   chmod +x .specter/scripts/*.sh
+   chmod +x .agentd/scripts/*.sh
    ```
 
 3. Customize for your AI tools:
@@ -109,10 +109,10 @@ source .env
 Test individual scripts:
 ```bash
 # Test proposal generation
-.specter/scripts/gemini-proposal.sh test-change "Test description"
+.agentd/scripts/gemini-proposal.sh test-change "Test description"
 
 # Test challenge
-.specter/scripts/codex-challenge.sh test-change
+.agentd/scripts/codex-challenge.sh test-change
 
 # Check output
 ls -la changes/test-change/

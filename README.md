@@ -1,4 +1,4 @@
-# Specter
+# Agentd
 
 **Spec**-driven Development Orches**ter** (Orchestrator)
 
@@ -13,16 +13,16 @@ Software development with Large Language Models (LLMs) often faces a trilemma of
 - Code-specialized models may lack broader architectural awareness.
 - Single-model workflows often drift from specifications.
 
-**Specter solves this by orchestrating the right tool for the right job:**
+**Agentd solves this by orchestrating the right tool for the right job:**
 - **Gemini CLI** (configurable, default: Gemini 1.5 Pro with 2M context): Deep codebase exploration and proposal generation. High context, low cost.
 - **Codex CLI** (configurable, default: GPT-4 or o1): Rigorous code review, testing, and quality gating. High precision for code analysis.
 - **Claude Code** (Claude 3.5 Sonnet): Interactive implementation with best-in-class coding capability.
 
 > **Note**: Model selection is configurable through external CLI tools. The defaults listed above represent recommended configurations for optimal cost/quality balance.
 
-## Why Specter?
+## Why Agentd?
 
-Specter is designed for developers who want the velocity of AI coding without sacrificing architectural integrity or incurring massive API costs.
+Agentd is designed for developers who want the velocity of AI coding without sacrificing architectural integrity or incurring massive API costs.
 
 - **💰 Cost Efficiency**: Reduces development costs by offloading context-heavy tasks to more efficient models.
 - **🛡️ Safety & Quality**: Introduces automated "Challenge" phases where an AI reviewer critiques the AI proposer *before* any code is written.
@@ -31,11 +31,11 @@ Specter is designed for developers who want the velocity of AI coding without sa
 
 ## Cost Analysis
 
-By specializing model usage, Specter can significantly reduce token costs compared to using a single high-end model for the entire workflow.
+By specializing model usage, Agentd can significantly reduce token costs compared to using a single high-end model for the entire workflow.
 
 > **Estimated savings** based on typical feature development in a 100+ file codebase. Actual costs vary based on codebase size, API pricing, and model selection.
 
-| Development Phase | Single-Model Approach | Specter Multi-Model | Estimated Savings |
+| Development Phase | Single-Model Approach | Agentd Multi-Model | Estimated Savings |
 |-------------------|----------------------|---------------------|-------------------|
 | **Proposal & Research** | High Cost (Deep context) | **Lower Cost** (Gemini) | ~70-80% |
 | **Code Review** | High Cost | **Lower Cost** (Codex) | ~60-75% |
@@ -57,21 +57,21 @@ By specializing model usage, Specter can significantly reduce token costs compar
 ### From Source (Recommended)
 
 ```bash
-git clone https://github.com/anthropics/specter
-cd specter
+git clone https://github.com/anthropics/agentd
+cd agentd
 cargo install --path .
-specter --version
+agentd --version
 ```
 
 ### Quick Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/anthropics/specter/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/anthropics/agentd/main/install.sh | sh
 ```
 
 ## Prerequisites
 
-Before using Specter, ensure you have:
+Before using Agentd, ensure you have:
 
 1. **AI CLI Tools** (choose based on your needs):
    - [Gemini CLI](https://github.com/google/generative-ai) for proposal generation
@@ -90,21 +90,21 @@ Before using Specter, ensure you have:
    - Code quality tools: `cargo clippy`, `cargo test`
    - Security: `cargo-audit`, `semgrep` (optional, for review scripts)
 
-> **Note**: Specter is language-agnostic but review scripts are currently optimized for Rust. Customize `specter/scripts/codex-review.sh` for other tech stacks.
+> **Note**: Agentd is language-agnostic but review scripts are currently optimized for Rust. Customize `agentd/scripts/codex-review.sh` for other tech stacks.
 
 ## Quick Start
 
 ### 1. Initialize Project
 ```bash
 cd your-project
-specter init
+agentd init
 ```
 
 ### 2. Basic Workflow
 
 ```bash
 # 1. Create a proposal (automatically runs challenge → reproposal loop)
-specter proposal add-oauth "Add OAuth authentication"
+agentd proposal add-oauth "Add OAuth authentication"
 # This single command:
 #   - Generates proposal with Gemini
 #   - Challenges it with Codex
@@ -112,18 +112,18 @@ specter proposal add-oauth "Add OAuth authentication"
 #   - Outputs a ready-to-implement plan
 
 # 2. Implement the feature (interactive with Claude Code)
-specter implement add-oauth
+agentd implement add-oauth
 # Requires Claude Code Skills - opens interactive session
 
 # 3. Review and test implementation
-specter review add-oauth
+agentd review add-oauth
 # Generates tests and runs code review with Codex
 
 # 4. Fix any issues found
-specter fix add-oauth  # (if review found issues)
+agentd fix add-oauth  # (if review found issues)
 
 # 5. Archive and merge to main specs
-specter archive add-oauth
+agentd archive add-oauth
 ```
 
 ### 3. Manual Steps (Advanced)
@@ -132,23 +132,23 @@ If you need more control, you can run individual phases:
 
 ```bash
 # Run challenge separately (if not using automatic loop)
-specter challenge add-oauth
+agentd challenge add-oauth
 
 # Manually trigger reproposal
-specter reproposal add-oauth
+agentd reproposal add-oauth
 
 # Refine with additional requirements
-specter refine add-oauth "Add support for GitHub OAuth"
+agentd refine add-oauth "Add support for GitHub OAuth"
 ```
 
 ## Detailed Workflow
 
-Specter follows a strict lifecycle to ensure quality.
+Agentd follows a strict lifecycle to ensure quality.
 
 ### 1. Proposal Generation (Automated Loop)
 **Primary Agent:** Gemini (configurable)
 
-When you run `specter proposal`, the system automatically:
+When you run `agentd proposal`, the system automatically:
 1. Generates initial proposal with full codebase context (up to 2M tokens)
 2. Creates `proposal.md`, `tasks.md`, `diagrams.md`, and spec deltas
 3. **Challenges** the proposal with Codex to find issues
@@ -178,9 +178,9 @@ When you run `specter proposal`, the system automatically:
 The archive command is a rigorous **7-step process**:
 1. **Validation**: Validates spec format and semantics using AST parsing (zero token cost)
 2. **Delta Analysis**: Computes metrics and decides merge strategy (zero token cost)
-3. **Backup**: Creates safety snapshot of `specter/specs/` before modification
+3. **Backup**: Creates safety snapshot of `agentd/specs/` before modification
 4. **Spec Merging**: Gemini merges spec deltas into main specs directory
-5. **Changelog Generation**: Gemini updates `specter/specs/CHANGELOG.md` automatically
+5. **Changelog Generation**: Gemini updates `agentd/specs/CHANGELOG.md` automatically
 6. **Quality Review**: Codex reviews merged specs and changelog for hallucinations or omissions
 7. **Archive/Rollback**: If approved, moves to `archive/`; if review fails, rolls back to backup
 
@@ -188,7 +188,7 @@ The archive command is a rigorous **7-step process**:
 
 ```
 project/
-├── specter/
+├── agentd/
 │   ├── config.toml              # Configuration
 │   ├── specs/                   # Source of Truth: Main specifications
 │   │   ├── CHANGELOG.md         # Auto-generated changelog
@@ -211,7 +211,7 @@ project/
 ├── .claude/
 │   └── skills/                  # Claude Code Skills (installed by init)
 └── .gemini/
-    └── commands/specter/        # Gemini command definitions
+    └── commands/agentd/        # Gemini command definitions
 ```
 
 ## Commands
@@ -220,27 +220,27 @@ project/
 
 | Command | Description |
 |---------|-------------|
-| `specter init` | Initialize Specter in current directory |
-| `specter proposal <id> "<desc>"` | Generate proposal (auto-runs challenge + reproposal) |
-| `specter challenge <id>` | Manually challenge a proposal with Codex |
-| `specter reproposal <id>` | Manually refine proposal based on challenge |
-| `specter refine <id> "<requirements>"` | Add requirements to existing proposal |
-| `specter implement <id>` | Implement changes (requires Claude Code) |
-| `specter review <id>` | Review implementation and generate tests |
-| `specter fix <id>` | Fix issues found during review |
-| `specter archive <id>` | Archive completed change (7-step quality gate) |
+| `agentd init` | Initialize Agentd in current directory |
+| `agentd proposal <id> "<desc>"` | Generate proposal (auto-runs challenge + reproposal) |
+| `agentd challenge <id>` | Manually challenge a proposal with Codex |
+| `agentd reproposal <id>` | Manually refine proposal based on challenge |
+| `agentd refine <id> "<requirements>"` | Add requirements to existing proposal |
+| `agentd implement <id>` | Implement changes (requires Claude Code) |
+| `agentd review <id>` | Review implementation and generate tests |
+| `agentd fix <id>` | Fix issues found during review |
+| `agentd archive <id>` | Archive completed change (7-step quality gate) |
 
 ### Utility Commands
 
 | Command | Description |
 |---------|-------------|
-| `specter list` | List active changes |
-| `specter list --archived` | List archived changes |
-| `specter status <id>` | Show detailed change status |
+| `agentd list` | List active changes |
+| `agentd list --archived` | List archived changes |
+| `agentd status <id>` | Show detailed change status |
 
 ## Architecture
 
-Specter operates through three layers:
+Agentd operates through three layers:
 
 1. **CLI Layer**: Rust-based command parsing and validation (clap)
 2. **Orchestration Layer**: Manages state, session resumption, and tool chaining (tokio)
@@ -267,14 +267,14 @@ Built with Rust for:
 
 - [Installation Guide](INSTALL.md) - Detailed installation instructions
 - [Architecture Documentation](CLAUDE.md) - Technical architecture and design
-- [Configuration](specter/config.toml.example) - Configuration options
+- [Configuration](agentd/config.toml.example) - Configuration options
 
 ## Contributing
 
 Contributions are welcome! Please follow standard Rust conventions. All new features should:
 1. Pass `cargo test`
 2. Pass `cargo clippy` with no warnings
-3. Follow the internal Specter workflow (Proposal → Implement → Review)
+3. Follow the internal Agentd workflow (Proposal → Implement → Review)
 
 ## License
 
@@ -282,4 +282,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Specter enables cost-effective, AI-assisted spec-driven development through intelligent orchestration and iterative refinement.**
+**Agentd enables cost-effective, AI-assisted spec-driven development through intelligent orchestration and iterative refinement.**

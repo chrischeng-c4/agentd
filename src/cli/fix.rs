@@ -1,6 +1,6 @@
 use crate::orchestrator::ScriptRunner;
 use crate::{
-    models::{Change, SpecterConfig},
+    models::{Change, AgentdConfig},
     Result,
 };
 use colored::Colorize;
@@ -8,7 +8,7 @@ use std::env;
 
 pub async fn run(change_id: &str) -> Result<()> {
     let project_root = env::current_dir()?;
-    let config = SpecterConfig::load(&project_root)?;
+    let config = AgentdConfig::load(&project_root)?;
 
     let change = Change::new(change_id, "");
     change.validate_structure(&project_root)?;
@@ -17,7 +17,7 @@ pub async fn run(change_id: &str) -> Result<()> {
     let verification_path = change.path(&project_root).join("VERIFICATION.md");
     if !verification_path.exists() {
         anyhow::bail!(
-            "No VERIFICATION.md found. Run 'specter verify {}' first.",
+            "No VERIFICATION.md found. Run 'agentd verify {}' first.",
             change_id
         );
     }
@@ -35,7 +35,7 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     println!("\n{}", "⏭️  Next steps:".yellow());
     println!("   1. Review the fixes");
-    println!("   2. Re-verify: specter verify {}", change_id);
+    println!("   2. Re-verify: agentd verify {}", change_id);
 
     Ok(())
 }

@@ -1,9 +1,9 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use specter::Result;
+use agentd::Result;
 
 #[derive(Parser)]
-#[command(name = "specter")]
+#[command(name = "agentd")]
 #[command(author = "Chris Cheng <chris.cheng@shopee.com>")]
 #[command(version = "0.1.0")]
 #[command(about = "Spec-driven Development Orchestrator", long_about = None)]
@@ -79,7 +79,7 @@ enum Commands {
         change_id: String,
     },
 
-    /// Initialize Specter in current directory
+    /// Initialize Agentd in current directory
     Init {
         /// Project name
         #[arg(short, long)]
@@ -117,7 +117,7 @@ async fn main() -> Result<()> {
                 "{}",
                 "🤖 Generating proposal with Gemini (2M context)...".cyan()
             );
-            specter::cli::proposal::run(&change_id, &description).await?;
+            agentd::cli::proposal::run(&change_id, &description).await?;
         }
 
         Commands::Challenge { change_id } => {
@@ -125,12 +125,12 @@ async fn main() -> Result<()> {
                 "{}",
                 format!("🔍 Challenging proposal: {}", change_id).cyan()
             );
-            specter::cli::challenge::run(&change_id).await?;
+            agentd::cli::challenge::run(&change_id).await?;
         }
 
         Commands::Reproposal { change_id } => {
             println!("{}", format!("🤖 Reproposing: {}", change_id).cyan());
-            specter::cli::reproposal::run(&change_id).await?;
+            agentd::cli::reproposal::run(&change_id).await?;
         }
 
         Commands::Refine {
@@ -138,45 +138,45 @@ async fn main() -> Result<()> {
             requirements,
         } => {
             println!("{}", format!("✨ Refining proposal: {}", change_id).cyan());
-            specter::cli::refine::run(&change_id, &requirements).await?;
+            agentd::cli::refine::run(&change_id, &requirements).await?;
         }
 
         Commands::Implement { change_id, tasks } => {
             // Implement command now includes automatic review loop
-            specter::cli::implement::run(&change_id, tasks.as_deref()).await?;
+            agentd::cli::implement::run(&change_id, tasks.as_deref()).await?;
         }
 
         Commands::Review { change_id } => {
             println!("{}", format!("🔍 Reviewing: {}", change_id).cyan());
-            specter::cli::review::run(&change_id).await?;
+            agentd::cli::review::run(&change_id).await?;
         }
 
         Commands::ResolveReviews { change_id } => {
             println!("{}", format!("🔧 Resolving reviews: {}", change_id).cyan());
-            specter::cli::resolve_reviews::run(&change_id).await?;
+            agentd::cli::resolve_reviews::run(&change_id).await?;
         }
 
         Commands::Fix { change_id } => {
             println!("{}", format!("🔧 Fixing issues: {}", change_id).cyan());
-            specter::cli::fix::run(&change_id).await?;
+            agentd::cli::fix::run(&change_id).await?;
         }
 
         Commands::Archive { change_id } => {
             println!("{}", format!("📦 Archiving: {}", change_id).cyan());
-            specter::cli::archive::run(&change_id).await?;
+            agentd::cli::archive::run(&change_id).await?;
         }
 
         Commands::Init { name } => {
-            println!("{}", "🚀 Initializing Specter...".cyan());
-            specter::cli::init::run(name.as_deref()).await?;
+            println!("{}", "🚀 Initializing Agentd...".cyan());
+            agentd::cli::init::run(name.as_deref()).await?;
         }
 
         Commands::Status { change_id, json } => {
-            specter::cli::status::run(&change_id, json).await?;
+            agentd::cli::status::run(&change_id, json).await?;
         }
 
         Commands::List { archived } => {
-            specter::cli::list::run(archived).await?;
+            agentd::cli::list::run(archived).await?;
         }
     }
 

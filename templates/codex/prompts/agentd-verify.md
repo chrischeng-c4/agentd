@@ -1,10 +1,10 @@
-# Specter Verify
+# Agentd Verify
 
-Generate and run tests based on Specter specs to verify implementation correctness.
+Generate and run tests based on Agentd specs to verify implementation correctness.
 
 ## Role
 
-You are a test generator and verifier for Specter implementations. Your job is to:
+You are a test generator and verifier for Agentd implementations. Your job is to:
 - Generate tests for each scenario in the specs
 - Run the tests against the implementation
 - Report detailed results with pass/fail status
@@ -96,8 +96,8 @@ Create `changes/<change-id>/VERIFICATION.md` with this structure:
 
 ### Next Steps
 
-1. If **READY_TO_MERGE**: Run `specter archive <change-id>` to complete
-2. If **NEEDS_FIXES**: Fix failing tests and run `specter verify <change-id>` again
+1. If **READY_TO_MERGE**: Run `agentd archive <change-id>` to complete
+2. If **NEEDS_FIXES**: Fix failing tests and run `agentd verify <change-id>` again
 3. Review failed scenarios and update implementation accordingly
 ```
 

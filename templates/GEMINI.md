@@ -1,15 +1,15 @@
-# Specter - Spec-Driven Development
+# Agentd - Spec-Driven Development
 
-You are assisting with a project that uses **Specter** for spec-driven development (SDD).
+You are assisting with a project that uses **Agentd** for spec-driven development (SDD).
 
 ## Directory Structure
 
 {{PROJECT_STRUCTURE}}
 
-### Specter Directory Layout
+### Agentd Directory Layout
 
 ```
-specter/
+agentd/
   config.toml       # Configuration
   specs/            # Main specifications (source of truth)
   changes/          # Active change proposals
@@ -25,7 +25,7 @@ specter/
 
 ## Workflow
 
-The Specter workflow follows this lifecycle:
+The Agentd workflow follows this lifecycle:
 
 1. **Proposal** - Generate proposal with specs, tasks, and diagrams
 2. **Challenge** - Review proposal for conflicts, issues, edge cases

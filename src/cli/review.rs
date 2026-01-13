@@ -1,7 +1,7 @@
 use crate::orchestrator::ScriptRunner;
 use crate::parser::parse_review_verdict;
 use crate::{
-    models::{Change, ReviewVerdict, SpecterConfig},
+    models::{Change, ReviewVerdict, AgentdConfig},
     Result,
 };
 use colored::Colorize;
@@ -13,13 +13,13 @@ pub async fn run(change_id: &str) -> Result<()> {
     let project_root = env::current_dir()?;
 
     // Load config
-    let config = SpecterConfig::load(&project_root)?;
+    let config = AgentdConfig::load(&project_root)?;
 
     // Check if change exists
-    let change_dir = project_root.join("specter/changes").join(change_id);
+    let change_dir = project_root.join("agentd/changes").join(change_id);
     if !change_dir.exists() {
         anyhow::bail!(
-            "Change '{}' not found. Run 'specter implement {}' first.",
+            "Change '{}' not found. Run 'agentd implement {}' first.",
             change_id,
             change_id
         );
@@ -60,15 +60,15 @@ pub async fn run(change_id: &str) -> Result<()> {
             ReviewVerdict::Approved => {
                 println!("   ✅ Implementation approved!");
                 println!("   Ready to archive:");
-                println!("      specter archive {}", change_id);
+                println!("      agentd archive {}", change_id);
             }
             ReviewVerdict::NeedsChanges => {
                 println!("   1. Review full report:");
                 println!("      cat {}", review_path.display());
                 println!("\n   2. Address issues automatically:");
-                println!("      specter resolve-reviews {}", change_id);
+                println!("      agentd resolve-reviews {}", change_id);
                 println!("\n   3. Or fix manually and re-review:");
-                println!("      specter review {}", change_id);
+                println!("      agentd review {}", change_id);
             }
             ReviewVerdict::MajorIssues => {
                 println!("   ⚠️  Major issues found");
@@ -76,7 +76,7 @@ pub async fn run(change_id: &str) -> Result<()> {
                 println!("      cat {}", review_path.display());
                 println!("\n   2. Fix critical issues manually");
                 println!("\n   3. Re-review when fixed:");
-                println!("      specter review {}", change_id);
+                println!("      agentd review {}", change_id);
             }
             ReviewVerdict::Unknown => {
                 println!("   ⚠️  Could not determine verdict");

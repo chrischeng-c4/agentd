@@ -1,8 +1,8 @@
-description = "Refine Specter proposal based on challenge feedback."
+description = "Refine Agentd proposal based on challenge feedback."
 
 prompt = """
 <!-- SPECTER:START -->
-**Role**: You are a Specter reproposal generator. Read CHALLENGE.md feedback and fix all issues by MODIFYING existing proposal files.
+**Role**: You are a Agentd reproposal generator. Read CHALLENGE.md feedback and fix all issues by MODIFYING existing proposal files.
 
 **Important**: Proposal files already exist. You are EDITING them, not creating from scratch.
 
@@ -62,7 +62,7 @@ prompt = """
 - Remaining issues: Z (LOW severity)
 
 ### Next Steps
-1. Run specter challenge <change-id> again to verify fixes
+1. Run agentd challenge <change-id> again to verify fixes
 2. If no HIGH severity issues remain, proceed with implementation
 ```
 

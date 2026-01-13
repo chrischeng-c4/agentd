@@ -1,6 +1,6 @@
 use crate::orchestrator::ScriptRunner;
 use crate::{
-    models::{Change, SpecterConfig},
+    models::{Change, AgentdConfig},
     Result,
 };
 use colored::Colorize;
@@ -12,13 +12,13 @@ pub async fn run(change_id: &str) -> Result<()> {
     let project_root = env::current_dir()?;
 
     // Load config
-    let config = SpecterConfig::load(&project_root)?;
+    let config = AgentdConfig::load(&project_root)?;
 
     // Check if change exists
-    let change_dir = project_root.join("specter/changes").join(change_id);
+    let change_dir = project_root.join("agentd/changes").join(change_id);
     if !change_dir.exists() {
         anyhow::bail!(
-            "Change '{}' not found. Run 'specter proposal {}' first.",
+            "Change '{}' not found. Run 'agentd proposal {}' first.",
             change_id,
             change_id
         );
@@ -59,9 +59,9 @@ pub async fn run(change_id: &str) -> Result<()> {
         println!("   1. Review full report:");
         println!("      cat {}", challenge_path.display());
         println!("\n   2. Address issues automatically:");
-        println!("      specter reproposal {}", change_id);
+        println!("      agentd reproposal {}", change_id);
         println!("\n   3. Or edit manually and re-challenge:");
-        println!("      specter challenge {}", change_id);
+        println!("      agentd challenge {}", change_id);
     } else {
         println!("\n{}", "⚠️  Warning: CHALLENGE.md not found".yellow());
         println!("   The Codex script may need adjustment.");

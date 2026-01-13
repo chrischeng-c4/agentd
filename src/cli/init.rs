@@ -1,26 +1,26 @@
-use crate::{models::SpecterConfig, Result};
+use crate::{models::AgentdConfig, Result};
 use colored::Colorize;
 use std::env;
 use std::path::{Path, PathBuf};
 
 // Claude Code Skills
-const SKILL_PROPOSAL: &str = include_str!("../../templates/skills/specter-proposal/SKILL.md");
-const SKILL_CHALLENGE: &str = include_str!("../../templates/skills/specter-challenge/SKILL.md");
-const SKILL_REPROPOSAL: &str = include_str!("../../templates/skills/specter-reproposal/SKILL.md");
-const SKILL_IMPLEMENT: &str = include_str!("../../templates/skills/specter-implement/SKILL.md");
-const SKILL_VERIFY: &str = include_str!("../../templates/skills/specter-verify/SKILL.md");
-const SKILL_FIX: &str = include_str!("../../templates/skills/specter-fix/SKILL.md");
-const SKILL_ARCHIVE: &str = include_str!("../../templates/skills/specter-archive/SKILL.md");
+const SKILL_PROPOSAL: &str = include_str!("../../templates/skills/agentd-proposal/SKILL.md");
+const SKILL_CHALLENGE: &str = include_str!("../../templates/skills/agentd-challenge/SKILL.md");
+const SKILL_REPROPOSAL: &str = include_str!("../../templates/skills/agentd-reproposal/SKILL.md");
+const SKILL_IMPLEMENT: &str = include_str!("../../templates/skills/agentd-implement/SKILL.md");
+const SKILL_VERIFY: &str = include_str!("../../templates/skills/agentd-verify/SKILL.md");
+const SKILL_FIX: &str = include_str!("../../templates/skills/agentd-fix/SKILL.md");
+const SKILL_ARCHIVE: &str = include_str!("../../templates/skills/agentd-archive/SKILL.md");
 
 // Gemini Commands
-const GEMINI_PROPOSAL: &str = include_str!("../../templates/gemini/commands/specter/proposal.toml");
+const GEMINI_PROPOSAL: &str = include_str!("../../templates/gemini/commands/agentd/proposal.toml");
 const GEMINI_REPROPOSAL: &str =
-    include_str!("../../templates/gemini/commands/specter/reproposal.toml");
+    include_str!("../../templates/gemini/commands/agentd/reproposal.toml");
 const GEMINI_SETTINGS: &str = include_str!("../../templates/gemini/settings.json");
 
 // Codex Prompts
-const CODEX_CHALLENGE: &str = include_str!("../../templates/codex/prompts/specter-challenge.md");
-const CODEX_VERIFY: &str = include_str!("../../templates/codex/prompts/specter-verify.md");
+const CODEX_CHALLENGE: &str = include_str!("../../templates/codex/prompts/agentd-challenge.md");
+const CODEX_VERIFY: &str = include_str!("../../templates/codex/prompts/agentd-verify.md");
 
 // AI Context Files (GEMINI.md and AGENTS.md) are now generated dynamically per change
 // from templates/GEMINI.md and templates/AGENTS.md
@@ -29,44 +29,44 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     let project_root = env::current_dir()?;
 
     // Check if already initialized
-    let specter_dir = project_root.join("specter");
+    let agentd_dir = project_root.join("agentd");
     let claude_dir = project_root.join(".claude");
 
-    if specter_dir.exists() {
-        println!("{}", "⚠️  Specter is already initialized".yellow());
+    if agentd_dir.exists() {
+        println!("{}", "⚠️  Agentd is already initialized".yellow());
         println!("   Run with --force to reinstall");
         return Ok(());
     }
 
     println!(
         "{}",
-        "🎭 Initializing Specter for Claude Code...".cyan().bold()
+        "🎭 Initializing Agentd for Claude Code...".cyan().bold()
     );
     println!();
 
     // Create directory structure
     println!("{}", "📁 Creating directory structure...".cyan());
-    std::fs::create_dir_all(&specter_dir)?;
-    std::fs::create_dir_all(specter_dir.join("specs"))?;
-    std::fs::create_dir_all(specter_dir.join("changes"))?;
-    std::fs::create_dir_all(specter_dir.join("archive"))?;
-    std::fs::create_dir_all(specter_dir.join("scripts"))?;
+    std::fs::create_dir_all(&agentd_dir)?;
+    std::fs::create_dir_all(agentd_dir.join("specs"))?;
+    std::fs::create_dir_all(agentd_dir.join("changes"))?;
+    std::fs::create_dir_all(agentd_dir.join("archive"))?;
+    std::fs::create_dir_all(agentd_dir.join("scripts"))?;
 
     // AI context files (GEMINI.md, AGENTS.md) are now generated dynamically
-    // per change in specter/changes/<change-id>/ by the CLI commands
+    // per change in agentd/changes/<change-id>/ by the CLI commands
 
     // Create Claude Code skills directory
     let skills_dir = claude_dir.join("skills");
     std::fs::create_dir_all(&skills_dir)?;
 
     // Create config
-    let mut config = SpecterConfig::default();
+    let mut config = AgentdConfig::default();
     if let Some(n) = name {
         config.project_name = n.to_string();
     } else if let Some(dir_name) = project_root.file_name() {
         config.project_name = dir_name.to_string_lossy().to_string();
     }
-    config.scripts_dir = specter_dir.join("scripts");
+    config.scripts_dir = agentd_dir.join("scripts");
     config.save(&project_root)?;
 
     // Install Claude Code Skills
@@ -77,7 +77,7 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     println!();
     println!("{}", "🤖 Installing Gemini Commands...".cyan());
     let gemini_dir = claude_dir.parent().unwrap().join(".gemini");
-    std::fs::create_dir_all(gemini_dir.join("commands/specter"))?;
+    std::fs::create_dir_all(gemini_dir.join("commands/agentd"))?;
     install_gemini_commands(&gemini_dir)?;
 
     // Install Codex Prompts (user-space)
@@ -90,32 +90,32 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     install_codex_prompts(&codex_prompts_dir)?;
 
     // Create helper scripts
-    create_helper_scripts(&specter_dir.join("scripts"))?;
+    create_helper_scripts(&agentd_dir.join("scripts"))?;
 
     println!();
-    println!("{}", "✅ Specter initialized successfully!".green().bold());
+    println!("{}", "✅ Agentd initialized successfully!".green().bold());
     println!();
     println!("{}", "📁 Structure:".cyan());
-    println!("   specter/                   - Main Specter directory");
-    println!("   specter/specs/             - Main specifications");
-    println!("   specter/changes/           - Active changes");
-    println!("   specter/archive/           - Completed changes");
+    println!("   agentd/                   - Main Agentd directory");
+    println!("   agentd/specs/             - Main specifications");
+    println!("   agentd/changes/           - Active changes");
+    println!("   agentd/archive/           - Completed changes");
     println!("   .claude/skills/            - 7 Skills installed");
-    println!("   .gemini/commands/specter/  - 2 Gemini commands");
+    println!("   .gemini/commands/agentd/  - 2 Gemini commands");
     println!("   ~/.codex/prompts/          - 2 Codex prompts");
     println!();
 
     println!("{}", "🤖 AI Commands Installed:".cyan().bold());
     println!(
         "   {} - Proposal generation",
-        "gemini specter:proposal".green()
+        "gemini agentd:proposal".green()
     );
     println!(
         "   {} - Proposal refinement",
-        "gemini specter:reproposal".green()
+        "gemini agentd:reproposal".green()
     );
-    println!("   {} - Code review", "codex specter-challenge".green());
-    println!("   {} - Test generation", "codex specter-verify".green());
+    println!("   {} - Code review", "codex agentd-challenge".green());
+    println!("   {} - Test generation", "codex agentd-verify".green());
     println!();
 
     println!(
@@ -124,25 +124,25 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     );
     println!(
         "   {} - Generate proposal with Gemini",
-        "/specter:proposal".green()
+        "/agentd:proposal".green()
     );
     println!(
         "   {} - Challenge proposal with Codex",
-        "/specter:challenge".green()
+        "/agentd:challenge".green()
     );
     println!(
         "   {} - Refine based on feedback",
-        "/specter:reproposal".green()
+        "/agentd:reproposal".green()
     );
     println!(
         "   {} - Implement with Claude",
-        "/specter:implement".green()
+        "/agentd:implement".green()
     );
-    println!("   {} - Verify with tests", "/specter:verify".green());
-    println!("   {} - Fix verification failures", "/specter:fix".green());
+    println!("   {} - Verify with tests", "/agentd:verify".green());
+    println!("   {} - Fix verification failures", "/agentd:fix".green());
     println!(
         "   {} - Archive completed change",
-        "/specter:archive".green()
+        "/agentd:archive".green()
     );
     println!();
 
@@ -150,14 +150,14 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     println!("   1. In Claude Code, run:");
     println!(
         "      {}",
-        "/specter:proposal my-feature \"Add awesome feature\"".cyan()
+        "/agentd:proposal my-feature \"Add awesome feature\"".cyan()
     );
     println!();
     println!("   2. Configure API keys (optional):");
-    println!("      Edit specter/scripts/config.sh");
+    println!("      Edit agentd/scripts/config.sh");
     println!();
     println!("   3. Read the guide:");
-    println!("      cat specter/README.md");
+    println!("      cat agentd/README.md");
 
     Ok(())
 }
@@ -174,10 +174,10 @@ fn install_claude_skills(skills_dir: &Path) -> Result<()> {
     ];
 
     for (name, content) in skills {
-        let skill_dir = skills_dir.join(format!("specter-{}", name));
+        let skill_dir = skills_dir.join(format!("agentd-{}", name));
         std::fs::create_dir_all(&skill_dir)?;
         std::fs::write(skill_dir.join("SKILL.md"), content)?;
-        println!("   ✓ specter-{}", name);
+        println!("   ✓ agentd-{}", name);
     }
 
     Ok(())
@@ -199,8 +199,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "🤖 Generating proposal with Gemini: $CHANGE_ID"
 
-# Use change-specific GEMINI.md context (generated dynamically by specter CLI)
-export GEMINI_SYSTEM_MD="$PROJECT_ROOT/specter/changes/$CHANGE_ID/GEMINI.md"
+# Use change-specific GEMINI.md context (generated dynamically by agentd CLI)
+export GEMINI_SYSTEM_MD="$PROJECT_ROOT/agentd/changes/$CHANGE_ID/GEMINI.md"
 
 # Build context for Gemini
 CONTEXT=$(cat << EOF
@@ -211,12 +211,12 @@ ${CHANGE_ID}
 ${DESCRIPTION}
 
 ## Instructions
-Create proposal files in specter/changes/${CHANGE_ID}/.
+Create proposal files in agentd/changes/${CHANGE_ID}/.
 EOF
 )
 
 # Call Gemini CLI with pre-defined command
-echo "$CONTEXT" | gemini specter:proposal --output-format stream-json
+echo "$CONTEXT" | gemini agentd:proposal --output-format stream-json
 "#;
 
     let gemini_reproposal = r#"#!/bin/bash
@@ -232,8 +232,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "🔄 Refining proposal with Gemini: $CHANGE_ID"
 
-# Use change-specific GEMINI.md context (generated dynamically by specter CLI)
-export GEMINI_SYSTEM_MD="$PROJECT_ROOT/specter/changes/$CHANGE_ID/GEMINI.md"
+# Use change-specific GEMINI.md context (generated dynamically by agentd CLI)
+export GEMINI_SYSTEM_MD="$PROJECT_ROOT/agentd/changes/$CHANGE_ID/GEMINI.md"
 
 # Build context for Gemini
 CONTEXT=$(cat << EOF
@@ -241,13 +241,13 @@ CONTEXT=$(cat << EOF
 ${CHANGE_ID}
 
 ## Instructions
-Read specter/changes/${CHANGE_ID}/CHALLENGE.md and fix all HIGH and MEDIUM severity issues.
+Read agentd/changes/${CHANGE_ID}/CHALLENGE.md and fix all HIGH and MEDIUM severity issues.
 EOF
 )
 
 # Call Gemini CLI with pre-defined command
 # Use --resume latest to reuse the proposal session (cached codebase context)
-echo "$CONTEXT" | gemini specter:reproposal --resume latest --output-format stream-json
+echo "$CONTEXT" | gemini agentd:reproposal --resume latest --output-format stream-json
 "#;
 
     let codex_challenge = r#"#!/bin/bash
@@ -263,20 +263,20 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "🔍 Analyzing proposal with Codex: $CHANGE_ID"
 
-# Use change-specific AGENTS.md context (generated dynamically by specter CLI)
+# Use change-specific AGENTS.md context (generated dynamically by agentd CLI)
 # Note: Set CODEX_INSTRUCTIONS_FILE if your Codex CLI supports it
-export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/specter/changes/$CHANGE_ID/AGENTS.md"
+export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/agentd/changes/$CHANGE_ID/AGENTS.md"
 
 # Build prompt with context
 PROMPT=$(cat << EOF
-# Specter Challenge Task
+# Agentd Challenge Task
 
-A skeleton CHALLENGE.md has been created at specter/changes/${CHANGE_ID}/CHALLENGE.md.
+A skeleton CHALLENGE.md has been created at agentd/changes/${CHANGE_ID}/CHALLENGE.md.
 
 ## Instructions
 1. Read the skeleton CHALLENGE.md to understand the structure
 
-2. Read all proposal files in specter/changes/${CHANGE_ID}/:
+2. Read all proposal files in agentd/changes/${CHANGE_ID}/:
    - proposal.md
    - tasks.md
    - diagrams.md
@@ -345,13 +345,13 @@ echo "$SEMGREP_OUTPUT" > "$TEMP_DIR/semgrep_output.txt"
 echo "$CLIPPY_OUTPUT" > "$TEMP_DIR/clippy_output.txt"
 
 # Use change-specific AGENTS.md context
-export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/specter/changes/$CHANGE_ID/AGENTS.md"
+export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/agentd/changes/$CHANGE_ID/AGENTS.md"
 
 # Build prompt with context
 PROMPT=$(cat << EOF
-# Specter Code Review Task (Iteration $ITERATION)
+# Agentd Code Review Task (Iteration $ITERATION)
 
-Review the implementation for specter/changes/${CHANGE_ID}/.
+Review the implementation for agentd/changes/${CHANGE_ID}/.
 
 ## Available Data
 - Test results: $TEMP_DIR/test_output.txt
@@ -371,7 +371,7 @@ Review the implementation for specter/changes/${CHANGE_ID}/.
    - Parse semgrep for security patterns
    - Parse clippy for code quality and security warnings
 5. Review code quality, best practices, and requirement compliance
-6. Fill specter/changes/${CHANGE_ID}/REVIEW.md with comprehensive findings
+6. Fill agentd/changes/${CHANGE_ID}/REVIEW.md with comprehensive findings
 
 ## Review Focus
 1. **Test Results (HIGH)**: Are all tests passing? Coverage adequate?
@@ -418,21 +418,21 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "🔍 Re-analyzing proposal with Codex (resuming session): $CHANGE_ID"
 
-# Use change-specific AGENTS.md context (generated dynamically by specter CLI)
+# Use change-specific AGENTS.md context (generated dynamically by agentd CLI)
 # Note: Set CODEX_INSTRUCTIONS_FILE if your Codex CLI supports it
-export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/specter/changes/$CHANGE_ID/AGENTS.md"
+export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/agentd/changes/$CHANGE_ID/AGENTS.md"
 
 # Build prompt with context
 PROMPT=$(cat << EOF
-# Specter Re-Challenge Task
+# Agentd Re-Challenge Task
 
-A skeleton CHALLENGE.md has been updated at specter/changes/${CHANGE_ID}/CHALLENGE.md.
+A skeleton CHALLENGE.md has been updated at agentd/changes/${CHANGE_ID}/CHALLENGE.md.
 The proposal has been revised based on previous feedback.
 
 ## Instructions
 1. Read the skeleton CHALLENGE.md to understand the structure
 
-2. Read the UPDATED proposal files in specter/changes/${CHANGE_ID}/:
+2. Read the UPDATED proposal files in agentd/changes/${CHANGE_ID}/:
    - proposal.md (revised)
    - tasks.md (revised)
    - diagrams.md (revised)
@@ -473,9 +473,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 echo "🎨 Implementing with Claude: $CHANGE_ID"
 
 PROMPT=$(cat << EOF
-# Specter Implement Task
+# Agentd Implement Task
 
-Implement the proposal for specter/changes/${CHANGE_ID}/.
+Implement the proposal for agentd/changes/${CHANGE_ID}/.
 
 ## Instructions
 1. Read proposal.md, tasks.md, diagrams.md, and specs/
@@ -514,9 +514,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 echo "🔧 Resolving review issues with Claude: $CHANGE_ID"
 
 PROMPT=$(cat << EOF
-# Specter Resolve Reviews Task
+# Agentd Resolve Reviews Task
 
-Fix issues identified in code review for specter/changes/${CHANGE_ID}/.
+Fix issues identified in code review for agentd/changes/${CHANGE_ID}/.
 
 ## Instructions
 1. Read REVIEW.md to understand all issues
@@ -568,13 +568,13 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 echo "🔄 Merging specs with Gemini: $SPEC_FILE ($STRATEGY)"
 
 # Use GEMINI.md context (generated by CLI)
-export GEMINI_INSTRUCTIONS_FILE="$PROJECT_ROOT/specter/changes/$CHANGE_ID/GEMINI.md"
+export GEMINI_INSTRUCTIONS_FILE="$PROJECT_ROOT/agentd/changes/$CHANGE_ID/GEMINI.md"
 
-DELTA_SPEC="$PROJECT_ROOT/specter/changes/$CHANGE_ID/specs/$SPEC_FILE"
-MAIN_SPEC="$PROJECT_ROOT/specter/specs/$SPEC_FILE"
+DELTA_SPEC="$PROJECT_ROOT/agentd/changes/$CHANGE_ID/specs/$SPEC_FILE"
+MAIN_SPEC="$PROJECT_ROOT/agentd/specs/$SPEC_FILE"
 
 PROMPT=$(cat << EOF
-# Specter Archive: Spec Merging Task
+# Agentd Archive: Spec Merging Task
 
 Merge spec deltas back to main specification using **${STRATEGY}** strategy.
 
@@ -582,8 +582,8 @@ Merge spec deltas back to main specification using **${STRATEGY}** strategy.
 - Change ID: ${CHANGE_ID}
 - Spec file: ${SPEC_FILE}
 - Strategy: ${STRATEGY}
-- Delta spec: specter/changes/${CHANGE_ID}/specs/${SPEC_FILE}
-- Main spec: specter/specs/${SPEC_FILE}
+- Delta spec: agentd/changes/${CHANGE_ID}/specs/${SPEC_FILE}
+- Main spec: agentd/specs/${SPEC_FILE}
 
 ## Your Task
 
@@ -597,7 +597,7 @@ Read both the delta spec and main spec (if it exists), then merge them according
 
 ## Output
 
-Write the merged spec to: specter/specs/${SPEC_FILE}
+Write the merged spec to: agentd/specs/${SPEC_FILE}
 
 Ensure the output follows the spec schema with:
 - Required headings: # Specification:, ## Overview, ## Requirements
@@ -607,7 +607,7 @@ Ensure the output follows the spec schema with:
 EOF
 )
 
-gemini specter:merge-specs --resume latest "$PROMPT"
+gemini agentd:merge-specs --resume latest "$PROMPT"
 "#;
     std::fs::write(scripts_dir.join("gemini-merge-specs.sh"), gemini_merge_specs)?;
 
@@ -626,16 +626,16 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 echo "📝 Generating CHANGELOG entry: $CHANGE_ID"
 
 PROMPT=$(cat << EOF
-# Specter Archive: CHANGELOG Generation
+# Agentd Archive: CHANGELOG Generation
 
 Generate a concise CHANGELOG entry for change: ${CHANGE_ID}
 
 ## Input Files
 
 Read these files to understand what changed:
-- specter/changes/${CHANGE_ID}/proposal.md
-- specter/changes/${CHANGE_ID}/tasks.md
-- specter/changes/${CHANGE_ID}/specs/ (all spec files)
+- agentd/changes/${CHANGE_ID}/proposal.md
+- agentd/changes/${CHANGE_ID}/tasks.md
+- agentd/changes/${CHANGE_ID}/specs/ (all spec files)
 
 ## Output Format
 
@@ -664,7 +664,7 @@ Added OAuth 2.0 support with Google and GitHub providers to enable social login.
 
 ## Output
 
-Prepend the entry to: specter/specs/CHANGELOG.md
+Prepend the entry to: agentd/specs/CHANGELOG.md
 
 If CHANGELOG.md doesn't exist, create it with:
 \`\`\`
@@ -677,7 +677,7 @@ All notable changes to this project's specifications will be documented in this 
 EOF
 )
 
-gemini specter:changelog "$PROMPT"
+gemini agentd:changelog "$PROMPT"
 "#;
     std::fs::write(scripts_dir.join("gemini-changelog.sh"), gemini_changelog)?;
 
@@ -697,7 +697,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 echo "🔍 Reviewing archive quality with Codex: $CHANGE_ID"
 
 # Create ARCHIVE_REVIEW.md skeleton
-REVIEW_PATH="$PROJECT_ROOT/specter/changes/$CHANGE_ID/ARCHIVE_REVIEW.md"
+REVIEW_PATH="$PROJECT_ROOT/agentd/changes/$CHANGE_ID/ARCHIVE_REVIEW.md"
 cat > "$REVIEW_PATH" << 'SKELETON'
 # Archive Quality Review
 
@@ -727,25 +727,25 @@ cat > "$REVIEW_PATH" << 'SKELETON'
 SKELETON
 
 PROMPT=$(cat << EOF
-# Specter Archive: Quality Review Task
+# Agentd Archive: Quality Review Task
 
 Review the merged specs and CHANGELOG before archiving change: ${CHANGE_ID}
 
 ## Context
 
 You need to verify that Gemini correctly merged the spec deltas:
-- **Delta specs**: specter/changes/${CHANGE_ID}/specs/ (original changes)
-- **Merged specs**: specter/specs/ (after Gemini merge)
+- **Delta specs**: agentd/changes/${CHANGE_ID}/specs/ (original changes)
+- **Merged specs**: agentd/specs/ (after Gemini merge)
 - **Strategy used**: ${STRATEGY}
-- **CHANGELOG**: specter/specs/CHANGELOG.md (latest entry should be for ${CHANGE_ID})
+- **CHANGELOG**: agentd/specs/CHANGELOG.md (latest entry should be for ${CHANGE_ID})
 
 ## Your Task
 
 ### 1. Compare Delta vs Merged Specs
 
 For each spec file in the delta:
-1. Read the delta spec: specter/changes/${CHANGE_ID}/specs/[file]
-2. Read the merged spec: specter/specs/[file]
+1. Read the delta spec: agentd/changes/${CHANGE_ID}/specs/[file]
+2. Read the merged spec: agentd/specs/[file]
 3. Verify ALL changes from delta are present in merged spec
 4. Check for hallucinations (content added by Gemini not in delta)
 5. Check for omissions (content missing that should be present)
@@ -775,7 +775,7 @@ Check the latest CHANGELOG entry:
 
 ### 5. Generate Report
 
-Update the file: specter/changes/${CHANGE_ID}/ARCHIVE_REVIEW.md
+Update the file: agentd/changes/${CHANGE_ID}/ARCHIVE_REVIEW.md
 
 Fill in all sections with your findings:
 
@@ -848,14 +848,14 @@ echo "✅ Review complete: $REVIEW_PATH"
 }
 
 fn install_gemini_commands(gemini_dir: &Path) -> Result<()> {
-    let commands_dir = gemini_dir.join("commands/specter");
+    let commands_dir = gemini_dir.join("commands/agentd");
 
     // Install command definitions
     std::fs::write(commands_dir.join("proposal.toml"), GEMINI_PROPOSAL)?;
     std::fs::write(commands_dir.join("reproposal.toml"), GEMINI_REPROPOSAL)?;
 
-    println!("   ✓ gemini specter:proposal");
-    println!("   ✓ gemini specter:reproposal");
+    println!("   ✓ gemini agentd:proposal");
+    println!("   ✓ gemini agentd:reproposal");
 
     // Install settings
     std::fs::write(gemini_dir.join("settings.json"), GEMINI_SETTINGS)?;
@@ -868,8 +868,8 @@ fn install_codex_prompts(prompts_dir: &Path) -> Result<()> {
     // Create directory if it doesn't exist
     std::fs::create_dir_all(prompts_dir)?;
 
-    let challenge_path = prompts_dir.join("specter-challenge.md");
-    let verify_path = prompts_dir.join("specter-verify.md");
+    let challenge_path = prompts_dir.join("agentd-challenge.md");
+    let verify_path = prompts_dir.join("agentd-verify.md");
 
     // Check if prompts already exist
     let challenge_exists = challenge_path.exists();
@@ -907,8 +907,8 @@ fn install_codex_prompts(prompts_dir: &Path) -> Result<()> {
     std::fs::write(&challenge_path, CODEX_CHALLENGE)?;
     std::fs::write(&verify_path, CODEX_VERIFY)?;
 
-    println!("   ✓ codex specter-challenge (installed to ~/.codex/prompts/)");
-    println!("   ✓ codex specter-verify (installed to ~/.codex/prompts/)");
+    println!("   ✓ codex agentd-challenge (installed to ~/.codex/prompts/)");
+    println!("   ✓ codex agentd-verify (installed to ~/.codex/prompts/)");
 
     Ok(())
 }

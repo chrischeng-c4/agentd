@@ -1,23 +1,23 @@
 ---
-name: specter-verify
+name: agentd-verify
 description: Generate and run tests
 user-invocable: true
 ---
 
-# /specter:verify
+# /agentd:verify
 
 Verify implementation with automated tests.
 
 ## Usage
 
 ```bash
-specter verify <change-id>
+agentd verify <change-id>
 ```
 
 ## Example
 
 ```bash
-specter verify add-oauth
+agentd verify add-oauth
 ```
 
 ## What it does
@@ -32,6 +32,6 @@ specter verify add-oauth
 
 ## Next step
 
-If tests pass: `/specter:archive <change-id>` to complete.
+If tests pass: `/agentd:archive <change-id>` to complete.
 
-If tests fail: Fix issues and run `/specter:verify` again.
+If tests fail: Fix issues and run `/agentd:verify` again.

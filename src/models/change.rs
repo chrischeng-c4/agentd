@@ -88,7 +88,7 @@ impl Change {
 
     /// Get the path to this change's directory
     pub fn path(&self, project_root: &Path) -> PathBuf {
-        project_root.join("specter/changes").join(&self.id)
+        project_root.join("agentd/changes").join(&self.id)
     }
 
     /// Get path to proposal.md
@@ -163,9 +163,9 @@ impl Change {
     }
 }
 
-/// Specter configuration
+/// Agentd configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpecterConfig {
+pub struct AgentdConfig {
     /// Project name
     pub project_name: String,
 
@@ -186,35 +186,35 @@ pub struct SpecterConfig {
     pub validation: ValidationRules,
 }
 
-impl Default for SpecterConfig {
+impl Default for AgentdConfig {
     fn default() -> Self {
         Self {
             project_name: "My Project".to_string(),
             gemini_command: "gemini".to_string(),
             claude_command: "claude".to_string(),
             codex_command: "codex".to_string(),
-            scripts_dir: PathBuf::from("specter/scripts"),
+            scripts_dir: PathBuf::from("agentd/scripts"),
             validation: ValidationRules::default(),
         }
     }
 }
 
-impl SpecterConfig {
-    /// Load config from specter/config.toml
+impl AgentdConfig {
+    /// Load config from agentd/config.toml
     pub fn load(project_root: &Path) -> anyhow::Result<Self> {
-        let config_path = project_root.join("specter/config.toml");
+        let config_path = project_root.join("agentd/config.toml");
         if !config_path.exists() {
             return Ok(Self::default());
         }
 
         let content = std::fs::read_to_string(&config_path)?;
-        let config: SpecterConfig = toml::from_str(&content)?;
+        let config: AgentdConfig = toml::from_str(&content)?;
         Ok(config)
     }
 
-    /// Save config to specter/config.toml
+    /// Save config to agentd/config.toml
     pub fn save(&self, project_root: &Path) -> anyhow::Result<()> {
-        let config_path = project_root.join("specter/config.toml");
+        let config_path = project_root.join("agentd/config.toml");
         std::fs::create_dir_all(config_path.parent().unwrap())?;
 
         let content = toml::to_string_pretty(self)?;

@@ -10,7 +10,7 @@ help:
 	@echo "Targets:"
 	@echo "  build      - Build debug binary"
 	@echo "  release    - Build optimized release binary"
-	@echo "  install    - Install specter to ~/.cargo/bin"
+	@echo "  install    - Install agentd to ~/.cargo/bin"
 	@echo "  dev        - Build and run in dev mode"
 	@echo "  test       - Run all tests"
 	@echo "  check      - Quick compile check"
@@ -18,7 +18,7 @@ help:
 	@echo "  lint       - Run clippy linter"
 	@echo "  clean      - Remove build artifacts"
 	@echo "  docs       - Generate documentation"
-	@echo "  run        - Run specter with args (make run ARGS='--help')"
+	@echo "  run        - Run agentd with args (make run ARGS='--help')"
 
 # Build debug binary
 build:
@@ -28,21 +28,21 @@ build:
 release:
 	cargo build --release
 	@echo ""
-	@echo "Release binary: target/release/specter"
-	@ls -lh target/release/specter
+	@echo "Release binary: target/release/agentd"
+	@ls -lh target/release/agentd
 
 # Install to system
 install:
 	cargo install --path . --force
 	@echo ""
-	@echo "Installed to: ~/.cargo/bin/specter"
-	@specter --version
+	@echo "Installed to: ~/.cargo/bin/agentd"
+	@agentd --version
 
 # Development mode (watch and rebuild)
 dev:
 	cargo watch -x 'build --release' -x 'test'
 
-# Run specter
+# Run agentd
 run:
 	cargo run -- $(ARGS)
 
@@ -82,8 +82,8 @@ build-all:
 # Run integration tests
 test-integration:
 	@echo "Running integration tests..."
-	cd test-project && ../target/release/specter init
-	cd test-project && ../target/release/specter list
+	cd test-project && ../target/release/agentd init
+	cd test-project && ../target/release/agentd list
 
 # Install dev dependencies
 setup-dev:

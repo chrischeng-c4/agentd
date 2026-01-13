@@ -1,6 +1,6 @@
 use crate::orchestrator::ScriptRunner;
 use crate::{
-    models::{Change, SpecterConfig},
+    models::{Change, AgentdConfig},
     Result,
 };
 use colored::Colorize;
@@ -10,7 +10,7 @@ pub struct ResolveReviewsCommand;
 
 pub async fn run(change_id: &str) -> Result<()> {
     let project_root = env::current_dir()?;
-    let config = SpecterConfig::load(&project_root)?;
+    let config = AgentdConfig::load(&project_root)?;
 
     // Check if change and review exist
     let change = Change::new(change_id, "");
@@ -18,7 +18,7 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     if !review_path.exists() {
         anyhow::bail!(
-            "No review found for '{}'. Run 'specter review {}' first.",
+            "No review found for '{}'. Run 'agentd review {}' first.",
             change_id,
             change_id
         );
@@ -35,7 +35,7 @@ pub async fn run(change_id: &str) -> Result<()> {
     println!("\n{}", "✅ Issues resolved!".green().bold());
     println!("\n{}", "⏭️  Next steps:".yellow());
     println!("   1. Review the changes made");
-    println!("   2. Re-review: specter review {}", change_id);
+    println!("   2. Re-review: agentd review {}", change_id);
     println!("   3. Or test manually and archive if ready");
 
     Ok(())

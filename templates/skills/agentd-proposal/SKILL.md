@@ -1,23 +1,23 @@
 ---
-name: specter-proposal
+name: agentd-proposal
 description: Generate proposal using Gemini (2M context)
 user-invocable: true
 ---
 
-# /specter:proposal
+# /agentd:proposal
 
 Generate spec-driven proposal.
 
 ## Usage
 
 ```bash
-specter proposal <change-id> "<description>"
+agentd proposal <change-id> "<description>"
 ```
 
 ## Example
 
 ```bash
-specter proposal add-oauth "Add OAuth authentication with Google and GitHub"
+agentd proposal add-oauth "Add OAuth authentication with Google and GitHub"
 ```
 
 ## What it does
@@ -32,4 +32,4 @@ specter proposal add-oauth "Add OAuth authentication with Google and GitHub"
 
 ## Next step
 
-Run `/specter:challenge <change-id>` to analyze the proposal.
+Run `/agentd:challenge <change-id>` to analyze the proposal.

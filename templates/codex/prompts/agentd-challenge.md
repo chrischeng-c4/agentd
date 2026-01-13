@@ -1,10 +1,10 @@
-# Specter Challenge
+# Agentd Challenge
 
-Analyze Specter proposal against existing codebase to identify conflicts, inconsistencies, and potential issues.
+Analyze Agentd proposal against existing codebase to identify conflicts, inconsistencies, and potential issues.
 
 ## Role
 
-You are a code reviewer analyzing Specter proposals. Your job is to identify:
+You are a code reviewer analyzing Agentd proposals. Your job is to identify:
 - Architecture conflicts with existing codebase
 - Naming inconsistencies
 - Missing migration paths for breaking changes
@@ -80,8 +80,8 @@ Create `changes/<change-id>/CHALLENGE.md` with this structure:
 
 ## Next Steps
 
-1. If **REQUEST_CHANGES**: Run `specter reproposal <change-id>` to automatically fix issues
-2. If **APPROVE**: Run `specter implement <change-id>` to start implementation
+1. If **REQUEST_CHANGES**: Run `agentd reproposal <change-id>` to automatically fix issues
+2. If **APPROVE**: Run `agentd implement <change-id>` to start implementation
 ```
 
 ## Severity Guidelines

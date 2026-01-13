@@ -1,15 +1,15 @@
-# Specter - Agent Instructions
+# Agentd - Agent Instructions
 
-This project uses **Specter** for spec-driven development (SDD).
+This project uses **Agentd** for spec-driven development (SDD).
 
 ## Directory Structure
 
 {{PROJECT_STRUCTURE}}
 
-### Specter Directory Layout
+### Agentd Directory Layout
 
 ```
-specter/
+agentd/
   config.toml       # Configuration
   specs/            # Main specifications (source of truth)
   changes/          # Active change proposals
@@ -90,7 +90,7 @@ Compare proposal with existing codebase:
 
 **These are NOT necessarily errors - especially for refactors or major changes.**
 
-When reviewing a proposal in `specter/changes/<change-id>/`:
+When reviewing a proposal in `agentd/changes/<change-id>/`:
 
 1. Read the skeleton `CHALLENGE.md` first
 2. Read `proposal.md`, `tasks.md`, `diagrams.md`, and `specs/`

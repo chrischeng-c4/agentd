@@ -1,6 +1,6 @@
-# Specter 安裝指南
+# Agentd 安裝指南
 
-Specter 是用 Rust 編寫的命令行工具，提供多種安裝方式。
+Agentd 是用 Rust 編寫的命令行工具，提供多種安裝方式。
 
 ## 系統要求
 
@@ -14,46 +14,46 @@ Specter 是用 Rust 編寫的命令行工具，提供多種安裝方式。
 
 ```bash
 # 1. 克隆倉庫
-git clone https://github.com/your-username/specter.git
-cd specter
+git clone https://github.com/your-username/agentd.git
+cd agentd
 
 # 2. 編譯並安裝
 cargo install --path .
 
 # 3. 驗證安裝
-specter --version
+agentd --version
 ```
 
-安裝後，`specter` 命令將在系統 PATH 中可用。
+安裝後，`agentd` 命令將在系統 PATH 中可用。
 
-**安裝位置**: `~/.cargo/bin/specter`
+**安裝位置**: `~/.cargo/bin/agentd`
 
 ### 方式 2: 使用 Cargo Install（發布到 crates.io 後）
 
 ```bash
 # 從 crates.io 安裝
-cargo install specter
+cargo install agentd
 
 # 驗證安裝
-specter --version
+agentd --version
 ```
 
-> ⚠️ 目前 Specter 尚未發布到 crates.io，請使用方式 1。
+> ⚠️ 目前 Agentd 尚未發布到 crates.io，請使用方式 1。
 
 ### 方式 3: 下載預編譯二進制文件（未來）
 
 ```bash
 # macOS (Apple Silicon)
-curl -L https://github.com/your-username/specter/releases/latest/download/specter-aarch64-apple-darwin.tar.gz | tar xz
-sudo mv specter /usr/local/bin/
+curl -L https://github.com/your-username/agentd/releases/latest/download/agentd-aarch64-apple-darwin.tar.gz | tar xz
+sudo mv agentd /usr/local/bin/
 
 # macOS (Intel)
-curl -L https://github.com/your-username/specter/releases/latest/download/specter-x86_64-apple-darwin.tar.gz | tar xz
-sudo mv specter /usr/local/bin/
+curl -L https://github.com/your-username/agentd/releases/latest/download/agentd-x86_64-apple-darwin.tar.gz | tar xz
+sudo mv agentd /usr/local/bin/
 
 # Linux (x86_64)
-curl -L https://github.com/your-username/specter/releases/latest/download/specter-x86_64-unknown-linux-gnu.tar.gz | tar xz
-sudo mv specter /usr/local/bin/
+curl -L https://github.com/your-username/agentd/releases/latest/download/agentd-x86_64-unknown-linux-gnu.tar.gz | tar xz
+sudo mv agentd /usr/local/bin/
 ```
 
 > ⚠️ 預編譯二進制文件尚未提供，請使用方式 1。
@@ -62,17 +62,17 @@ sudo mv specter /usr/local/bin/
 
 ```bash
 # 克隆倉庫
-git clone https://github.com/your-username/specter.git
-cd specter
+git clone https://github.com/your-username/agentd.git
+cd agentd
 
 # 編譯
 cargo build --release
 
 # 使用完整路徑運行
-./target/release/specter --version
+./target/release/agentd --version
 
 # 或創建別名（添加到 ~/.bashrc 或 ~/.zshrc）
-alias specter="/path/to/specter/target/release/specter"
+alias agentd="/path/to/agentd/target/release/agentd"
 ```
 
 ## 安裝 Rust（如果尚未安裝）
@@ -92,36 +92,36 @@ source $HOME/.cargo/env
 
 ```bash
 # 檢查版本
-specter --version
-# 輸出: specter 0.1.0
+agentd --version
+# 輸出: agentd 0.1.0
 
 # 查看幫助
-specter --help
+agentd --help
 
 # 測試初始化
 mkdir test-project
 cd test-project
-specter init --name "Test Project"
+agentd init --name "Test Project"
 ```
 
 ## 配置 AI 工具整合
 
-Specter 需要配置 AI 工具腳本才能正常工作：
+Agentd 需要配置 AI 工具腳本才能正常工作：
 
 ```bash
 # 1. 初始化專案
 cd your-project
-specter init
+agentd init
 
 # 2. 複製示例腳本
-cp /path/to/specter/examples/scripts/* .specter/scripts/
+cp /path/to/agentd/examples/scripts/* .agentd/scripts/
 
 # 3. 使腳本可執行（Unix 系統）
-chmod +x .specter/scripts/*.sh
+chmod +x .agentd/scripts/*.sh
 
 # 4. 編輯腳本以整合你的 AI 工具
-nano .specter/scripts/gemini-proposal.sh
-nano .specter/scripts/codex-challenge.sh
+nano .agentd/scripts/gemini-proposal.sh
+nano .agentd/scripts/codex-challenge.sh
 # ... 其他腳本
 ```
 
@@ -163,12 +163,12 @@ npm install -g gemini-cli
 # 根據你的 Codex 提供商安裝
 ```
 
-## 更新 Specter
+## 更新 Agentd
 
 ### 從源碼更新
 
 ```bash
-cd specter
+cd agentd
 git pull
 cargo install --path . --force
 ```
@@ -176,17 +176,17 @@ cargo install --path . --force
 ### 從 crates.io 更新
 
 ```bash
-cargo install specter --force
+cargo install agentd --force
 ```
 
 ## 卸載
 
 ```bash
 # 刪除二進制文件
-cargo uninstall specter
+cargo uninstall agentd
 
 # 或手動刪除
-rm ~/.cargo/bin/specter
+rm ~/.cargo/bin/agentd
 ```
 
 ## 故障排除
@@ -199,7 +199,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env
 ```
 
-### 問題: `specter: command not found` (安裝後)
+### 問題: `agentd: command not found` (安裝後)
 
 **解決方案**: 確保 `~/.cargo/bin` 在 PATH 中
 ```bash
@@ -218,7 +218,7 @@ rustup update stable
 
 **解決方案**: 檢查腳本權限
 ```bash
-chmod +x .specter/scripts/*.sh
+chmod +x .agentd/scripts/*.sh
 ```
 
 ### 問題: AI 工具未找到
@@ -226,7 +226,7 @@ chmod +x .specter/scripts/*.sh
 **解決方案**:
 1. 檢查 AI CLI 是否已安裝
 2. 檢查環境變量是否正確設置
-3. 編輯 `.specter/config.toml` 設置正確的命令路徑
+3. 編輯 `.agentd/config.toml` 設置正確的命令路徑
 
 ## 性能優化
 
@@ -262,16 +262,16 @@ COPY . .
 RUN cargo build --release
 
 FROM debian:bookworm-slim
-COPY --from=builder /app/target/release/specter /usr/local/bin/
-ENTRYPOINT ["specter"]
+COPY --from=builder /app/target/release/agentd /usr/local/bin/
+ENTRYPOINT ["agentd"]
 ```
 
 ```bash
 # 構建 Docker 映像
-docker build -t specter .
+docker build -t agentd .
 
 # 運行
-docker run -v $(pwd):/workspace -w /workspace specter init
+docker run -v $(pwd):/workspace -w /workspace agentd init
 ```
 
 ## 支持的平台
@@ -292,12 +292,12 @@ docker run -v $(pwd):/workspace -w /workspace specter init
 
 或直接開始：
 ```bash
-specter init
-specter proposal my-first-change "Add awesome feature"
+agentd init
+agentd proposal my-first-change "Add awesome feature"
 ```
 
 ## 需要幫助？
 
 - 📖 查看 [文檔](README.md)
-- 🐛 報告問題: [GitHub Issues](https://github.com/your-username/specter/issues)
-- 💬 討論: [GitHub Discussions](https://github.com/your-username/specter/discussions)
+- 🐛 報告問題: [GitHub Issues](https://github.com/your-username/agentd/issues)
+- 💬 討論: [GitHub Discussions](https://github.com/your-username/agentd/discussions)

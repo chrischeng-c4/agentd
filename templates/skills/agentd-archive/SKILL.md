@@ -1,23 +1,23 @@
 ---
-name: specter-archive
+name: agentd-archive
 description: Archive completed change
 user-invocable: true
 ---
 
-# /specter:archive
+# /agentd:archive
 
 Archive completed and verified change.
 
 ## Usage
 
 ```bash
-specter archive <change-id>
+agentd archive <change-id>
 ```
 
 ## Example
 
 ```bash
-specter archive add-oauth
+agentd archive add-oauth
 ```
 
 ## What it does

@@ -1,23 +1,23 @@
 ---
-name: specter-fix
+name: agentd-fix
 description: Fix issues found during verification
 user-invocable: true
 ---
 
-# /specter:fix
+# /agentd:fix
 
 Fix code issues found during verification.
 
 ## Usage
 
 ```bash
-specter fix <change-id>
+agentd fix <change-id>
 ```
 
 ## Example
 
 ```bash
-specter fix add-oauth
+agentd fix add-oauth
 ```
 
 ## What it does
@@ -29,10 +29,10 @@ specter fix add-oauth
 
 ## Prerequisite
 
-Must have `VERIFICATION.md` with failures. Run `/specter:verify` first.
+Must have `VERIFICATION.md` with failures. Run `/agentd:verify` first.
 
 ## Next step
 
-Run `/specter:verify <change-id>` again to confirm fixes.
+Run `/agentd:verify <change-id>` again to confirm fixes.
 
-If all tests pass: `/specter:archive <change-id>` to complete.
+If all tests pass: `/agentd:archive <change-id>` to complete.

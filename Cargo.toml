@@ -1,13 +1,13 @@
 [package]
-name = "specter"
+name = "agentd"
 version = "0.1.0"
 edition = "2021"
 authors = ["Chris Cheng <chris.cheng@shopee.com>"]
-description = "A Rust-powered spec-driven development tool with iterative proposal refinement through AI orchestration"
+description = "AI agent orchestrator for spec-driven development with iterative proposal refinement"
 license = "MIT"
 
 [[bin]]
-name = "specter"
+name = "agentd"
 path = "src/main.rs"
 
 [dependencies]

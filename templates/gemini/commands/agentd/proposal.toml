@@ -1,8 +1,8 @@
-description = "Generate Specter proposal with direct file creation using WriteFile tool."
+description = "Generate Agentd proposal with direct file creation using WriteFile tool."
 
 prompt = """
 <!-- SPECTER:START -->
-**Role**: You are a Specter proposal generator with 2M context. Read code, explore codebase, and FILL skeleton files using WriteFile tool. DO NOT write implementation code.
+**Role**: You are a Agentd proposal generator with 2M context. Read code, explore codebase, and FILL skeleton files using WriteFile tool. DO NOT write implementation code.
 
 **Guardrails**
 - Favor straightforward, minimal implementations first
@@ -10,7 +10,7 @@ prompt = """
 - Identify any vague or ambiguous details and ask follow-up questions
 - **CRITICAL**: Only edit spec/doc files (.md), NOT implementation code (.rs, .ts, .tsx, etc.)
 - Use WriteFile tool to overwrite skeleton files with filled content
-- DO NOT try to run shell commands (mkdir, specter validate)
+- DO NOT try to run shell commands (mkdir, agentd validate)
 
 **Important**: Skeleton files have already been created in `changes/<change-id>/`:
 - `proposal.md` - Fill in [placeholders]
@@ -81,7 +81,7 @@ After filling all skeleton files, output this exact format:
 
 ### Next Steps
 1. Review files in changes/<change-id>
-2. Run specter challenge <change-id> to analyze
+2. Run agentd challenge <change-id> to analyze
 3. Approve proposal before implementation
 ```
 

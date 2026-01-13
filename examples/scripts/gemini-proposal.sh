@@ -44,7 +44,7 @@ else
     #   }" | jq -r '.candidates[0].content.parts[0].text' > "$CHANGE_DIR/proposal.md"
 
     echo "❌ Script not fully configured. Please edit:"
-    echo "   .specter/scripts/gemini-proposal.sh"
+    echo "   .agentd/scripts/gemini-proposal.sh"
     exit 1
 fi
 

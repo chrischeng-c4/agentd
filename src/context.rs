@@ -35,7 +35,7 @@ fn scan_project_structure() -> Result<String> {
     let mut output = String::from("```\n");
 
     // Scan important directories
-    let important_dirs = vec!["src", "specter/specs", "specter/changes"];
+    let important_dirs = vec!["src", "agentd/specs", "agentd/changes"];
 
     for dir in important_dirs {
         let path = current_dir.join(dir);

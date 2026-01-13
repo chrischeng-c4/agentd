@@ -1,23 +1,23 @@
 ---
-name: specter-reproposal
+name: agentd-reproposal
 description: Refine proposal based on challenge feedback
 user-invocable: true
 ---
 
-# /specter:reproposal
+# /agentd:reproposal
 
 Automatically fix issues found in challenge.
 
 ## Usage
 
 ```bash
-specter reproposal <change-id>
+agentd reproposal <change-id>
 ```
 
 ## Example
 
 ```bash
-specter reproposal add-oauth
+agentd reproposal add-oauth
 ```
 
 ## What it does
@@ -29,6 +29,6 @@ specter reproposal add-oauth
 
 ## Next step
 
-Run `/specter:challenge <change-id>` again to verify fixes.
+Run `/agentd:challenge <change-id>` again to verify fixes.
 
 Repeat until no HIGH severity issues remain.

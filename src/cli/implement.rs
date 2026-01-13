@@ -1,7 +1,7 @@
 use crate::orchestrator::ScriptRunner;
 use crate::parser::parse_review_verdict;
 use crate::{
-    models::{Change, ReviewVerdict, SpecterConfig},
+    models::{Change, ReviewVerdict, AgentdConfig},
     Result,
 };
 use colored::Colorize;
@@ -12,9 +12,9 @@ pub struct ImplementCommand;
 
 pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
     let project_root = env::current_dir()?;
-    let config = SpecterConfig::load(&project_root)?;
+    let config = AgentdConfig::load(&project_root)?;
 
-    println!("{}", "🎨 Specter Implementation Workflow".cyan().bold());
+    println!("{}", "🎨 Agentd Implementation Workflow".cyan().bold());
     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
     println!();
 
@@ -32,7 +32,7 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
             println!();
             println!("{}", "✨ Implementation approved!".green().bold());
             println!("\n{}", "⏭️  Next:".yellow());
-            println!("   specter archive {}", change_id);
+            println!("   agentd archive {}", change_id);
             return Ok(());
         }
         ReviewVerdict::NeedsChanges => {
@@ -54,7 +54,7 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
                     println!();
                     println!("{}", "✨ Fixed and approved!".green().bold());
                     println!("\n{}", "⏭️  Next:".yellow());
-                    println!("   specter archive {}", change_id);
+                    println!("   agentd archive {}", change_id);
                     return Ok(());
                 }
                 ReviewVerdict::NeedsChanges => {
@@ -76,7 +76,7 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
                             println!();
                             println!("{}", "✨ Fixed and approved!".green().bold());
                             println!("\n{}", "⏭️  Next:".yellow());
-                            println!("   specter archive {}", change_id);
+                            println!("   agentd archive {}", change_id);
                             Ok(())
                         }
                         _ => {
@@ -118,7 +118,7 @@ async fn run_implement_step(
     change_id: &str,
     tasks: Option<&str>,
     project_root: &PathBuf,
-    config: &SpecterConfig,
+    config: &AgentdConfig,
 ) -> Result<()> {
     let change = Change::new(change_id, "");
     change.validate_structure(project_root)?;
@@ -136,10 +136,10 @@ async fn run_implement_step(
 async fn run_review_step(
     change_id: &str,
     project_root: &PathBuf,
-    config: &SpecterConfig,
+    config: &AgentdConfig,
     iteration: u32,
 ) -> Result<ReviewVerdict> {
-    let change_dir = project_root.join("specter/changes").join(change_id);
+    let change_dir = project_root.join("agentd/changes").join(change_id);
 
     // Regenerate AGENTS.md context
     crate::context::generate_agents_context(&change_dir)?;
@@ -168,7 +168,7 @@ async fn run_review_step(
 async fn run_resolve_step(
     change_id: &str,
     project_root: &PathBuf,
-    config: &SpecterConfig,
+    config: &AgentdConfig,
 ) -> Result<()> {
     let change = Change::new(change_id, "");
     let review_path = change.review_path(project_root);
@@ -245,10 +245,10 @@ fn display_remaining_issues(change_id: &str, project_root: &PathBuf) -> Result<(
     println!("      cat {}", review_path.display());
     println!();
     println!("   2. Fix issues manually and re-review:");
-    println!("      specter review {}", change_id);
+    println!("      agentd review {}", change_id);
     println!();
     println!("   3. Or resolve specific issues:");
-    println!("      specter resolve-reviews {}", change_id);
+    println!("      agentd resolve-reviews {}", change_id);
 
     Ok(())
 }
