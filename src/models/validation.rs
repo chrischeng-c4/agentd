@@ -151,12 +151,12 @@ impl Default for ValidationRules {
     fn default() -> Self {
         Self {
             required_headings: vec![
-                "# Specification:".to_string(),
-                "## Overview".to_string(),
-                "## Requirements".to_string(),
+                "Specification:".to_string(),
+                "Overview".to_string(),
+                "Requirements".to_string(),
             ],
-            requirement_pattern: r"^### R\d+:".to_string(),
-            scenario_pattern: r"^#### Scenario:".to_string(),
+            requirement_pattern: r"^R\d+:".to_string(),
+            scenario_pattern: r"^Scenario:".to_string(),
             scenario_min_count: 1,
             require_when_then: true,
             when_pattern: r"- \*\*WHEN\*\*".to_string(),

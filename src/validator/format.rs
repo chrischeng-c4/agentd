@@ -97,12 +97,13 @@ impl SpecFormatValidator {
                     }
 
                     // Check for WHEN/THEN patterns in content
+                    // Note: markdown parser strips ** so we check for plain text
                     if self.rules.require_when_then && state.in_requirement {
                         let text_str = text.as_ref();
-                        if text_str.contains("**WHEN**") {
+                        if text_str.contains("WHEN") {
                             state.has_when = true;
                         }
-                        if text_str.contains("**THEN**") {
+                        if text_str.contains("THEN") {
                             state.has_then = true;
                         }
                     }
@@ -137,8 +138,7 @@ impl SpecFormatValidator {
             Err(_) => return errors, // Invalid regex in config
         };
 
-        let full_heading = format!("### {}", text);
-        if !req_regex.is_match(&full_heading) {
+        if !req_regex.is_match(text) {
             let severity = self.rules.severity_map.invalid_requirement_format;
             errors.push(ValidationError::new(
                 format!(
@@ -169,8 +169,7 @@ impl SpecFormatValidator {
             Err(_) => return errors,
         };
 
-        let full_heading = format!("#### {}", text);
-        if !scenario_regex.is_match(&full_heading) {
+        if !scenario_regex.is_match(text) {
             let severity = self.rules.severity_map.missing_scenario;
             errors.push(ValidationError::new(
                 format!(
