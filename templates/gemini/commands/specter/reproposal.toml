@@ -2,30 +2,33 @@ description = "Refine Specter proposal based on challenge feedback."
 
 prompt = """
 <!-- SPECTER:START -->
-**Role**: You are a Specter reproposal generator. Read CHALLENGE.md feedback and fix all issues by updating proposal files.
+**Role**: You are a Specter reproposal generator. Read CHALLENGE.md feedback and fix all issues by MODIFYING existing proposal files.
+
+**Important**: Proposal files already exist. You are EDITING them, not creating from scratch.
 
 **Guardrails**
 - Focus on fixing issues identified in CHALLENGE.md
-- Only create spec/doc files (.md), NOT implementation code
-- Use WriteFile tool to update files directly
+- Only modify spec/doc files (.md), NOT implementation code
+- Use WriteFile tool to overwrite files with corrected content
 - DO NOT try to run shell commands
 
 **Steps**
-1. Read existing files:
+1. Read and understand issues:
    - Read `changes/<change-id>/CHALLENGE.md` to understand all issues
+   - Pay attention to issue severity (HIGH, MEDIUM, LOW)
    - Read current proposal files (proposal.md, tasks.md, diagrams.md, specs/)
-   - Understand the root cause of each HIGH and MEDIUM severity issue
+   - Understand the root cause of each issue
 
 2. Fix issues by priority:
-   - **HIGH severity**: MUST fix all (architecture conflicts, breaking changes, missing migrations)
-   - **MEDIUM severity**: SHOULD fix if possible (naming inconsistencies, unclear requirements)
-   - **LOW severity**: Optional (style suggestions, minor improvements)
+   - **HIGH severity**: MUST fix all (Internal Consistency Issues - proposal contradictions)
+   - **MEDIUM severity**: SHOULD fix (Code Alignment Issues - clarify intentions)
+   - **LOW severity**: Optional (Quality Suggestions - nice to have)
 
 3. Update files using WriteFile:
-   - Update `proposal.md` if scope/impact needs clarification
-   - Update `tasks.md` if implementation steps need adjustment
-   - Update `diagrams.md` if architecture visualization needs correction
-   - Update `specs/<capability>/spec.md` if requirements need refinement
+   - Overwrite `proposal.md` with fixed version (add missing details, clarify scope)
+   - Overwrite `tasks.md` with fixed version (add missing tasks, fix inconsistencies)
+   - Overwrite `diagrams.md` with fixed version (add missing components, fix flows)
+   - Overwrite `specs/<capability>/spec.md` with fixed version (clarify requirements)
 
 4. Output what was changed (see Output Format below)
 
@@ -63,22 +66,32 @@ prompt = """
 2. If no HIGH severity issues remain, proceed with implementation
 ```
 
-**Tool Usage**
+**Tool Usage Examples**
 
 ```python
-# Read challenge feedback
+# Read challenge feedback first
 read_file(file_path="changes/<change-id>/CHALLENGE.md")
 
 # Read existing proposal files
 read_file(file_path="changes/<change-id>/proposal.md")
+read_file(file_path="changes/<change-id>/tasks.md")
+read_file(file_path="changes/<change-id>/diagrams.md")
 
-# Update files with fixes
+# Overwrite files with corrected content (not append!)
 write_file(
     file_path="changes/<change-id>/proposal.md",
-    content="[Updated content with fixes]"
+    content="# Change: ...\n\n## Summary\n[Fixed content addressing issues]..."
+)
+
+write_file(
+    file_path="changes/<change-id>/tasks.md",
+    content="# Tasks\n\n## 1. Implementation\n[Added missing tasks]..."
 )
 ```
 
-**CRITICAL**: Focus on fixing the specific issues identified in CHALLENGE.md. Do NOT make unrelated changes.
+**CRITICAL**:
+- Focus on fixing the specific issues identified in CHALLENGE.md
+- Do NOT make unrelated changes
+- Overwrite entire files with corrected versions (WriteFile replaces content)
 <!-- SPECTER:END -->
 """

@@ -103,13 +103,19 @@ impl ScriptRunner {
         .await
     }
 
-    /// Run Codex challenge
+    /// Run Codex challenge (creates new session)
     pub async fn run_codex_challenge(&self, change_id: &str) -> Result<String> {
         self.run_script("codex-challenge.sh", &[change_id.to_string()], true)
             .await
     }
 
-    /// Run Gemini reproposal
+    /// Run Codex re-challenge (resumes previous session for cached context)
+    pub async fn run_codex_rechallenge(&self, change_id: &str) -> Result<String> {
+        self.run_script("codex-rechallenge.sh", &[change_id.to_string()], true)
+            .await
+    }
+
+    /// Run Gemini reproposal (resumes previous session for cached context)
     pub async fn run_gemini_reproposal(&self, change_id: &str) -> Result<String> {
         self.run_script("gemini-reproposal.sh", &[change_id.to_string()], true)
             .await

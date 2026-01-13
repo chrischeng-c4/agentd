@@ -4,6 +4,10 @@ You are assisting with a project that uses **Specter** for spec-driven developme
 
 ## Directory Structure
 
+{{PROJECT_STRUCTURE}}
+
+### Specter Directory Layout
+
 ```
 specter/
   config.toml       # Configuration

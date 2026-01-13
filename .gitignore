@@ -19,3 +19,7 @@ Thumbs.db
 changes/*/IMPLEMENTATION.md
 changes/*/VERIFICATION.md
 changes/*/CHALLENGE.md
+
+# Dynamic AI context files (generated per change from templates)
+specter/changes/*/GEMINI.md
+specter/changes/*/AGENTS.md

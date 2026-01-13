@@ -24,6 +24,10 @@ pub async fn run(change_id: &str) -> Result<()> {
         );
     }
 
+    // Generate GEMINI.md context for this change
+    let change_dir = project_root.join("specter/changes").join(change_id);
+    crate::context::generate_gemini_context(&change_dir)?;
+
     println!(
         "{}",
         "🤖 Regenerating proposal with Gemini based on challenge feedback...".cyan()

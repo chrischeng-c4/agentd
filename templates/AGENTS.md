@@ -4,6 +4,10 @@ This project uses **Specter** for spec-driven development (SDD).
 
 ## Directory Structure
 
+{{PROJECT_STRUCTURE}}
+
+### Specter Directory Layout
+
 ```
 specter/
   config.toml       # Configuration
@@ -31,42 +35,92 @@ You are responsible for **challenge** (code review) and **verify** (testing):
 
 ### Challenge Phase
 
+**Your Role**: Code reviewer ensuring proposal quality through TWO types of checks.
+
+**Important**: A skeleton `CHALLENGE.md` has been created. Read and fill it following the structure.
+
+#### Check Type 1: Internal Consistency (HIGH Priority)
+
+Verify proposal documents are consistent with each other:
+
+- **proposal.md vs tasks.md**: Does "What Changes" match implementation tasks?
+  - Example Issue: Proposal mentions "Add OAuth middleware" but no task implements it
+  - Severity: HIGH
+  - Category: Completeness
+
+- **proposal.md vs diagrams.md**: Do architecture diagrams match descriptions?
+  - Example Issue: Proposal says "Add Redis cache" but no Redis in diagrams
+  - Severity: HIGH
+  - Category: Consistency
+
+- **proposal.md vs specs/**: Do spec requirements align with Impact section?
+  - Example Issue: Impact says "affects auth module" but no auth specs
+  - Severity: HIGH
+  - Category: Completeness
+
+- **Quality checks**:
+  - Are test plans adequate? (unit + integration tests)
+  - Is error handling considered?
+  - Are edge cases documented?
+  - Are breaking changes clearly marked with migration plans?
+
+**These are BLOCKING issues - must fix before implementation.**
+
+#### Check Type 2: Code Alignment (MEDIUM/LOW Priority)
+
+Compare proposal with existing codebase:
+
+- **File paths**: Do mentioned files exist?
+  - Example: Proposal says "update src/auth.rs" but file is "src/authentication.rs"
+  - Severity: MEDIUM
+  - Category: Conflict
+
+- **APIs/Functions**: Do referenced APIs exist in current code?
+  - Example: Proposal calls `getUserById()` but current API is `fetchUser()`
+  - Severity: MEDIUM
+  - Category: Conflict
+
+- **Architecture patterns**: Does proposal follow existing conventions?
+  - Example: Current code uses Service pattern, proposal uses Repository pattern
+  - **CRITICAL CHECK**: Look for keywords in proposal.md:
+    - "refactor", "BREAKING", "architectural change", "redesign", "migration"
+  - If found, mark as: `⚠️ Note: Intentional architectural change per proposal.md`
+  - Severity: LOW (flag for user awareness, not an error)
+  - Category: Other
+
+**These are NOT necessarily errors - especially for refactors or major changes.**
+
 When reviewing a proposal in `specter/changes/<change-id>/`:
 
-1. Read `proposal.md`, `tasks.md`, `diagrams.md`, and `specs/`
-2. Analyze for:
-   - **Conflicts**: Does this conflict with existing specs or code?
-   - **Completeness**: Are all edge cases covered?
-   - **Consistency**: Are specs, tasks, and diagrams aligned?
-   - **Security**: Any security vulnerabilities introduced?
-   - **Performance**: Any performance concerns?
-   - **Dependencies**: Are all dependencies identified?
+1. Read the skeleton `CHALLENGE.md` first
+2. Read `proposal.md`, `tasks.md`, `diagrams.md`, and `specs/`
+3. Explore relevant existing code
+4. Fill the skeleton with issues found, following the two-check approach above
+5. Adjust verdict based on severity:
+   - APPROVED: No HIGH issues
+   - NEEDS_REVISION: 1+ HIGH or multiple MEDIUM issues
+   - REJECTED: Fundamental architectural problems
 
-3. Create `CHALLENGE.md` with issues found:
+3. Output format (fill the skeleton `CHALLENGE.md`):
 
-```markdown
-# Challenge Report: <change-id>
+The skeleton already has the structure. Fill each section:
 
-## Summary
-Brief assessment of the proposal.
+**Internal Consistency Issues** (HIGH priority):
+- Focus on contradictions between proposal documents
+- Must be fixed before proceeding
 
-## Issues
+**Code Alignment Issues** (MEDIUM/LOW priority):
+- Note deviations from existing code
+- Check if intentional (refactor keywords in proposal)
+- Flag for user review, not necessarily errors
 
-### Issue 1: <Title>
-- **Severity**: High | Medium | Low
-- **Category**: Conflict | Completeness | Security | Performance | Other
-- **Description**: What's wrong
-- **Location**: File/section affected
-- **Recommendation**: How to fix
+**Quality Suggestions** (LOW priority):
+- Missing tests, error handling, documentation
+- Nice-to-have improvements
 
-### Issue 2: <Title>
-...
-
-## Verdict
-- [ ] APPROVED - Ready for implementation
-- [ ] NEEDS_REVISION - Address issues and repropose
-- [ ] REJECTED - Fundamental problems, needs rethinking
-```
+**Verdict**:
+- Check appropriate box based on HIGH severity count
+- Provide clear next steps
 
 ### Verify Phase
 

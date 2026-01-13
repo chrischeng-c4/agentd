@@ -28,7 +28,16 @@ pub async fn run(change_id: &str) -> Result<()> {
     let change = Change::new(change_id, "");
     change.validate_structure(&project_root)?;
 
-    println!("{}", "🔍 Analyzing proposal with Codex...".cyan());
+    // Generate AGENTS.md context for this change
+    crate::context::generate_agents_context(&change_dir)?;
+
+    // Create CHALLENGE.md skeleton for Codex to fill
+    crate::context::create_challenge_skeleton(&change_dir, change_id)?;
+
+    println!(
+        "{}",
+        "🔍 Analyzing proposal with Codex...".cyan()
+    );
 
     // Run Codex script
     let script_runner = ScriptRunner::new(config.scripts_dir);

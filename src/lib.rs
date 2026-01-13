@@ -2,6 +2,7 @@
 // A Rust-powered tool for iterative proposal refinement through AI orchestration
 
 pub mod cli;
+pub mod context;
 pub mod models;
 pub mod orchestrator;
 pub mod parser;

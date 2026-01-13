@@ -22,6 +22,9 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     std::fs::create_dir_all(&archive_dir)?;
 
+    // Clean up dynamically generated context files
+    crate::context::cleanup_context_files(&change_dir)?;
+
     // Move change directory to archive
     let archived_path = archive_dir.join(change_id);
     std::fs::rename(&change_dir, &archived_path)?;

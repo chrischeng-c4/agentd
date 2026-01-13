@@ -22,9 +22,8 @@ const GEMINI_SETTINGS: &str = include_str!("../../templates/gemini/settings.json
 const CODEX_CHALLENGE: &str = include_str!("../../templates/codex/prompts/specter-challenge.md");
 const CODEX_VERIFY: &str = include_str!("../../templates/codex/prompts/specter-verify.md");
 
-// AI Context Files
-const SPECTER_GEMINI_MD: &str = include_str!("../../templates/GEMINI.md");
-const SPECTER_AGENTS_MD: &str = include_str!("../../templates/AGENTS.md");
+// AI Context Files (GEMINI.md and AGENTS.md) are now generated dynamically per change
+// from templates/GEMINI.md and templates/AGENTS.md
 
 pub async fn run(name: Option<&str>) -> Result<()> {
     let project_root = env::current_dir()?;
@@ -53,12 +52,8 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     std::fs::create_dir_all(specter_dir.join("archive"))?;
     std::fs::create_dir_all(specter_dir.join("scripts"))?;
 
-    // Install AI context files
-    println!("{}", "📝 Installing AI context files...".cyan());
-    std::fs::write(specter_dir.join("GEMINI.md"), SPECTER_GEMINI_MD)?;
-    println!("   ✓ specter/GEMINI.md (Gemini instructions)");
-    std::fs::write(specter_dir.join("AGENTS.md"), SPECTER_AGENTS_MD)?;
-    println!("   ✓ specter/AGENTS.md (Codex instructions)");
+    // AI context files (GEMINI.md, AGENTS.md) are now generated dynamically
+    // per change in specter/changes/<change-id>/ by the CLI commands
 
     // Create Claude Code skills directory
     let skills_dir = claude_dir.join("skills");
@@ -102,8 +97,6 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     println!();
     println!("{}", "📁 Structure:".cyan());
     println!("   specter/                   - Main Specter directory");
-    println!("   specter/GEMINI.md          - Gemini context (via GEMINI_SYSTEM_MD)");
-    println!("   specter/AGENTS.md          - Codex context");
     println!("   specter/specs/             - Main specifications");
     println!("   specter/changes/           - Active changes");
     println!("   specter/archive/           - Completed changes");
@@ -206,8 +199,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "🤖 Generating proposal with Gemini: $CHANGE_ID"
 
-# Use Specter's GEMINI.md to override any existing context
-export GEMINI_SYSTEM_MD="$PROJECT_ROOT/specter/GEMINI.md"
+# Use change-specific GEMINI.md context (generated dynamically by specter CLI)
+export GEMINI_SYSTEM_MD="$PROJECT_ROOT/specter/changes/$CHANGE_ID/GEMINI.md"
 
 # Build context for Gemini
 CONTEXT=$(cat << EOF
@@ -239,8 +232,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "🔄 Refining proposal with Gemini: $CHANGE_ID"
 
-# Use Specter's GEMINI.md to override any existing context
-export GEMINI_SYSTEM_MD="$PROJECT_ROOT/specter/GEMINI.md"
+# Use change-specific GEMINI.md context (generated dynamically by specter CLI)
+export GEMINI_SYSTEM_MD="$PROJECT_ROOT/specter/changes/$CHANGE_ID/GEMINI.md"
 
 # Build context for Gemini
 CONTEXT=$(cat << EOF
@@ -253,7 +246,8 @@ EOF
 )
 
 # Call Gemini CLI with pre-defined command
-echo "$CONTEXT" | gemini specter:reproposal --output-format stream-json
+# Use --resume latest to reuse the proposal session (cached codebase context)
+echo "$CONTEXT" | gemini specter:reproposal --resume latest --output-format stream-json
 "#;
 
     let codex_challenge = r#"#!/bin/bash
@@ -263,28 +257,39 @@ set -euo pipefail
 
 CHANGE_ID="$1"
 
+# Get the project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "🔍 Analyzing proposal with Codex: $CHANGE_ID"
+
+# Use change-specific AGENTS.md context (generated dynamically by specter CLI)
+# Note: Set CODEX_INSTRUCTIONS_FILE if your Codex CLI supports it
+export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/specter/changes/$CHANGE_ID/AGENTS.md"
 
 # Build prompt with context
 PROMPT=$(cat << EOF
 # Specter Challenge Task
 
-Analyze the proposal at specter/changes/${CHANGE_ID}/ and create a challenge report.
+A skeleton CHALLENGE.md has been created at specter/changes/${CHANGE_ID}/CHALLENGE.md.
 
 ## Instructions
-1. Read all files in specter/changes/${CHANGE_ID}/:
+1. Read the skeleton CHALLENGE.md to understand the structure
+
+2. Read all proposal files in specter/changes/${CHANGE_ID}/:
    - proposal.md
    - tasks.md
    - diagrams.md
    - specs/*.md
 
-2. Explore the existing codebase for conflicts and inconsistencies
+3. Explore the existing codebase
 
-3. Create specter/changes/${CHANGE_ID}/CHALLENGE.md with:
-   - HIGH severity issues (blockers)
-   - MEDIUM severity issues (important)
-   - LOW severity issues (suggestions)
-   - Summary with APPROVE or REQUEST_CHANGES recommendation
+4. Fill the CHALLENGE.md skeleton with your findings:
+   - **Internal Consistency Issues** (HIGH): Check if proposal docs match each other
+   - **Code Alignment Issues** (MEDIUM/LOW): Check alignment with existing code
+     - If proposal mentions "refactor" or "BREAKING", note deviations as intentional
+   - **Quality Suggestions** (LOW): Missing tests, error handling, etc.
+   - **Verdict**: APPROVED/NEEDS_REVISION/REJECTED based on HIGH severity count
 
 Be thorough and constructive. Reference specific files and provide actionable recommendations.
 EOF
@@ -301,7 +306,15 @@ set -euo pipefail
 
 CHANGE_ID="$1"
 
+# Get the project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "🧪 Verifying implementation with Codex: $CHANGE_ID"
+
+# Use change-specific AGENTS.md context (generated dynamically by specter CLI)
+# Note: Set CODEX_INSTRUCTIONS_FILE if your Codex CLI supports it
+export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/specter/changes/$CHANGE_ID/AGENTS.md"
 
 # Build prompt with context
 PROMPT=$(cat << EOF
@@ -326,9 +339,59 @@ EOF
 codex exec --full-auto "$PROMPT"
 "#;
 
+    // Create codex-rechallenge.sh for session resumption
+    let codex_rechallenge = r#"#!/bin/bash
+# Codex re-challenge script (resumes previous session for cached context)
+# Usage: ./codex-rechallenge.sh <change-id>
+set -euo pipefail
+
+CHANGE_ID="$1"
+
+# Get the project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+echo "🔍 Re-analyzing proposal with Codex (resuming session): $CHANGE_ID"
+
+# Use change-specific AGENTS.md context (generated dynamically by specter CLI)
+# Note: Set CODEX_INSTRUCTIONS_FILE if your Codex CLI supports it
+export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/specter/changes/$CHANGE_ID/AGENTS.md"
+
+# Build prompt with context
+PROMPT=$(cat << EOF
+# Specter Re-Challenge Task
+
+A skeleton CHALLENGE.md has been updated at specter/changes/${CHANGE_ID}/CHALLENGE.md.
+The proposal has been revised based on previous feedback.
+
+## Instructions
+1. Read the skeleton CHALLENGE.md to understand the structure
+
+2. Read the UPDATED proposal files in specter/changes/${CHANGE_ID}/:
+   - proposal.md (revised)
+   - tasks.md (revised)
+   - diagrams.md (revised)
+   - specs/*.md (revised)
+
+3. Re-fill the CHALLENGE.md with your findings:
+   - **Internal Consistency Issues** (HIGH): Check if revised proposal docs now match each other
+   - **Code Alignment Issues** (MEDIUM/LOW): Check alignment with existing code
+     - If proposal mentions "refactor" or "BREAKING", note deviations as intentional
+   - **Quality Suggestions** (LOW): Missing tests, error handling, etc.
+   - **Verdict**: APPROVED/NEEDS_REVISION/REJECTED based on HIGH severity count
+
+Focus on whether the previous issues have been addressed.
+EOF
+)
+
+# Resume the previous session to reuse cached codebase context
+codex resume --last "$PROMPT"
+"#;
+
     std::fs::write(scripts_dir.join("gemini-proposal.sh"), gemini_proposal)?;
     std::fs::write(scripts_dir.join("gemini-reproposal.sh"), gemini_reproposal)?;
     std::fs::write(scripts_dir.join("codex-challenge.sh"), codex_challenge)?;
+    std::fs::write(scripts_dir.join("codex-rechallenge.sh"), codex_rechallenge)?;
     std::fs::write(scripts_dir.join("codex-verify.sh"), codex_verify)?;
 
     // Placeholder for claude-implement.sh (not updated yet)
@@ -363,6 +426,7 @@ echo "⚠️  This script is a placeholder - fixing happens via Claude Code Skil
             "gemini-proposal.sh",
             "gemini-reproposal.sh",
             "codex-challenge.sh",
+            "codex-rechallenge.sh",
             "codex-verify.sh",
             "claude-implement.sh",
             "claude-fix.sh",
@@ -412,11 +476,20 @@ fn install_codex_prompts(prompts_dir: &Path) -> Result<()> {
             "⚠️".yellow()
         );
 
+        // Try to use interactive prompt, fall back to default if not available
         use dialoguer::Confirm;
-        let overwrite = Confirm::new()
+        let overwrite = match Confirm::new()
             .with_prompt("Overwrite existing prompts?")
             .default(false)
-            .interact()?;
+            .interact()
+        {
+            Ok(response) => response,
+            Err(_) => {
+                // Not a terminal or dialoguer failed - use default (don't overwrite)
+                println!("   (non-interactive mode: keeping existing prompts)");
+                false
+            }
+        };
 
         if !overwrite {
             println!("   Skipping Codex prompts installation");

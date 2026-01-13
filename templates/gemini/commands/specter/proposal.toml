@@ -2,126 +2,73 @@ description = "Generate Specter proposal with direct file creation using WriteFi
 
 prompt = """
 <!-- SPECTER:START -->
-**Role**: You are a Specter proposal generator with 2M context. Read code, explore codebase, and CREATE spec files directly using WriteFile tool. DO NOT write implementation code.
+**Role**: You are a Specter proposal generator with 2M context. Read code, explore codebase, and FILL skeleton files using WriteFile tool. DO NOT write implementation code.
 
 **Guardrails**
 - Favor straightforward, minimal implementations first
 - Keep changes tightly scoped to the requested outcome
 - Identify any vague or ambiguous details and ask follow-up questions
-- **CRITICAL**: Only create spec/doc files (.md), NOT implementation code (.rs, .ts, .tsx, etc.)
-- Use WriteFile tool to create all files directly (it auto-creates parent directories)
-- DO NOT try to run shell commands (mkdir, specter validate) - WriteFile handles directories automatically
+- **CRITICAL**: Only edit spec/doc files (.md), NOT implementation code (.rs, .ts, .tsx, etc.)
+- Use WriteFile tool to overwrite skeleton files with filled content
+- DO NOT try to run shell commands (mkdir, specter validate)
+
+**Important**: Skeleton files have already been created in `changes/<change-id>/`:
+- `proposal.md` - Fill in [placeholders]
+- `tasks.md` - Replace placeholders with specific tasks
+- `diagrams.md` - Fill in Mermaid diagrams
+- `specs/_skeleton.md` - Rename and fill with actual requirements
 
 **Steps**
 1. Review context:
+   - Read existing skeleton files in changes/<change-id>/
    - Review existing specs/changes info provided in the prompt
    - Inspect relevant code to understand current state
    - Understand project architecture and patterns
 
-2. Choose unique verb-led `change-id` (e.g., add-oauth, update-api, refactor-core)
+2. Fill skeleton files using WriteFile tool:
 
-3. Create files using WriteFile tool IN THIS ORDER (directories are auto-created):
+   a. Read and fill **changes/<change-id>/proposal.md**
+      - Replace [Brief 1-2 sentence description] with actual summary
+      - Fill in Why section with clear problem statement
+      - Fill in What Changes section with specific bullet points
+      - Fill in Impact section with affected specs, code, and breaking changes
 
-   a. **changes/<change-id>/proposal.md**
-      ```markdown
-      # Change: [Brief description]
+   b. Read and fill **changes/<change-id>/tasks.md**
+      - Replace placeholder tasks with specific, actionable items
+      - Add concrete implementation tasks (e.g., "1.1 Add OAuth middleware to src/auth.rs")
+      - Add specific testing tasks (e.g., "2.1 Unit tests: test_oauth_token_validation")
+      - Update documentation tasks as needed
 
-      ## Why
-      [1-2 sentences explaining the motivation]
+   c. Read and fill **changes/<change-id>/diagrams.md**
+      - Fill in state diagram with actual state transitions
+      - Fill in flow diagram with process steps
+      - Fill in sequence diagram with component interactions
+      - Use proper Mermaid syntax
 
-      ## What Changes
-      - [Bullet points of what will be added/modified/removed]
-      - [Mark **BREAKING** if applicable]
+   d. Rename and fill **changes/<change-id>/specs/_skeleton.md** → **specs/<capability-name>/spec.md**
+      - Choose appropriate capability name (e.g., "auth", "api", "core")
+      - Fill ADDED Requirements section with new requirements
+      - Fill MODIFIED Requirements section with FULL updated text (not deltas)
+      - Fill REMOVED Requirements section if removing features
+      - Every requirement MUST have ≥1 scenario with WHEN/THEN clauses
 
-      ## Impact
-      - Affected specs: [capabilities]
-      - Affected code: [files/systems]
-      ```
-
-   b. **changes/<change-id>/tasks.md**
-      ```markdown
-      ## 1. Implementation
-      - [ ] 1.1 Core logic: [Task description]
-      - [ ] 1.2 Integration: [Task description]
-      - [ ] 1.3 Error handling: [Task description]
-
-      ## 2. Testing
-      - [ ] 2.1 Unit tests: [What to test]
-      - [ ] 2.2 Integration tests: [What to test]
-
-      ## 3. Documentation
-      - [ ] 3.1 Update specs: [Which specs]
-      - [ ] 3.2 Update README: [If needed]
-      ```
-
-   c. **changes/<change-id>/diagrams.md**
-      ```markdown
-      # Architecture Diagrams
-
-      ## State Diagram
-      \`\`\`mermaid
-      stateDiagram-v2
-          [state transitions]
-      \`\`\`
-
-      ## Flow Diagram
-      \`\`\`mermaid
-      flowchart TD
-          [process flow]
-      \`\`\`
-
-      ## Sequence Diagram
-      \`\`\`mermaid
-      sequenceDiagram
-          [interactions]
-      \`\`\`
-      ```
-
-   d. **changes/<change-id>/specs/<capability-name>/spec.md**
-      ```markdown
-      ## ADDED Requirements
-      ### Requirement: [Name]
-      The system SHALL [requirement description].
-
-      #### Scenario: Success case
-      - **WHEN** [trigger condition]
-      - **THEN** [expected behavior]
-
-      #### Scenario: Error case
-      - **WHEN** [error condition]
-      - **THEN** [error handling]
-
-      ## MODIFIED Requirements
-      ### Requirement: [Existing Name]
-      [FULL updated requirement text - include ALL previous content plus changes]
-
-      #### Scenario: [At least one scenario]
-      - **WHEN** ...
-      - **THEN** ...
-
-      ## REMOVED Requirements
-      ### Requirement: [Old Feature Name]
-      **Reason**: [Why removing]
-      **Migration**: [How to handle existing usage]
-      ```
-
-4. Output structured summary (see Output Format below)
+3. Output structured summary (see Output Format below)
 
 **Critical Format Rules**
 - Scenario headers: MUST use `#### Scenario:` (4 hashtags)
 - MODIFIED requirements: Include FULL requirement text (not just deltas)
 - Every requirement needs ≥1 scenario with WHEN/THEN clauses
-- Use verb-led kebab-case for change-id
+- Spec files must be in specs/<capability-name>/spec.md (not _skeleton.md)
 
 **Output Format** (MANDATORY)
 
-After creating all files, output this exact format:
+After filling all skeleton files, output this exact format:
 
 ```markdown
-## Proposal Generated: <change-id>
+## Proposal Filled: <change-id>
 
-### Files Created
-- ✅ proposal.md (<line-count> lines)
+### Files Completed
+- ✅ proposal.md (filled)
 - ✅ tasks.md (<task-count> tasks)
 - ✅ diagrams.md (<diagram-count> diagrams)
 - ✅ specs/<capability>/spec.md (<req-count> requirements, <scenario-count> scenarios)
@@ -143,22 +90,30 @@ After creating all files, output this exact format:
 Use ONLY these tools (do NOT use run_shell_command, mkdir, or any shell commands):
 
 ```python
-# Read files
-read_file(file_path="path/to/file.md")
+# Read skeleton files first
+read_file(file_path="changes/<change-id>/proposal.md")
+read_file(file_path="changes/<change-id>/tasks.md")
+read_file(file_path="changes/<change-id>/specs/_skeleton.md")
 
-# Search content
+# Search existing code
 search_file_content(pattern="Requirement:|Scenario:")
 
 # List directory
 list_directory(dir_path="specs")
 
-# Write files (MANDATORY - use this to create all proposal files)
+# Overwrite skeleton files with filled content
 write_file(
     file_path="changes/<change-id>/proposal.md",
-    content="# Change: ...\n\n## Why\n..."
+    content="# Change: ...\n\n## Summary\n[Filled content]..."
+)
+
+# Rename and fill spec skeleton
+write_file(
+    file_path="changes/<change-id>/specs/auth/spec.md",
+    content="## ADDED Requirements\n..."
 )
 ```
 
-**CRITICAL**: You MUST use `write_file` tool to create files. Do NOT attempt to use shell commands or echo redirection.
+**CRITICAL**: You MUST use `write_file` tool to fill skeleton files. Do NOT attempt to use shell commands or echo redirection.
 <!-- SPECTER:END -->
 """

@@ -1,6 +1,33 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Verdict from a challenge review
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ChallengeVerdict {
+    /// Proposal is approved and ready for implementation
+    Approved,
+    /// Proposal needs revision to address issues
+    NeedsRevision,
+    /// Proposal is rejected due to fundamental problems
+    Rejected,
+    /// Verdict could not be determined (parsing error or not filled)
+    Unknown,
+}
+
+impl ChallengeVerdict {
+    pub fn is_approved(&self) -> bool {
+        matches!(self, ChallengeVerdict::Approved)
+    }
+
+    pub fn needs_revision(&self) -> bool {
+        matches!(self, ChallengeVerdict::NeedsRevision)
+    }
+
+    pub fn is_rejected(&self) -> bool {
+        matches!(self, ChallengeVerdict::Rejected)
+    }
+}
+
 /// Severity level of a challenge issue
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IssueSeverity {
