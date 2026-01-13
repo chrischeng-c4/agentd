@@ -50,3 +50,6 @@ reqwest = { version = "0.12", features = ["json"], optional = true }
 [features]
 default = []
 api-direct = ["reqwest"]
+
+[dev-dependencies]
+tempfile = "3"

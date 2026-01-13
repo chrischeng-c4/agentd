@@ -163,4 +163,43 @@ impl ScriptRunner {
         self.run_script("claude-fix.sh", &[change_id.to_string()], true)
             .await
     }
+
+    /// Run Gemini spec merging (merge delta specs back to main specs)
+    pub async fn run_gemini_merge_specs(
+        &self,
+        change_id: &str,
+        strategy: &str,
+        spec_file: &str,
+    ) -> Result<String> {
+        self.run_script(
+            "gemini-merge-specs.sh",
+            &[
+                change_id.to_string(),
+                strategy.to_string(),
+                spec_file.to_string(),
+            ],
+            true,
+        )
+        .await
+    }
+
+    /// Run Gemini CHANGELOG generation
+    pub async fn run_gemini_changelog(&self, change_id: &str) -> Result<String> {
+        self.run_script("gemini-changelog.sh", &[change_id.to_string()], true)
+            .await
+    }
+
+    /// Run Codex archive quality review
+    pub async fn run_codex_archive_review(
+        &self,
+        change_id: &str,
+        strategy: &str,
+    ) -> Result<String> {
+        self.run_script(
+            "codex-archive-review.sh",
+            &[change_id.to_string(), strategy.to_string()],
+            true,
+        )
+        .await
+    }
 }

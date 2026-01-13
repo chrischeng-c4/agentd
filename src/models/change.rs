@@ -1,4 +1,4 @@
-use super::{Challenge, RequirementDelta, Verification};
+use super::{Challenge, RequirementDelta, ValidationRules, Verification};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -180,6 +180,10 @@ pub struct SpecterConfig {
 
     /// Scripts directory
     pub scripts_dir: PathBuf,
+
+    /// Validation rules for spec files
+    #[serde(default)]
+    pub validation: ValidationRules,
 }
 
 impl Default for SpecterConfig {
@@ -190,6 +194,7 @@ impl Default for SpecterConfig {
             claude_command: "claude".to_string(),
             codex_command: "codex".to_string(),
             scripts_dir: PathBuf::from("specter/scripts"),
+            validation: ValidationRules::default(),
         }
     }
 }
