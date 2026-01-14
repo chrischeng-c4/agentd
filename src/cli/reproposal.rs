@@ -1,3 +1,4 @@
+use crate::context::ContextPhase;
 use crate::orchestrator::ScriptRunner;
 use crate::{
     models::{Change, AgentdConfig},
@@ -26,7 +27,7 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     // Generate GEMINI.md context for this change
     let change_dir = project_root.join("agentd/changes").join(change_id);
-    crate::context::generate_gemini_context(&change_dir)?;
+    crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
 
     println!(
         "{}",

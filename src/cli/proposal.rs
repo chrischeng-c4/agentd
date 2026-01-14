@@ -1,5 +1,6 @@
 use crate::cli::validate_challenge::validate_challenge;
 use crate::cli::validate_proposal::validate_proposal;
+use crate::context::ContextPhase;
 use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, ValidationOptions};
 use crate::orchestrator::ScriptRunner;
 use crate::parser::parse_challenge_verdict;
@@ -148,7 +149,7 @@ async fn run_proposal_step(
     std::fs::create_dir_all(&change_dir)?;
 
     // Generate GEMINI.md context
-    crate::context::generate_gemini_context(&change_dir)?;
+    crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
 
     // Create proposal skeleton
     crate::context::create_proposal_skeleton(&change_dir, &resolved_change_id)?;
@@ -220,7 +221,7 @@ async fn run_challenge_step(
     change.validate_structure(project_root)?;
 
     // Generate AGENTS.md context
-    crate::context::generate_agents_context(&change_dir)?;
+    crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
 
     // Create CHALLENGE.md skeleton
     crate::context::create_challenge_skeleton(&change_dir, change_id)?;
@@ -284,7 +285,7 @@ async fn run_rechallenge_step(
     change.validate_structure(project_root)?;
 
     // Regenerate AGENTS.md context
-    crate::context::generate_agents_context(&change_dir)?;
+    crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
 
     // Recreate CHALLENGE.md skeleton for re-challenge
     crate::context::create_challenge_skeleton(&change_dir, change_id)?;
@@ -321,7 +322,7 @@ async fn run_reproposal_step(
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
     // Regenerate GEMINI.md context
-    crate::context::generate_gemini_context(&change_dir)?;
+    crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
 
     // Run Gemini reproposal
     let script_runner = ScriptRunner::new(config.scripts_dir.clone());

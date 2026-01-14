@@ -1,3 +1,4 @@
+use crate::context::ContextPhase;
 use crate::orchestrator::ScriptRunner;
 use crate::parser::parse_review_verdict;
 use crate::{
@@ -142,7 +143,7 @@ async fn run_review_step(
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
     // Regenerate AGENTS.md context
-    crate::context::generate_agents_context(&change_dir)?;
+    crate::context::generate_agents_context(&change_dir, ContextPhase::Review)?;
 
     // Create/update REVIEW.md skeleton
     crate::context::create_review_skeleton(&change_dir, change_id, iteration)?;

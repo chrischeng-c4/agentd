@@ -7,10 +7,100 @@ use walkdir::WalkDir;
 const GEMINI_TEMPLATE: &str = include_str!("../templates/GEMINI.md");
 const AGENTS_TEMPLATE: &str = include_str!("../templates/AGENTS.md");
 
+/// Context phase determines which project.md sections to inject
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContextPhase {
+    /// Design phase: Overview, Architecture, Key Patterns
+    Proposal,
+    /// Design review: Overview, Architecture, Key Patterns
+    Challenge,
+    /// Code writing: Overview, Tech Stack, Conventions, Key Patterns
+    Implement,
+    /// Code review: Overview, Tech Stack, Conventions, Key Patterns
+    Review,
+    /// Spec merge: Overview, Architecture, Key Patterns
+    Archive,
+}
+
+impl ContextPhase {
+    /// Get the section names to include for this phase
+    pub fn sections(&self) -> Vec<&'static str> {
+        match self {
+            ContextPhase::Proposal | ContextPhase::Challenge | ContextPhase::Archive => {
+                vec!["Overview", "Architecture", "Key Patterns"]
+            }
+            ContextPhase::Implement | ContextPhase::Review => {
+                vec!["Overview", "Tech Stack", "Conventions", "Key Patterns"]
+            }
+        }
+    }
+}
+
+/// Load specific sections from project.md based on the context phase
+///
+/// Parses agentd/project.md and extracts only the sections relevant to the phase.
+/// Returns formatted markdown with the selected sections.
+pub fn load_project_sections(phase: ContextPhase) -> Result<String> {
+    let current_dir = std::env::current_dir()?;
+    let project_path = current_dir.join("agentd/project.md");
+
+    // If project.md doesn't exist, return empty string
+    if !project_path.exists() {
+        return Ok(String::new());
+    }
+
+    let content = std::fs::read_to_string(&project_path)?;
+    let sections_to_include = phase.sections();
+
+    let mut result = String::new();
+    let mut current_section: Option<&str> = None;
+    let mut current_content = String::new();
+
+    for line in content.lines() {
+        // Check if this is a section header (## Level)
+        if line.starts_with("## ") {
+            // Save previous section if it was one we wanted
+            if let Some(section_name) = current_section {
+                if sections_to_include.contains(&section_name) && !current_content.trim().is_empty() {
+                    result.push_str(&format!("## {}\n", section_name));
+                    result.push_str(current_content.trim());
+                    result.push_str("\n\n");
+                }
+            }
+
+            // Start new section
+            let section_name = line.trim_start_matches("## ").trim();
+            current_section = sections_to_include.iter().find(|&&s| s == section_name).copied();
+            current_content.clear();
+        } else if current_section.is_some() {
+            // Skip HTML comments
+            if !line.trim().starts_with("<!--") && !line.trim().ends_with("-->") {
+                current_content.push_str(line);
+                current_content.push('\n');
+            }
+        }
+    }
+
+    // Don't forget the last section
+    if let Some(section_name) = current_section {
+        if sections_to_include.contains(&section_name) && !current_content.trim().is_empty() {
+            result.push_str(&format!("## {}\n", section_name));
+            result.push_str(current_content.trim());
+            result.push_str("\n\n");
+        }
+    }
+
+    Ok(result.trim().to_string())
+}
+
 /// Generate GEMINI.md context file for a specific change
-pub fn generate_gemini_context(change_dir: &Path) -> Result<()> {
+pub fn generate_gemini_context(change_dir: &Path, phase: ContextPhase) -> Result<()> {
     let project_structure = scan_project_structure()?;
-    let content = GEMINI_TEMPLATE.replace("{{PROJECT_STRUCTURE}}", &project_structure);
+    let project_context = load_project_sections(phase)?;
+
+    let content = GEMINI_TEMPLATE
+        .replace("{{PROJECT_STRUCTURE}}", &project_structure)
+        .replace("{{PROJECT_CONTEXT}}", &project_context);
 
     let output_path = change_dir.join("GEMINI.md");
     std::fs::write(&output_path, content)?;
@@ -19,9 +109,13 @@ pub fn generate_gemini_context(change_dir: &Path) -> Result<()> {
 }
 
 /// Generate AGENTS.md context file for a specific change
-pub fn generate_agents_context(change_dir: &Path) -> Result<()> {
+pub fn generate_agents_context(change_dir: &Path, phase: ContextPhase) -> Result<()> {
     let project_structure = scan_project_structure()?;
-    let content = AGENTS_TEMPLATE.replace("{{PROJECT_STRUCTURE}}", &project_structure);
+    let project_context = load_project_sections(phase)?;
+
+    let content = AGENTS_TEMPLATE
+        .replace("{{PROJECT_STRUCTURE}}", &project_structure)
+        .replace("{{PROJECT_CONTEXT}}", &project_context);
 
     let output_path = change_dir.join("AGENTS.md");
     std::fs::write(&output_path, content)?;

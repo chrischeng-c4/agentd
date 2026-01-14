@@ -1,3 +1,4 @@
+use crate::context::ContextPhase;
 use crate::orchestrator::ScriptRunner;
 use crate::parser::parse_review_verdict;
 use crate::{
@@ -30,7 +31,7 @@ pub async fn run(change_id: &str) -> Result<()> {
     change.validate_structure(&project_root)?;
 
     // Generate AGENTS.md context for this change
-    crate::context::generate_agents_context(&change_dir)?;
+    crate::context::generate_agents_context(&change_dir, ContextPhase::Review)?;
 
     // Create REVIEW.md skeleton for Codex to fill (iteration 0 for standalone review)
     crate::context::create_review_skeleton(&change_dir, change_id, 0)?;

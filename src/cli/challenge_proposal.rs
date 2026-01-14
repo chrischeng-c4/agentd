@@ -1,3 +1,4 @@
+use crate::context::ContextPhase;
 use crate::orchestrator::ScriptRunner;
 use crate::{
     models::{Change, AgentdConfig},
@@ -29,7 +30,7 @@ pub async fn run(change_id: &str) -> Result<()> {
     change.validate_structure(&project_root)?;
 
     // Generate AGENTS.md context for this change
-    crate::context::generate_agents_context(&change_dir)?;
+    crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
 
     // Create CHALLENGE.md skeleton for Codex to fill
     crate::context::create_challenge_skeleton(&change_dir, change_id)?;

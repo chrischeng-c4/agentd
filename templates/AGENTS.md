@@ -2,6 +2,10 @@
 
 This project uses **Agentd** for spec-driven development (SDD).
 
+## Project Context
+
+{{PROJECT_CONTEXT}}
+
 ## Directory Structure
 
 {{PROJECT_STRUCTURE}}
