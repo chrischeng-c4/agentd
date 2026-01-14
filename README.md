@@ -1,247 +1,75 @@
 # Agentd
 
-**Spec**-driven Development Orches**ter** (Orchestrator)
-
-A Rust-based tool for spec-driven development (SDD) that orchestrates multiple AI models to optimize for cost, quality, and safety.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-## Overview
-
-Software development with Large Language Models (LLMs) often faces a trilemma of **Context**, **Cost**, and **Control**.
-- High-context models are expensive for routine tasks.
-- Code-specialized models may lack broader architectural awareness.
-- Single-model workflows often drift from specifications.
-
-**Agentd solves this by orchestrating the right tool for the right job:**
-- **Gemini CLI** (default: `gemini-3-flash-preview`): Deep codebase exploration and proposal generation. 2M token context, low cost.
-- **Codex CLI** (default: `gpt-5.2-codex medium`): Rigorous code review, testing, and quality gating. High precision with configurable reasoning levels.
-- **Claude Code** (default: `sonnet`): Interactive implementation with best-in-class coding capability.
-
-> **Note**: Agentd automatically selects models based on task complexity. Simple tasks use faster/cheaper models; complex tasks escalate to more capable models. See [Dynamic Model Selection](#dynamic-model-selection).
-
-## Why Agentd?
-
-Agentd is designed for developers who want the velocity of AI coding without sacrificing architectural integrity or incurring massive API costs.
-
-- **💰 Cost Efficiency**: Reduces development costs by offloading context-heavy tasks to more efficient models.
-- **🛡️ Safety & Quality**: Introduces automated "Challenge" phases where an AI reviewer critiques the AI proposer *before* any code is written.
-- **🔄 Self-Correction**: Automatically detects and fixes hallucinations or conflicts through iterative refinement loops.
-- **✅ Rigorous Archiving**: The `archive` workflow is a 7-step quality gate that validates specs, merges changes, and verifies correctness before archiving.
-
-## Cost Analysis
-
-By specializing model usage, Agentd can significantly reduce token costs compared to using a single high-end model for the entire workflow.
-
-> **Estimated savings** based on typical feature development in a 100+ file codebase. Actual costs vary based on codebase size, API pricing, and model selection.
-
-| Development Phase | Single-Model Approach | Agentd Multi-Model | Estimated Savings |
-|-------------------|----------------------|---------------------|-------------------|
-| **Proposal & Research** | High Cost (Deep context) | **Lower Cost** (Gemini) | ~70-80% |
-| **Code Review** | High Cost | **Lower Cost** (Codex) | ~60-75% |
-| **Implementation** | Medium Cost | Medium Cost (Claude) | ~0% |
-| **Test Generation** | Medium Cost | **Lower Cost** (Codex) | ~50-60% |
-
-*Note: Session resumption and caching can provide additional 30-40% token savings during reproposal iterations.*
-
-## Key Features
-
-- **Dynamic Model Selection**: Automatically chooses the right model based on task complexity (Low → Critical).
-- **Automated Challenge-Reproposal Loop**: Proposal workflow automatically challenges and refines the plan before implementation.
-- **Iterative Refinement**: Built-in quality gates ensure plans are solid before code is written.
-- **Conflict Resolution**: Automatic detection and resolution of conflicting change-ids.
-- **Safety Rollbacks**: Integrated backup and rollback systems during critical phases like archiving.
-- **Context Awareness**: Leverages 2M+ token context windows for holistic project understanding.
-- **Validation System**: Local validation with `--strict`, `--verbose`, and `--json` output modes.
+AI-powered spec-driven development orchestrator.
 
 ## Installation
 
-### From Source (Recommended)
-
 ```bash
+# From source
 git clone https://github.com/anthropics/agentd
 cd agentd
 cargo install --path .
+
+# Verify
 agentd --version
-```
-
-### Quick Install
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/anthropics/agentd/main/install.sh | sh
 ```
 
 ## Prerequisites
 
-Before using Agentd, ensure you have:
+Set up your AI CLI tools and API keys:
 
-1. **AI CLI Tools** (choose based on your needs):
-   - [Gemini CLI](https://github.com/google/generative-ai) for proposal generation
-   - [Codex CLI](https://github.com/openai/codex-cli) for code review and testing
-   - [Claude Code](https://claude.ai/code) for interactive implementation
-
-2. **API Keys** (set as environment variables):
-   ```bash
-   export GEMINI_API_KEY="your-gemini-key"
-   export OPENAI_API_KEY="your-openai-key"
-   export ANTHROPIC_API_KEY="your-anthropic-key"
-   ```
-
-3. **Development Tools** (for Rust projects):
-   - Rust toolchain: `rustc`, `cargo`
-   - Code quality tools: `cargo clippy`, `cargo test`
-   - Security: `cargo-audit`, `semgrep` (optional, for review scripts)
-
-> **Note**: Agentd is language-agnostic but review scripts are currently optimized for Rust. Customize `agentd/scripts/codex-review.sh` for other tech stacks.
+```bash
+export GEMINI_API_KEY="your-gemini-key"
+export OPENAI_API_KEY="your-openai-key"
+export ANTHROPIC_API_KEY="your-anthropic-key"
+```
 
 ## Quick Start
 
-### 1. Initialize Project
 ```bash
+# 1. Initialize in your project
 cd your-project
 agentd init
-```
 
-### 2. Basic Workflow
+# 2. Create a proposal
+agentd proposal add-oauth "Add OAuth authentication with Google"
 
-```bash
-# 1. Create a proposal (automatically runs challenge → reproposal loop)
-agentd proposal add-oauth "Add OAuth authentication"
-# This single command:
-#   - Generates proposal with Gemini
-#   - Challenges it with Codex
-#   - Refines it with Gemini (if issues found)
-#   - Outputs a ready-to-implement plan
-
-# 2. Implement the feature (interactive with Claude Code)
+# 3. Implement (opens Claude Code)
 agentd implement add-oauth
-# Requires Claude Code Skills - opens interactive session
 
-# 3. Review and test implementation
+# 4. Review and test
 agentd review add-oauth
-# Generates tests and runs code review with Codex
 
-# 4. Fix any issues found
-agentd fix add-oauth  # (if review found issues)
-
-# 5. Archive and merge to main specs
+# 5. Archive when done
 agentd archive add-oauth
-```
-
-### 3. Manual Steps (Advanced)
-
-If you need more control, you can run individual phases:
-
-```bash
-# Run challenge separately (if not using automatic loop)
-agentd challenge add-oauth
-
-# Manually trigger reproposal
-agentd reproposal add-oauth
-
-# Refine with additional requirements
-agentd refine add-oauth "Add support for GitHub OAuth"
-```
-
-## Detailed Workflow
-
-Agentd follows a strict lifecycle to ensure quality.
-
-### 1. Proposal Generation (Automated Loop)
-**Primary Agent:** Gemini (configurable)
-
-When you run `agentd proposal`, the system automatically:
-1. Generates initial proposal with full codebase context (up to 2M tokens)
-2. Creates `proposal.md`, `tasks.md`, and spec deltas (with Mermaid diagrams)
-3. **Challenges** the proposal with Codex to find issues
-4. **Refines** the proposal if HIGH severity issues are found (one automatic iteration)
-5. **Outcome:** A vetted, high-quality spec ready for implementation
-
-### 2. Implementation (Interactive)
-**Agent:** Claude Code (haiku/sonnet/opus based on complexity)
-
-**Important**: Implementation requires Claude Code interactive environment.
-- Executes the tasks defined in `tasks.md`
-- Includes automatic review loop during implementation
-- Updates `IMPLEMENTATION.md` with progress notes
-- **Outcome:** Code changes applied to your project
-
-### 3. Review & Testing
-**Agent:** Codex (configurable)
-
-- Generates targeted unit and integration tests based on specs
-- Runs the project's test suite
-- Performs security scanning and code quality checks
-- **Outcome:** A `REVIEW.md` report with test results and findings
-
-### 4. Archive (The Quality Gate)
-**Agents:** Mixed (validation, Gemini, Codex)
-
-The archive command is a rigorous **7-step process**:
-1. **Validation**: Validates spec format and semantics using AST parsing (zero token cost)
-2. **Delta Analysis**: Computes metrics and decides merge strategy (zero token cost)
-3. **Backup**: Creates safety snapshot of `agentd/specs/` before modification
-4. **Spec Merging**: Gemini merges spec deltas into main specs directory
-5. **Changelog Generation**: Gemini updates `agentd/specs/CHANGELOG.md` automatically
-6. **Quality Review**: Codex reviews merged specs and changelog for hallucinations or omissions
-7. **Archive/Rollback**: If approved, moves to `archive/`; if review fails, rolls back to backup
-
-## Project Structure
-
-```
-project/
-├── agentd/
-│   ├── config.toml              # Configuration
-│   ├── specs/                   # Source of Truth: Main specifications
-│   │   ├── CHANGELOG.md         # Auto-generated changelog
-│   │   └── auth/spec.md
-│   ├── changes/                 # Active Work
-│   │   └── add-oauth/
-│   │       ├── proposal.md      # PRD: Why, What, Impact
-│   │       ├── tasks.md         # Tickets: File paths, actions, dependencies
-│   │       ├── specs/           # TD: Mermaid, JSON Schema, Pseudo code, Acceptance Criteria
-│   │       ├── GEMINI.md        # Auto-generated context for Gemini
-│   │       ├── AGENTS.md        # Auto-generated context for Codex
-│   │       ├── CHALLENGE.md     # Challenge review feedback
-│   │       ├── REVIEW.md        # Code review results
-│   │       ├── IMPLEMENTATION.md # Implementation notes
-│   │       └── ARCHIVE_REVIEW.md # Final quality gate report
-│   ├── archive/                 # Completed History
-│   │   └── 20260113-add-oauth/
-│   └── scripts/                 # AI Bridge Scripts (customizable)
-├── .claude/
-│   └── skills/                  # Claude Code Skills (installed by init)
-└── .gemini/
-    └── commands/agentd/        # Gemini command definitions
 ```
 
 ## Commands
 
-### Core Commands
+### Workflow Commands
 
 | Command | Description |
 |---------|-------------|
-| `agentd init` | Initialize Agentd in current directory |
-| `agentd proposal <id> "<desc>"` | Generate proposal (auto-runs challenge + reproposal) |
-| `agentd challenge <id>` | Manually challenge a proposal with Codex |
-| `agentd reproposal <id>` | Manually refine proposal based on challenge |
-| `agentd refine <id> "<requirements>"` | Add requirements to existing proposal |
-| `agentd implement <id>` | Implement changes (requires Claude Code) |
-| `agentd review <id>` | Review implementation and generate tests |
+| `agentd init` | Initialize Agentd in current project |
+| `agentd proposal <id> "<description>"` | Create a new proposal |
+| `agentd challenge-proposal <id>` | Challenge proposal with code review |
+| `agentd reproposal <id>` | Refine proposal based on challenge feedback |
+| `agentd implement <id>` | Implement the change (requires Claude Code) |
+| `agentd review <id>` | Review implementation and run tests |
 | `agentd fix <id>` | Fix issues found during review |
-| `agentd archive <id>` | Archive completed change (7-step quality gate) |
+| `agentd archive <id>` | Archive completed change |
 
 ### Validation Commands
 
 | Command | Description |
 |---------|-------------|
-| `agentd validate-proposal <id>` | Validate proposal format (local, no AI) |
-| `agentd validate-challenge <id>` | Validate challenge format (local, no AI) |
+| `agentd validate-proposal <id>` | Validate proposal format |
+| `agentd validate-challenge <id>` | Validate challenge format |
 
-**Validation flags:**
-- `--strict` - Treat warnings (MEDIUM/LOW) as errors
-- `--verbose` - Show file:line details for each error
-- `--json` - Output results as JSON (for CI/CD integration)
+Options:
+- `--strict` - Treat warnings as errors
+- `--verbose` - Show detailed error locations
+- `--json` - Output as JSON
 
 ### Utility Commands
 
@@ -249,107 +77,73 @@ project/
 |---------|-------------|
 | `agentd list` | List active changes |
 | `agentd list --archived` | List archived changes |
-| `agentd status <id>` | Show detailed change status |
-| `agentd status <id> --json` | Output status as JSON |
+| `agentd status <id>` | Show change status |
 
-## Dynamic Model Selection
+## Workflow
 
-Agentd automatically selects the appropriate model based on task complexity, optimizing for cost without sacrificing quality.
+```
+proposal → challenge → reproposal → implement → review → fix → archive
+```
 
-### Complexity Levels
+1. **Proposal**: Generate PRD, tasks, and specs using Gemini
+2. **Challenge**: Review proposal for issues using Codex
+3. **Reproposal**: Refine based on feedback (automatic if issues found)
+4. **Implement**: Write code using Claude Code
+5. **Review**: Run tests and code review
+6. **Fix**: Address any issues
+7. **Archive**: Merge specs and archive the change
 
-| Level | Description | Typical Tasks |
-|-------|-------------|---------------|
-| **Low** | Simple changes, < 5 files | Bug fixes, config updates |
-| **Medium** | Moderate scope, 5-15 files | New features, refactoring |
-| **High** | Large scope, 15+ files | Major features, cross-module changes |
-| **Critical** | Architectural changes | System redesign, breaking changes |
+## Project Structure
 
-### Model Selection Matrix
+After `agentd init`:
 
-| Tool | Low | Medium | High | Critical |
-|------|-----|--------|------|----------|
-| **Gemini** | flash | flash | pro | pro |
-| **Codex** | gpt-5.2-codex low | gpt-5.2-codex medium | gpt-5.2-codex high | gpt-5.2-codex extra high |
-| **Claude** | haiku | sonnet | opus | opus |
+```
+your-project/
+├── agentd/
+│   ├── config.toml          # Configuration
+│   ├── specs/               # Main specifications
+│   ├── changes/             # Active changes
+│   │   └── <change-id>/
+│   │       ├── proposal.md  # PRD
+│   │       ├── tasks.md     # Implementation tasks
+│   │       ├── specs/       # Technical design
+│   │       └── CHALLENGE.md # Review feedback
+│   └── archive/             # Completed changes
+├── .claude/skills/          # Claude Code skills
+└── .gemini/commands/        # Gemini commands
+```
 
-### Configuration
+## Configuration
 
-Model selection is configured in `agentd/config.toml`:
+Edit `agentd/config.toml` to customize:
 
 ```toml
+project_name = "my-project"
+
 [gemini]
 command = "gemini"
 default = "flash"
-
-[[gemini.models]]
-id = "flash"
-model = "gemini-3-flash-preview"
-complexity = "medium"
-
-[[gemini.models]]
-id = "pro"
-model = "gemini-3-pro-preview"
-complexity = "critical"
 
 [codex]
 command = "codex"
 default = "balanced"
 
-[[codex.models]]
-id = "balanced"
-model = "gpt-5.2-codex"
-reasoning = "medium"
-complexity = "medium"
+[claude]
+command = "claude"
+default = "balanced"
 ```
 
-Scripts receive model info via environment variables:
-- `AGENTD_MODEL` - Full model argument (e.g., `gpt-5.2-codex medium`)
-- `AGENTD_MODEL_COMMAND` - CLI command (e.g., `codex`)
-- `AGENTD_MODEL_REASONING` - Codex reasoning level (e.g., `medium`)
+## Claude Code Skills
 
-## Architecture
+After initialization, use these skills in Claude Code:
 
-Agentd operates through three layers:
-
-1. **CLI Layer**: Rust-based command parsing and validation (clap)
-2. **Orchestration Layer**: Manages state, session resumption, and tool chaining (tokio)
-3. **AI Integration Layer**:
-   - Project-specific context generation (GEMINI.md, AGENTS.md)
-   - Specialized prompts for different models
-   - Safety sandboxing for script execution
-
-**Key optimizations**:
-- Session resumption via cached contexts
-- Skeleton-based generation to reduce token usage
-- Change-id conflict resolution before LLM calls
-- Zero-cost validation with AST-based parsing using pulldown-cmark
-
-## Technical Stack
-
-Built with Rust for:
-- **Performance**: Compiled binary with minimal overhead
-- **Type safety**: Compile-time guarantees for correctness
-- **Portability**: Single binary, no runtime dependencies
-- **Reliability**: Robust error handling with anyhow/thiserror
-
-## Documentation
-
-- [Installation Guide](INSTALL.md) - Detailed installation instructions
-- [Architecture Documentation](CLAUDE.md) - Technical architecture and design
-- [Configuration](agentd/config.toml.example) - Configuration options
-
-## Contributing
-
-Contributions are welcome! Please follow standard Rust conventions. All new features should:
-1. Pass `cargo test`
-2. Pass `cargo clippy` with no warnings
-3. Follow the internal Agentd workflow (Proposal → Implement → Review)
+- `/agentd-proposal` - Generate proposal
+- `/agentd-challenge` - Challenge proposal
+- `/agentd-reproposal` - Refine proposal
+- `/agentd-implement` - Implement change
+- `/agentd-verify` - Verify implementation
+- `/agentd-archive` - Archive change
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-**Agentd enables cost-effective, AI-assisted spec-driven development through intelligent orchestration and iterative refinement.**
+MIT
