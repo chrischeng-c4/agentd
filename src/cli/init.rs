@@ -29,6 +29,9 @@ const CODEX_REVIEW: &str = include_str!("../../templates/codex/prompts/agentd-re
 // Project Context Template
 const PROJECT_TEMPLATE: &str = include_str!("../../templates/project.md");
 
+// CLAUDE.md Template for target projects
+const CLAUDE_TEMPLATE: &str = include_str!("../../templates/CLAUDE.md");
+
 // Prompt for generating project.md
 const PROJECT_INIT_PROMPT: &str = r#"Analyze this codebase and generate a project.md file.
 
@@ -149,6 +152,9 @@ fn run_fresh_install(
     // Install system files
     install_system_files(project_root, agentd_dir, claude_dir)?;
 
+    // Generate CLAUDE.md with project context
+    generate_claude_md(project_root, agentd_dir)?;
+
     // Write version file
     std::fs::write(version_file, AGENTD_VERSION)?;
 
@@ -181,6 +187,9 @@ fn run_upgrade(
 
     // Install/update system files
     install_system_files(project_root, agentd_dir, claude_dir)?;
+
+    // Regenerate CLAUDE.md with project context
+    generate_claude_md(project_root, agentd_dir)?;
 
     // Write new version
     std::fs::write(version_file, AGENTD_VERSION)?;
@@ -391,6 +400,25 @@ fn generate_project_md(project_md_path: &Path) {
     println!();
     println!("   Or ask Claude Code:");
     println!("     {}", "\"Read agentd/project.md and help me fill it out\"".cyan());
+}
+
+/// Generate CLAUDE.md with project context injected
+fn generate_claude_md(project_root: &Path, agentd_dir: &Path) -> Result<()> {
+    let project_md_path = agentd_dir.join("project.md");
+    let claude_md_path = project_root.join("CLAUDE.md");
+
+    // Read project.md content
+    let project_content = std::fs::read_to_string(&project_md_path)
+        .unwrap_or_else(|_| PROJECT_TEMPLATE.to_string());
+
+    // Inject into CLAUDE.md template
+    let claude_content = CLAUDE_TEMPLATE.replace("{{PROJECT_CONTEXT}}", &project_content);
+
+    // Write CLAUDE.md
+    std::fs::write(&claude_md_path, claude_content)?;
+    println!("   {} CLAUDE.md", "✓".green());
+
+    Ok(())
 }
 
 /// Check if upgrade is available and optionally auto-upgrade
