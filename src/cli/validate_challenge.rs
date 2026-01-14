@@ -164,19 +164,34 @@ pub fn validate_challenge(
     }
 
     // Check for required sections
-    let required_sections = [
-        "# Challenge Report",
-        "## Verdict",
-        "## Issues",
-    ];
+    // Note: "## Issues" is the old format; new format uses categorized sections
+    let has_title = content.contains("# Challenge Report");
+    let has_verdict = content.contains("## Verdict");
+    // Accept either "## Issues" (old) or categorized sections (new Codex format)
+    let has_issues_section = content.contains("## Issues")
+        || content.contains("## Internal Consistency Issues")
+        || content.contains("## Code Alignment Issues")
+        || content.contains("## Quality Suggestions");
 
-    for section in &required_sections {
-        if !content.contains(section) {
-            has_valid_structure = false;
-            errors.push(format!("Missing required section: {}", section));
-            if !options.json {
-                println!("      {} Missing: {}", "HIGH:".red(), section);
-            }
+    if !has_title {
+        has_valid_structure = false;
+        errors.push("Missing required section: # Challenge Report".to_string());
+        if !options.json {
+            println!("      {} Missing: # Challenge Report", "HIGH:".red());
+        }
+    }
+    if !has_verdict {
+        has_valid_structure = false;
+        errors.push("Missing required section: ## Verdict".to_string());
+        if !options.json {
+            println!("      {} Missing: ## Verdict", "HIGH:".red());
+        }
+    }
+    if !has_issues_section {
+        has_valid_structure = false;
+        errors.push("Missing issues section (## Issues or categorized sections)".to_string());
+        if !options.json {
+            println!("      {} Missing: issues section", "HIGH:".red());
         }
     }
 
@@ -207,7 +222,8 @@ pub fn validate_challenge(
     }
 
     // Validate issue format (each issue should have required fields)
-    let issue_regex = Regex::new(r"####\s+Issue\s+\d+").ok();
+    // Support both old format "#### Issue \d+" and new format "### Issue:"
+    let issue_regex = Regex::new(r"###\s+Issue[:\s]").ok();
     if let Some(re) = issue_regex {
         let issue_headers: Vec<_> = re.find_iter(&content).collect();
 
@@ -217,18 +233,35 @@ pub fn validate_challenge(
             let issue_end = if i + 1 < issue_headers.len() {
                 issue_headers[i + 1].start()
             } else {
-                content.len()
+                // Find next ## section or end of content
+                content[issue_start + 1..]
+                    .find("\n## ")
+                    .map(|pos| issue_start + 1 + pos)
+                    .unwrap_or(content.len())
             };
             let issue_content = &content[issue_start..issue_end];
 
-            // Check required fields
-            let required_fields = ["**Severity**:", "**Description**:", "**Location**:"];
-            for field in &required_fields {
-                if !issue_content.contains(field) {
-                    errors.push(format!("Issue {} missing field: {}", issue_num, field));
-                    if !options.json {
-                        println!("      {} Issue {} missing: {}", "MEDIUM:".yellow(), issue_num, field);
-                    }
+            // Check required fields (note: **Severity** may have - prefix)
+            let has_severity = issue_content.contains("**Severity**:");
+            let has_description = issue_content.contains("**Description**:");
+            let has_location = issue_content.contains("**Location**:");
+
+            if !has_severity {
+                errors.push(format!("Issue {} missing field: Severity", issue_num));
+                if !options.json {
+                    println!("      {} Issue {} missing: Severity", "MEDIUM:".yellow(), issue_num);
+                }
+            }
+            if !has_description {
+                errors.push(format!("Issue {} missing field: Description", issue_num));
+                if !options.json {
+                    println!("      {} Issue {} missing: Description", "MEDIUM:".yellow(), issue_num);
+                }
+            }
+            // Location is optional for some issues
+            if !has_location && options.verbose {
+                if !options.json {
+                    println!("      {} Issue {} missing optional: Location", "LOW:".bright_black(), issue_num);
                 }
             }
         }
