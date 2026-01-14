@@ -683,8 +683,8 @@ Focus on whether the previous issues have been addressed.
 EOF
 )
 
-# Resume the previous session with JSON streaming
-cd "$PROJECT_ROOT" && codex resume --last --json "$PROMPT" | while IFS= read -r line; do
+# Run with JSON streaming (codex resume doesn't support --json, use exec instead)
+cd "$PROJECT_ROOT" && codex exec --full-auto --json "$PROMPT" | while IFS= read -r line; do
   type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
   case "$type" in
     item.completed)
