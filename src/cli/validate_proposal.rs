@@ -1,6 +1,7 @@
 use crate::models::{
-    Change, AgentdConfig, JsonValidationError, Severity, ValidationCounts, ValidationError,
-    ValidationJsonOutput, ValidationOptions, ValidationResult, frontmatter::ValidationMode,
+    Change, AgentdConfig, JsonValidationError, Severity, ValidationCounts,
+    ValidationError, ValidationJsonOutput, ValidationOptions, ValidationResult, ValidationRules,
+    frontmatter::ValidationMode,
 };
 use crate::parser::has_frontmatter;
 use crate::state::StateManager;
@@ -232,9 +233,19 @@ pub fn validate_proposal(
     let change = Change::new(change_id, "");
     change.validate_structure(project_root)?;
 
-    let rules = config.validation.clone();
-    let format_validator = SpecFormatValidator::new(rules.clone());
-    let semantic_validator = SemanticValidator::new(rules);
+    // Create validators with type-specific rules
+    // PRD validator for proposal.md (lenient rules)
+    let prd_rules = ValidationRules::for_prd();
+    let prd_format_validator = SpecFormatValidator::new(prd_rules);
+
+    // Task validator for tasks.md (lenient rules)
+    let task_rules = ValidationRules::for_task();
+    let task_format_validator = SpecFormatValidator::new(task_rules);
+
+    // Spec validator for specs/*.md (strict rules)
+    let spec_rules = config.validation.clone();
+    let spec_format_validator = SpecFormatValidator::new(spec_rules.clone());
+    let semantic_validator = SemanticValidator::new(spec_rules);
 
     // Schema validator for frontmatter validation
     let schemas_dir = project_root.join("agentd/schemas");
@@ -283,8 +294,8 @@ pub fn validate_proposal(
             );
         }
 
-        // Format validation
-        let result = format_validator.validate(&proposal_path);
+        // Format validation (PRD rules - lenient)
+        let result = prd_format_validator.validate(&proposal_path);
         acc.process_result(&result, "proposal.md", "      ", options);
 
         if result.is_valid() && schema_valid && !options.json {
@@ -323,8 +334,8 @@ pub fn validate_proposal(
             );
         }
 
-        // Format validation
-        let result = format_validator.validate(&tasks_path);
+        // Format validation (Task rules - lenient)
+        let result = task_format_validator.validate(&tasks_path);
         acc.process_result(&result, "tasks.md", "      ", options);
 
         if result.is_valid() && schema_valid && !options.json {
@@ -342,6 +353,13 @@ pub fn validate_proposal(
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
+            // Skip template/skeleton files (files starting with underscore)
+            .filter(|e| {
+                e.path()
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map_or(true, |name| !name.starts_with('_'))
+            })
             .collect();
 
         for entry in spec_files {
@@ -367,8 +385,8 @@ pub fn validate_proposal(
                 }
             }
 
-            // Format validation
-            let format_result = format_validator.validate(entry.path());
+            // Format validation (Spec rules - strict)
+            let format_result = spec_format_validator.validate(entry.path());
             // Semantic validation
             let semantic_result = semantic_validator.validate(entry.path());
 

@@ -1,4 +1,4 @@
-use crate::models::{ErrorCategory, Severity, ValidationError, ValidationResult, ValidationRules};
+use crate::models::{DocumentType, ErrorCategory, Severity, ValidationError, ValidationResult, ValidationRules};
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use regex::Regex;
 use std::path::{Path, PathBuf};
@@ -12,6 +12,14 @@ impl SpecFormatValidator {
     /// Create a new format validator with rules
     pub fn new(rules: ValidationRules) -> Self {
         Self { rules }
+    }
+
+    /// Validate a file with document-type-specific rules
+    pub fn validate_with_type(&self, file_path: &Path, doc_type: DocumentType) -> ValidationResult {
+        // Get type-specific rules
+        let rules = ValidationRules::for_document_type(doc_type);
+        let validator = SpecFormatValidator::new(rules);
+        validator.validate(file_path)
     }
 
     /// Validate a spec file's format
@@ -119,7 +127,7 @@ impl SpecFormatValidator {
         errors.extend(self.validate_required_headings(&state));
 
         // Validate requirement completeness
-        errors.extend(self.validate_requirement_completeness(&state));
+        errors.extend(self.validate_requirement_completeness(&state, &content));
 
         ValidationResult::new(errors)
     }
@@ -213,11 +221,29 @@ impl SpecFormatValidator {
     }
 
     /// Validate requirement completeness (scenarios, WHEN/THEN)
-    fn validate_requirement_completeness(&self, state: &ValidationState) -> Vec<ValidationError> {
+    fn validate_requirement_completeness(&self, state: &ValidationState, content: &str) -> Vec<ValidationError> {
         let mut errors = Vec::new();
 
-        // Count scenarios (level 4 headings)
-        let scenario_count = state.headings.iter().filter(|(level, _)| *level == 4).count();
+        // Count scenarios from text content (more flexible than H4 headings)
+        let scenario_count = if !self.rules.scenario_pattern.is_empty() {
+            // Enable multiline mode for patterns that use ^ or $ anchors
+            let pattern = if self.rules.scenario_pattern.starts_with('^')
+                && !self.rules.scenario_pattern.starts_with("(?m)") {
+                format!("(?m){}", self.rules.scenario_pattern)
+            } else {
+                self.rules.scenario_pattern.clone()
+            };
+
+            if let Ok(scenario_regex) = Regex::new(&pattern) {
+                scenario_regex.find_iter(content).count()
+            } else {
+                // Fall back to H4 heading count if regex is invalid
+                state.headings.iter().filter(|(level, _)| *level == 4).count()
+            }
+        } else {
+            // No scenario pattern defined, skip scenario validation
+            self.rules.scenario_min_count // Pass validation
+        };
 
         if scenario_count < self.rules.scenario_min_count {
             let severity = self.rules.severity_map.missing_scenario;
@@ -233,9 +259,25 @@ impl SpecFormatValidator {
             ));
         }
 
-        // Validate WHEN/THEN presence
-        if self.rules.require_when_then && state.in_requirement {
-            if !state.has_when {
+        // Validate WHEN/THEN presence (check entire content, not just list items)
+        if self.rules.require_when_then && self.rules.scenario_min_count > 0 {
+            let has_when = if !self.rules.when_pattern.is_empty() {
+                Regex::new(&self.rules.when_pattern)
+                    .map(|r| r.is_match(content))
+                    .unwrap_or(content.contains("**WHEN**"))
+            } else {
+                true // No pattern means no requirement
+            };
+
+            let has_then = if !self.rules.then_pattern.is_empty() {
+                Regex::new(&self.rules.then_pattern)
+                    .map(|r| r.is_match(content))
+                    .unwrap_or(content.contains("**THEN**"))
+            } else {
+                true // No pattern means no requirement
+            };
+
+            if !has_when {
                 let severity = self.rules.severity_map.missing_when_then;
                 errors.push(ValidationError::new(
                     "Missing **WHEN** clause in scenarios",
@@ -245,7 +287,7 @@ impl SpecFormatValidator {
                     ErrorCategory::MissingWhenThen,
                 ));
             }
-            if !state.has_then {
+            if !has_then {
                 let severity = self.rules.severity_map.missing_when_then;
                 errors.push(ValidationError::new(
                     "Missing **THEN** clause in scenarios",

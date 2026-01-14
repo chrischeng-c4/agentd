@@ -33,7 +33,7 @@ pub use requirement::{Requirement, RequirementDelta};
 pub use review::{IssueCategory, ReviewIssue, ReviewVerdict};
 pub use scenario::Scenario;
 pub use validation::{
-    ErrorCategory, JsonValidationError, Severity, SeverityMap, ValidationCounts,
+    DocumentType, ErrorCategory, JsonValidationError, Severity, SeverityMap, ValidationCounts,
     ValidationError, ValidationJsonOutput, ValidationOptions, ValidationResult, ValidationRules,
 };
 pub use verification::{TestResult, TestStatus, Verification};

@@ -1,6 +1,33 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Document type for type-specific validation
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DocumentType {
+    /// PRD (Product Requirements Document) - proposal.md
+    Prd,
+    /// Task list - tasks.md
+    Task,
+    /// Technical Design Spec - specs/*.md
+    Spec,
+}
+
+impl DocumentType {
+    /// Determine document type from file path
+    pub fn from_path(path: &std::path::Path) -> Self {
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+        if file_name == "proposal.md" {
+            DocumentType::Prd
+        } else if file_name == "tasks.md" {
+            DocumentType::Task
+        } else {
+            // Default to Spec for files in specs/ directory or any other .md files
+            DocumentType::Spec
+        }
+    }
+}
+
 /// Severity level for validation errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Severity {
@@ -155,6 +182,51 @@ pub struct ValidationRules {
 
 impl Default for ValidationRules {
     fn default() -> Self {
+        // Default rules are for Spec documents (most restrictive)
+        Self::for_spec()
+    }
+}
+
+impl ValidationRules {
+    /// Get validation rules for PRD (proposal.md)
+    /// PRD documents are less strict - they describe "why" and "what", not technical details
+    pub fn for_prd() -> Self {
+        Self {
+            required_headings: vec![
+                // PRD doesn't require spec-style headings
+                // Common PRD sections are: Summary, Why, What Changes, Impact
+            ],
+            requirement_pattern: String::new(), // No requirement pattern for PRD
+            scenario_pattern: String::new(),    // No scenarios required
+            scenario_min_count: 0,              // No minimum scenarios
+            require_when_then: false,           // No WHEN/THEN required
+            when_pattern: String::new(),
+            then_pattern: String::new(),
+            severity_map: SeverityMap::default(),
+        }
+    }
+
+    /// Get validation rules for Task list (tasks.md)
+    /// Task documents describe implementation tasks, not formal specifications
+    pub fn for_task() -> Self {
+        Self {
+            required_headings: vec![
+                // Task files should have a "Tasks" heading or numbered sections
+                // But we'll be lenient and not require specific headings
+            ],
+            requirement_pattern: String::new(), // No formal requirements
+            scenario_pattern: String::new(),    // No scenarios in task files
+            scenario_min_count: 0,              // No minimum scenarios
+            require_when_then: false,           // No WHEN/THEN required
+            when_pattern: String::new(),
+            then_pattern: String::new(),
+            severity_map: SeverityMap::default(),
+        }
+    }
+
+    /// Get validation rules for Spec (Technical Design) documents
+    /// Spec documents require formal structure with requirements and scenarios
+    pub fn for_spec() -> Self {
         Self {
             required_headings: vec![
                 "Specification:".to_string(),
@@ -162,12 +234,22 @@ impl Default for ValidationRules {
                 "Requirements".to_string(),
             ],
             requirement_pattern: r"^R\d+:".to_string(),
-            scenario_pattern: r"^Scenario:".to_string(),
+            // More flexible scenario pattern - matches "Scenario:" anywhere in text
+            scenario_pattern: r"Scenario:".to_string(),
             scenario_min_count: 1,
             require_when_then: true,
-            when_pattern: r"- \*\*WHEN\*\*".to_string(),
-            then_pattern: r"- \*\*THEN\*\*".to_string(),
+            when_pattern: r"\*\*WHEN\*\*".to_string(),
+            then_pattern: r"\*\*THEN\*\*".to_string(),
             severity_map: SeverityMap::default(),
+        }
+    }
+
+    /// Get validation rules based on document type
+    pub fn for_document_type(doc_type: DocumentType) -> Self {
+        match doc_type {
+            DocumentType::Prd => Self::for_prd(),
+            DocumentType::Task => Self::for_task(),
+            DocumentType::Spec => Self::for_spec(),
         }
     }
 }
