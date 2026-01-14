@@ -5,8 +5,13 @@ AI-powered spec-driven development orchestrator.
 ## Installation
 
 ```bash
-brew tap chrischeng-c4/tap
-brew install agentd
+curl -fsSL https://raw.githubusercontent.com/chrischeng-c4/agentd/main/install.sh | bash
+```
+
+To update to the latest version:
+
+```bash
+agentd update
 ```
 
 ## Prerequisites
@@ -73,6 +78,8 @@ Options:
 | `agentd list` | List active changes |
 | `agentd list --archived` | List archived changes |
 | `agentd status <id>` | Show change status |
+| `agentd update` | Update to latest version |
+| `agentd update --check` | Check for updates without installing |
 
 ## Workflow
 
