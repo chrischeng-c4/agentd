@@ -1,5 +1,5 @@
 ---
-name: agentd-fix
+name: agentd:fix
 description: Fix issues found during verification
 user-invocable: true
 ---

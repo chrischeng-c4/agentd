@@ -1,5 +1,5 @@
 ---
-name: agentd-challenge
+name: agentd:challenge
 description: Challenge proposal with Codex analysis
 user-invocable: true
 ---

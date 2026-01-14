@@ -1,5 +1,5 @@
 ---
-name: agentd-proposal
+name: agentd:proposal
 description: Generate proposal using Gemini (2M context)
 user-invocable: true
 ---

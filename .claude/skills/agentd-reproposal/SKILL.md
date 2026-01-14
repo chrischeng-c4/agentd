@@ -1,5 +1,5 @@
 ---
-name: agentd-reproposal
+name: agentd:reproposal
 description: Refine proposal based on challenge feedback
 user-invocable: true
 ---

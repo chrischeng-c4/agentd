@@ -1,5 +1,5 @@
 ---
-name: agentd-archive
+name: agentd:archive
 description: Archive completed change
 user-invocable: true
 ---

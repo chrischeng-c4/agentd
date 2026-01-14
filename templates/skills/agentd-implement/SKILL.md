@@ -1,5 +1,5 @@
 ---
-name: agentd-implement
+name: agentd:implement
 description: Implement tasks from proposal
 user-invocable: true
 ---
