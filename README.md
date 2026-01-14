@@ -5,7 +5,7 @@ AI-powered spec-driven development orchestrator.
 ## Installation
 
 ```bash
-brew tap chrischeng-c4/agentd
+brew tap chrischeng-c4/tap
 brew install agentd
 ```
 
