@@ -42,8 +42,8 @@ thiserror = "2"
 walkdir = "2"
 glob = "0.3"
 
-# Git
-git2 = "0.20"
+# Git (vendored-openssl for cross-platform builds)
+git2 = { version = "0.20", features = ["vendored-openssl"] }
 
 # Process execution (for scripts)
 tokio = { version = "1", features = ["process", "io-util", "rt-multi-thread", "macros"] }
