@@ -10,5 +10,6 @@ pub mod reproposal;
 pub mod resolve_reviews;
 pub mod review;
 pub mod status;
+pub mod update;
 pub mod validate_challenge;
 pub mod validate_proposal;

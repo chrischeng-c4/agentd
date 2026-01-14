@@ -142,6 +142,13 @@ enum Commands {
         #[arg(short, long)]
         archived: bool,
     },
+
+    /// Update agentd to the latest version
+    Update {
+        /// Check for updates without installing
+        #[arg(short, long)]
+        check: bool,
+    },
 }
 
 #[tokio::main]
@@ -243,6 +250,10 @@ async fn main() -> Result<()> {
 
         Commands::List { archived } => {
             agentd::cli::list::run(archived).await?;
+        }
+
+        Commands::Update { check } => {
+            agentd::cli::update::run(check).await?;
         }
     }
 
