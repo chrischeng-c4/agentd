@@ -1,0 +1,18 @@
+{
+  "tools": {
+    "allowed": [
+      "list_directory",
+      "read_file",
+      "search_file_content",
+      "glob",
+      "write_file",
+      "replace"
+    ]
+  },
+  "approvals": {
+    "autoApprove": {
+      "write_file": true,
+      "replace": true
+    }
+  }
+}

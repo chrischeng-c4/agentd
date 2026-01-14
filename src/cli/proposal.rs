@@ -152,7 +152,7 @@ async fn run_proposal_step(
         Ok(_) => {
             println!(
                 "{}",
-                "✅ Proposal generated (proposal.md, tasks.md, diagrams.md, specs/)".green()
+                "✅ Proposal generated (proposal.md, tasks.md, specs/)".green()
             );
             Ok(resolved_change_id)
         }

@@ -111,69 +111,102 @@ pub fn create_proposal_skeleton(change_dir: &Path, change_id: &str) -> Result<()
     );
     std::fs::write(change_dir.join("proposal.md"), proposal_skeleton)?;
 
-    // Create tasks.md skeleton
+    // Create tasks.md skeleton (Ticket format)
     let tasks_skeleton = r#"# Tasks
 
-## 1. Implementation
-- [ ] 1.1 [Task description]
-- [ ] 1.2 [Task description]
+<!--
+Each task is a dev ticket derived from specs.
+NO actual code - just file paths, actions, and references.
+-->
 
-## 2. Testing
-- [ ] 2.1 Unit tests: [What to test]
-- [ ] 2.2 Integration tests: [What to test]
+## 1. Data Layer
+- [ ] 1.1 [Task title]
+  - File: `path/to/file.rs` (CREATE|MODIFY|DELETE)
+  - Spec: `specs/[name].md#[section]`
+  - Do: [What to implement - not how]
 
-## 3. Documentation
-- [ ] 3.1 Update specs: [Which specs]
-- [ ] 3.2 Update README: [If needed]
+## 2. Logic Layer
+- [ ] 2.1 [Task title]
+  - File: `path/to/file.rs` (CREATE|MODIFY)
+  - Spec: `specs/[name].md#[section]`
+  - Do: [What to implement]
+  - Depends: 1.1
+
+## 3. Integration
+- [ ] 3.1 [Task title]
+  - File: `path/to/file.rs` (MODIFY)
+  - Do: [What to integrate]
+  - Depends: 2.1
+
+## 4. Testing
+- [ ] 4.1 [Test task title]
+  - File: `path/to/test.rs` (CREATE)
+  - Verify: `specs/[name].md#acceptance-criteria`
+  - Depends: [relevant tasks]
 "#;
     std::fs::write(change_dir.join("tasks.md"), tasks_skeleton)?;
-
-    // Create diagrams.md skeleton
-    let diagrams_skeleton = r#"# Architecture Diagrams
-
-## State Diagram
-```mermaid
-stateDiagram-v2
-    [Add state transitions here]
-```
-
-## Flow Diagram
-```mermaid
-flowchart TD
-    [Add process flow here]
-```
-
-## Sequence Diagram
-```mermaid
-sequenceDiagram
-    [Add interactions here]
-```
-"#;
-    std::fs::write(change_dir.join("diagrams.md"), diagrams_skeleton)?;
 
     // Create specs directory with a skeleton file
     let specs_dir = change_dir.join("specs");
     std::fs::create_dir_all(&specs_dir)?;
 
-    let spec_skeleton = r#"# Spec Delta
+    // Spec skeleton: TD + AC format with diagrams (NO actual code)
+    let spec_skeleton = r#"# Spec: [Feature Name]
 
-## ADDED Requirements
-### Requirement: [Name]
-The system SHALL [requirement description].
+<!--
+Technical Design + Acceptance Criteria.
+Use abstraction tools: Mermaid, JSON Schema, OpenAPI, Pseudo code.
+NO actual implementation code.
+-->
 
-#### Scenario: Success case
-- **WHEN** [trigger condition]
-- **THEN** [expected behavior]
+## Overview
+[Brief description of what this spec covers]
 
-#### Scenario: Error case
-- **WHEN** [error condition]
-- **THEN** [error handling]
+## Flow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant S as System
+    U->>S: [action]
+    S-->>U: [response]
+```
 
-## MODIFIED Requirements
-[If modifying existing requirements, include FULL updated requirement text]
+## State (if applicable)
+```mermaid
+stateDiagram-v2
+    [*] --> State1
+    State1 --> State2: event
+    State2 --> [*]
+```
 
-## REMOVED Requirements
-[If removing requirements, explain why and migration path]
+## Data Model
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "field1": { "type": "string", "description": "..." },
+    "field2": { "type": "integer" }
+  },
+  "required": ["field1"]
+}
+```
+
+## Interfaces
+```
+FUNCTION function_name(param1: type, param2: type) -> ResultType
+  INPUT: [describe inputs]
+  OUTPUT: [describe outputs]
+  ERRORS: [possible error conditions]
+
+FUNCTION another_function() -> void
+  SIDE_EFFECTS: [what it modifies]
+```
+
+## Acceptance Criteria
+- WHEN [trigger condition] THEN [expected behavior]
+- WHEN [error condition] THEN [error handling]
+- WHEN [edge case] THEN [expected behavior]
 "#;
     std::fs::write(specs_dir.join("_skeleton.md"), spec_skeleton)?;
 
@@ -191,7 +224,7 @@ pub fn create_challenge_skeleton(change_dir: &Path, change_id: &str) -> Result<(
 
 ## Internal Consistency Issues
 [Check if proposal files are consistent with each other]
-[Examples: Does proposal.md match tasks.md? Do diagrams.md match descriptions? Do specs/ align with Impact?]
+[Examples: Does proposal.md match tasks.md? Do Mermaid diagrams in specs/ match descriptions? Do task spec refs exist?]
 [These are HIGH priority - must fix before implementation]
 
 ### Issue: [Title]

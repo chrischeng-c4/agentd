@@ -22,6 +22,9 @@ const GEMINI_SETTINGS: &str = include_str!("../../templates/gemini/settings.json
 const CODEX_CHALLENGE: &str = include_str!("../../templates/codex/prompts/agentd-challenge.md");
 const CODEX_VERIFY: &str = include_str!("../../templates/codex/prompts/agentd-verify.md");
 
+// Project Context Template
+const PROJECT_TEMPLATE: &str = include_str!("../../templates/project.md");
+
 // AI Context Files (GEMINI.md and AGENTS.md) are now generated dynamically per change
 // from templates/GEMINI.md and templates/AGENTS.md
 
@@ -54,6 +57,11 @@ pub async fn run(name: Option<&str>) -> Result<()> {
 
     // AI context files (GEMINI.md, AGENTS.md) are now generated dynamically
     // per change in agentd/changes/<change-id>/ by the CLI commands
+
+    // Create project.md for project context
+    let project_md_path = agentd_dir.join("project.md");
+    std::fs::write(&project_md_path, PROJECT_TEMPLATE)?;
+    println!("   ✓ agentd/project.md");
 
     // Create Claude Code skills directory
     let skills_dir = claude_dir.join("skills");
@@ -97,12 +105,16 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     println!();
     println!("{}", "📁 Structure:".cyan());
     println!("   agentd/                   - Main Agentd directory");
+    println!(
+        "   {}       - Project context (fill with AI)",
+        "agentd/project.md".yellow()
+    );
     println!("   agentd/specs/             - Main specifications");
     println!("   agentd/changes/           - Active changes");
     println!("   agentd/archive/           - Completed changes");
-    println!("   .claude/skills/            - 7 Skills installed");
+    println!("   .claude/skills/           - 7 Skills installed");
     println!("   .gemini/commands/agentd/  - 2 Gemini commands");
-    println!("   ~/.codex/prompts/          - 2 Codex prompts");
+    println!("   ~/.codex/prompts/         - 2 Codex prompts");
     println!();
 
     println!("{}", "🤖 AI Commands Installed:".cyan().bold());
@@ -147,17 +159,20 @@ pub async fn run(name: Option<&str>) -> Result<()> {
     println!();
 
     println!("{}", "⏭️  Next Steps:".yellow().bold());
-    println!("   1. In Claude Code, run:");
+    println!(
+        "   1. {} Fill project context with AI:",
+        "📝".cyan()
+    );
+    println!(
+        "      {}",
+        "\"Read agentd/project.md and help me fill it out\"".cyan()
+    );
+    println!();
+    println!("   2. Start your first proposal:");
     println!(
         "      {}",
         "/agentd:proposal my-feature \"Add awesome feature\"".cyan()
     );
-    println!();
-    println!("   2. Configure API keys (optional):");
-    println!("      Edit agentd/scripts/config.sh");
-    println!();
-    println!("   3. Read the guide:");
-    println!("      cat agentd/README.md");
 
     Ok(())
 }
@@ -279,8 +294,7 @@ A skeleton CHALLENGE.md has been created at agentd/changes/${CHANGE_ID}/CHALLENG
 2. Read all proposal files in agentd/changes/${CHANGE_ID}/:
    - proposal.md
    - tasks.md
-   - diagrams.md
-   - specs/*.md
+   - specs/*.md (contains Mermaid diagrams, JSON Schema, interfaces, acceptance criteria)
 
 3. Explore the existing codebase
 
@@ -435,8 +449,7 @@ The proposal has been revised based on previous feedback.
 2. Read the UPDATED proposal files in agentd/changes/${CHANGE_ID}/:
    - proposal.md (revised)
    - tasks.md (revised)
-   - diagrams.md (revised)
-   - specs/*.md (revised)
+   - specs/*.md (revised - with Mermaid diagrams, JSON Schema, interfaces, acceptance criteria)
 
 3. Re-fill the CHALLENGE.md with your findings:
    - **Internal Consistency Issues** (HIGH): Check if revised proposal docs now match each other
@@ -478,7 +491,7 @@ PROMPT=$(cat << EOF
 Implement the proposal for agentd/changes/${CHANGE_ID}/.
 
 ## Instructions
-1. Read proposal.md, tasks.md, diagrams.md, and specs/
+1. Read proposal.md, tasks.md, and specs/
 2. Implement ALL tasks in tasks.md (or only ${TASKS} if specified)
 3. **Write tests for all implemented features** (unit + integration)
    - Test all spec scenarios (WHEN/THEN cases)

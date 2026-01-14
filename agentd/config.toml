@@ -1,0 +1,26 @@
+project_name = "agentd"
+gemini_command = "gemini"
+claude_command = "claude"
+codex_command = "codex"
+scripts_dir = "/Users/chrischeng/projects/agentd/agentd/scripts"
+
+[validation]
+required_headings = [
+    "Specification:",
+    "Overview",
+    "Requirements",
+]
+requirement_pattern = '^R\d+:'
+scenario_pattern = "^Scenario:"
+scenario_min_count = 1
+require_when_then = true
+when_pattern = '- \*\*WHEN\*\*'
+then_pattern = '- \*\*THEN\*\*'
+
+[validation.severity_map]
+missing_heading = "High"
+invalid_requirement_format = "High"
+missing_scenario = "High"
+missing_when_then = "High"
+duplicate_requirement = "High"
+broken_reference = "Medium"

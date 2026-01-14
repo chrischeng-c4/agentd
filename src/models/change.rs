@@ -101,11 +101,6 @@ impl Change {
         self.path(project_root).join("tasks.md")
     }
 
-    /// Get path to diagrams.md
-    pub fn diagrams_path(&self, project_root: &Path) -> PathBuf {
-        self.path(project_root).join("diagrams.md")
-    }
-
     /// Get path to specs directory
     pub fn specs_path(&self, project_root: &Path) -> PathBuf {
         self.path(project_root).join("specs")
@@ -147,11 +142,6 @@ impl Change {
         let tasks = self.tasks_path(project_root);
         if !tasks.exists() {
             anyhow::bail!("Missing tasks.md at {:?}", tasks);
-        }
-
-        let diagrams = self.diagrams_path(project_root);
-        if !diagrams.exists() {
-            anyhow::bail!("Missing diagrams.md at {:?}", diagrams);
         }
 
         let specs = self.specs_path(project_root);

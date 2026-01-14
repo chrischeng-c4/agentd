@@ -92,10 +92,9 @@ cargo fmt -- --check
 ### Key Concepts
 
 **Change**: Central unit of work with phases (Proposed → Challenged → Implementing → Testing → Complete → Archived). Each change has:
-- `proposal.md`: Why, what, impact
-- `tasks.md`: Implementation checklist
-- `diagrams.md`: Mermaid diagrams
-- `specs/`: Specification deltas
+- `proposal.md`: PRD - Why, what, impact
+- `tasks.md`: Tickets - File paths, actions, spec references, dependencies
+- `specs/`: TD - Technical design (Mermaid, JSON Schema, Pseudo code) + Acceptance criteria
 - `CHALLENGE.md`: Code review feedback (Codex)
 - `IMPLEMENTATION.md`: Implementation notes (Claude)
 - `VERIFICATION.md`: Test results (Codex)
@@ -118,8 +117,7 @@ agentd/                # Main Agentd directory (visible)
     add-oauth/
       proposal.md
       tasks.md
-      diagrams.md
-      specs/
+      specs/            # TD with Mermaid, JSON Schema, Pseudo code
       CHALLENGE.md
       IMPLEMENTATION.md
       VERIFICATION.md

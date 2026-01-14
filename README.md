@@ -150,7 +150,7 @@ Agentd follows a strict lifecycle to ensure quality.
 
 When you run `agentd proposal`, the system automatically:
 1. Generates initial proposal with full codebase context (up to 2M tokens)
-2. Creates `proposal.md`, `tasks.md`, `diagrams.md`, and spec deltas
+2. Creates `proposal.md`, `tasks.md`, and spec deltas (with Mermaid diagrams)
 3. **Challenges** the proposal with Codex to find issues
 4. **Refines** the proposal if HIGH severity issues are found (one automatic iteration)
 5. **Outcome:** A vetted, high-quality spec ready for implementation
@@ -195,10 +195,9 @@ project/
 │   │   └── auth/spec.md
 │   ├── changes/                 # Active Work
 │   │   └── add-oauth/
-│   │       ├── proposal.md      # The Plan (Why, What, Impact)
-│   │       ├── tasks.md         # Implementation checklist
-│   │       ├── diagrams.md      # Architecture diagrams
-│   │       ├── specs/           # Spec Deltas (changes to merge)
+│   │       ├── proposal.md      # PRD: Why, What, Impact
+│   │       ├── tasks.md         # Tickets: File paths, actions, dependencies
+│   │       ├── specs/           # TD: Mermaid, JSON Schema, Pseudo code, Acceptance Criteria
 │   │       ├── GEMINI.md        # Auto-generated context for Gemini
 │   │       ├── AGENTS.md        # Auto-generated context for Codex
 │   │       ├── CHALLENGE.md     # Challenge review feedback
