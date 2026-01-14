@@ -356,19 +356,22 @@ mod tests {
 
     #[test]
     fn test_valid_spec() {
-        let content = r#"# Specification: Test Feature
+        // New TD + AC format that Gemini produces
+        let content = r#"# Spec: Authentication
 
 ## Overview
-This is a test specification.
+This spec covers user authentication with JWT.
 
-## Requirements
+## Flow
+```mermaid
+sequenceDiagram
+    User->>API: POST /login
+    API-->>User: JWT token
+```
 
-### R1: First Requirement
-This is the first requirement.
-
-#### Scenario: Success Case
-- **WHEN** user performs action
-- **THEN** system responds correctly
+## Acceptance Criteria
+- WHEN user provides valid credentials THEN return JWT token
+- WHEN user provides invalid credentials THEN return 401 error
 "#;
 
         let mut file = NamedTempFile::new().unwrap();
@@ -383,10 +386,14 @@ This is the first requirement.
 
     #[test]
     fn test_missing_required_heading() {
-        let content = r#"# Specification: Test Feature
+        // Missing Acceptance Criteria
+        let content = r#"# Spec: Test Feature
 
-## Requirements
-### R1: First Requirement
+## Overview
+Test description.
+
+## Flow
+Some flow description.
 "#;
 
         let mut file = NamedTempFile::new().unwrap();
@@ -405,15 +412,15 @@ This is the first requirement.
 
     #[test]
     fn test_invalid_requirement_format() {
-        let content = r#"# Specification: Test Feature
+        // Missing WHEN/THEN in Acceptance Criteria
+        let content = r#"# Spec: Test Feature
 
 ## Overview
 Test
 
-## Requirements
-
-### Bad Format
-This doesn't follow R\d+: pattern
+## Acceptance Criteria
+- User can login
+- User can logout
 "#;
 
         let mut file = NamedTempFile::new().unwrap();
@@ -426,7 +433,7 @@ This doesn't follow R\d+: pattern
         assert!(!result.is_valid());
         assert!(result.errors.iter().any(|e| matches!(
             e.category,
-            ErrorCategory::InvalidRequirementFormat
+            ErrorCategory::MissingWhenThen
         )));
     }
 

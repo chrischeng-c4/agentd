@@ -225,21 +225,30 @@ impl ValidationRules {
     }
 
     /// Get validation rules for Spec (Technical Design) documents
-    /// Spec documents require formal structure with requirements and scenarios
+    ///
+    /// Spec format (TD + AC):
+    /// - # Spec: [Feature Name]
+    /// - ## Overview
+    /// - ## Flow (Mermaid diagrams)
+    /// - ## Data Model (JSON Schema)
+    /// - ## Interfaces (pseudo code)
+    /// - ## Acceptance Criteria (WHEN/THEN)
     pub fn for_spec() -> Self {
         Self {
             required_headings: vec![
-                "Specification:".to_string(),
                 "Overview".to_string(),
-                "Requirements".to_string(),
+                "Acceptance Criteria".to_string(),
             ],
-            requirement_pattern: r"^R\d+:".to_string(),
-            // More flexible scenario pattern - matches "Scenario:" anywhere in text
-            scenario_pattern: r"Scenario:".to_string(),
+            // No strict requirement naming - allow descriptive headings
+            requirement_pattern: String::new(),
+            // Look for WHEN...THEN pattern as our "scenario" marker
+            scenario_pattern: r"WHEN\s.*THEN\s".to_string(),
             scenario_min_count: 1,
+            // Require WHEN/THEN clauses in Acceptance Criteria
             require_when_then: true,
-            when_pattern: r"\*\*WHEN\*\*".to_string(),
-            then_pattern: r"\*\*THEN\*\*".to_string(),
+            // More flexible patterns - just WHEN and THEN anywhere
+            when_pattern: r"WHEN\s".to_string(),
+            then_pattern: r"THEN\s".to_string(),
             severity_map: SeverityMap::default(),
         }
     }
