@@ -3,6 +3,9 @@ use colored::Colorize;
 use std::env;
 use std::path::{Path, PathBuf};
 
+// Current version for tracking upgrades
+const AGENTD_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 // Claude Code Skills
 const SKILL_PROPOSAL: &str = include_str!("../../templates/skills/agentd-proposal/SKILL.md");
 const SKILL_CHALLENGE: &str = include_str!("../../templates/skills/agentd-challenge/SKILL.md");
@@ -28,35 +31,65 @@ const PROJECT_TEMPLATE: &str = include_str!("../../templates/project.md");
 // AI Context Files (GEMINI.md and AGENTS.md) are now generated dynamically per change
 // from templates/GEMINI.md and templates/AGENTS.md
 
-pub async fn run(name: Option<&str>) -> Result<()> {
+pub async fn run(name: Option<&str>, force: bool) -> Result<()> {
     let project_root = env::current_dir()?;
-
-    // Check if already initialized
     let agentd_dir = project_root.join("agentd");
     let claude_dir = project_root.join(".claude");
+    let version_file = agentd_dir.join(".version");
 
-    if agentd_dir.exists() {
+    // Check if already initialized
+    let is_initialized = agentd_dir.exists();
+
+    if is_initialized && !force {
+        // Check installed version
+        let installed_version = std::fs::read_to_string(&version_file)
+            .unwrap_or_else(|_| "unknown".to_string());
+
         println!("{}", "⚠️  Agentd is already initialized".yellow());
-        println!("   Run with --force to reinstall");
+        println!("   Installed version: {}", installed_version.trim());
+        println!("   Current version:   {}", AGENTD_VERSION);
+        println!();
+        println!("   Run {} to upgrade system files", "--force".cyan());
+        println!("   (preserves specs, changes, archive, and config)");
         return Ok(());
     }
 
-    println!(
-        "{}",
-        "🎭 Initializing Agentd for Claude Code...".cyan().bold()
-    );
-    println!();
+    if force && is_initialized {
+        // Smart upgrade mode
+        println!(
+            "{}",
+            format!("🔄 Upgrading Agentd to v{}...", AGENTD_VERSION).cyan().bold()
+        );
+        println!();
+        run_upgrade(&project_root, &agentd_dir, &claude_dir, &version_file)?;
+    } else {
+        // Fresh install
+        println!(
+            "{}",
+            format!("🎭 Initializing Agentd v{}...", AGENTD_VERSION).cyan().bold()
+        );
+        println!();
+        run_fresh_install(name, &project_root, &agentd_dir, &claude_dir, &version_file)?;
+    }
 
+    Ok(())
+}
+
+/// Fresh install: create all directories and files
+fn run_fresh_install(
+    name: Option<&str>,
+    project_root: &Path,
+    agentd_dir: &Path,
+    claude_dir: &Path,
+    version_file: &Path,
+) -> Result<()> {
     // Create directory structure
     println!("{}", "📁 Creating directory structure...".cyan());
-    std::fs::create_dir_all(&agentd_dir)?;
+    std::fs::create_dir_all(agentd_dir)?;
     std::fs::create_dir_all(agentd_dir.join("specs"))?;
     std::fs::create_dir_all(agentd_dir.join("changes"))?;
     std::fs::create_dir_all(agentd_dir.join("archive"))?;
     std::fs::create_dir_all(agentd_dir.join("scripts"))?;
-
-    // AI context files (GEMINI.md, AGENTS.md) are now generated dynamically
-    // per change in agentd/changes/<change-id>/ by the CLI commands
 
     // Create project.md for project context
     let project_md_path = agentd_dir.join("project.md");
@@ -75,31 +108,97 @@ pub async fn run(name: Option<&str>) -> Result<()> {
         config.project_name = dir_name.to_string_lossy().to_string();
     }
     config.scripts_dir = agentd_dir.join("scripts");
-    config.save(&project_root)?;
+    config.save(project_root)?;
+
+    // Install system files
+    install_system_files(project_root, agentd_dir, claude_dir)?;
+
+    // Write version file
+    std::fs::write(version_file, AGENTD_VERSION)?;
+
+    // Print success message
+    print_init_success();
+
+    Ok(())
+}
+
+/// Smart upgrade: only update system files, preserve user data
+fn run_upgrade(
+    project_root: &Path,
+    agentd_dir: &Path,
+    claude_dir: &Path,
+    version_file: &Path,
+) -> Result<()> {
+    let old_version = std::fs::read_to_string(version_file)
+        .unwrap_or_else(|_| "unknown".to_string());
+
+    println!("{}", "📦 Preserving user data:".cyan());
+    println!("   ✓ agentd/specs/     (untouched)");
+    println!("   ✓ agentd/changes/   (untouched)");
+    println!("   ✓ agentd/archive/   (untouched)");
+    println!("   ✓ agentd/config.toml (untouched)");
+    println!("   ✓ agentd/project.md (untouched)");
+    println!();
+
+    // Ensure scripts directory exists
+    std::fs::create_dir_all(agentd_dir.join("scripts"))?;
+
+    // Install/update system files
+    install_system_files(project_root, agentd_dir, claude_dir)?;
+
+    // Write new version
+    std::fs::write(version_file, AGENTD_VERSION)?;
+
+    println!();
+    println!(
+        "{}",
+        format!("✅ Upgraded from {} to {}", old_version.trim(), AGENTD_VERSION)
+            .green()
+            .bold()
+    );
+
+    Ok(())
+}
+
+/// Install/update all system files (scripts, skills, commands, prompts)
+fn install_system_files(
+    project_root: &Path,
+    agentd_dir: &Path,
+    claude_dir: &Path,
+) -> Result<()> {
+    let skills_dir = claude_dir.join("skills");
+    std::fs::create_dir_all(&skills_dir)?;
 
     // Install Claude Code Skills
-    println!("{}", "🤖 Installing Claude Code Skills...".cyan());
+    println!("{}", "🤖 Updating Claude Code Skills...".cyan());
     install_claude_skills(&skills_dir)?;
 
     // Install Gemini Commands (project-specific)
     println!();
-    println!("{}", "🤖 Installing Gemini Commands...".cyan());
-    let gemini_dir = claude_dir.parent().unwrap().join(".gemini");
+    println!("{}", "🤖 Updating Gemini Commands...".cyan());
+    let gemini_dir = project_root.join(".gemini");
     std::fs::create_dir_all(gemini_dir.join("commands/agentd"))?;
     install_gemini_commands(&gemini_dir)?;
 
     // Install Codex Prompts (user-space)
     println!();
-    println!("{}", "🤖 Installing Codex Prompts...".cyan());
+    println!("{}", "🤖 Updating Codex Prompts...".cyan());
     let home_dir = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .unwrap_or_else(|_| ".".to_string());
     let codex_prompts_dir = PathBuf::from(home_dir).join(".codex/prompts");
     install_codex_prompts(&codex_prompts_dir)?;
 
-    // Create helper scripts
+    // Create/update helper scripts
+    println!();
+    println!("{}", "📜 Updating helper scripts...".cyan());
     create_helper_scripts(&agentd_dir.join("scripts"))?;
 
+    Ok(())
+}
+
+/// Print success message for fresh install
+fn print_init_success() {
     println!();
     println!("{}", "✅ Agentd initialized successfully!".green().bold());
     println!();
@@ -150,7 +249,7 @@ pub async fn run(name: Option<&str>) -> Result<()> {
         "   {} - Implement with Claude",
         "/agentd:implement".green()
     );
-    println!("   {} - Verify with tests", "/agentd:verify".green());
+    println!("   {} - Verify with tests", "/agentd:review".green());
     println!("   {} - Fix verification failures", "/agentd:fix".green());
     println!(
         "   {} - Archive completed change",
@@ -173,8 +272,80 @@ pub async fn run(name: Option<&str>) -> Result<()> {
         "      {}",
         "/agentd:proposal my-feature \"Add awesome feature\"".cyan()
     );
+}
 
-    Ok(())
+/// Check if upgrade is available and optionally auto-upgrade
+/// Returns true if auto-upgrade was performed
+pub fn check_and_auto_upgrade(auto_upgrade: bool) -> bool {
+    let project_root = match env::current_dir() {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+
+    let version_file = project_root.join("agentd/.version");
+
+    // Not initialized, nothing to upgrade
+    if !version_file.exists() {
+        return false;
+    }
+
+    let installed_version = std::fs::read_to_string(&version_file)
+        .unwrap_or_else(|_| "0.0.0".to_string());
+    let installed_version = installed_version.trim();
+
+    // Compare versions
+    if installed_version == AGENTD_VERSION {
+        return false; // Already up to date
+    }
+
+    // Version mismatch detected
+    if auto_upgrade {
+        println!(
+            "{}",
+            format!(
+                "🔄 Auto-upgrading Agentd: {} → {}",
+                installed_version, AGENTD_VERSION
+            )
+            .cyan()
+        );
+
+        let agentd_dir = project_root.join("agentd");
+        let claude_dir = project_root.join(".claude");
+
+        if let Err(e) = run_upgrade(&project_root, &agentd_dir, &claude_dir, &version_file) {
+            eprintln!("{}", format!("⚠️  Auto-upgrade failed: {}", e).yellow());
+            return false;
+        }
+
+        println!();
+        return true;
+    } else {
+        // Just notify
+        println!(
+            "{}",
+            format!(
+                "💡 Agentd update available: {} → {} (run {} to upgrade)",
+                installed_version,
+                AGENTD_VERSION,
+                "agentd init --force".cyan()
+            )
+            .yellow()
+        );
+        println!();
+        return false;
+    }
+}
+
+/// Get installed version (for display purposes)
+pub fn get_installed_version() -> Option<String> {
+    let project_root = env::current_dir().ok()?;
+    let version_file = project_root.join("agentd/.version");
+    std::fs::read_to_string(&version_file).ok().map(|v| v.trim().to_string())
+}
+
+/// Get current CLI version
+pub fn get_current_version() -> &'static str {
+    AGENTD_VERSION
 }
 
 fn install_claude_skills(skills_dir: &Path) -> Result<()> {

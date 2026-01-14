@@ -120,6 +120,10 @@ enum Commands {
         /// Project name
         #[arg(short, long)]
         name: Option<String>,
+
+        /// Force upgrade: update scripts and skills, preserve user data
+        #[arg(short, long)]
+        force: bool,
     },
 
     /// Show status of a change
@@ -143,6 +147,12 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    // Auto-upgrade check for all commands except init
+    if !matches!(cli.command, Commands::Init { .. }) {
+        // Check for updates and auto-upgrade if available
+        agentd::cli::init::check_and_auto_upgrade(true);
+    }
 
     match cli.command {
         Commands::Proposal {
@@ -218,9 +228,13 @@ async fn main() -> Result<()> {
             agentd::cli::archive::run(&change_id).await?;
         }
 
-        Commands::Init { name } => {
-            println!("{}", "🚀 Initializing Agentd...".cyan());
-            agentd::cli::init::run(name.as_deref()).await?;
+        Commands::Init { name, force } => {
+            if force {
+                println!("{}", "🔄 Upgrading Agentd...".cyan());
+            } else {
+                println!("{}", "🚀 Initializing Agentd...".cyan());
+            }
+            agentd::cli::init::run(name.as_deref(), force).await?;
         }
 
         Commands::Status { change_id, json } => {
