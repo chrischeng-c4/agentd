@@ -310,7 +310,7 @@ EOF
 )
 
 # Run non-interactively with full auto mode
-codex exec --full-auto "$PROMPT"
+cd "$PROJECT_ROOT" && codex exec --full-auto "$PROMPT"
 "#;
 
     let codex_review = r#"#!/bin/bash
@@ -410,7 +410,7 @@ EOF
 )
 
 # Run non-interactively with full auto mode
-codex exec --full-auto "$PROMPT"
+cd "$PROJECT_ROOT" && codex exec --full-auto "$PROMPT"
 
 # Cleanup temp files
 rm -rf "$TEMP_DIR"
@@ -463,7 +463,7 @@ EOF
 )
 
 # Resume the previous session to reuse cached codebase context
-codex resume --last "$PROMPT"
+cd "$PROJECT_ROOT" && codex resume --last "$PROMPT"
 "#;
 
     std::fs::write(scripts_dir.join("gemini-proposal.sh"), gemini_proposal)?;
@@ -756,7 +756,9 @@ You need to verify that Gemini correctly merged the spec deltas:
 
 ### 1. Compare Delta vs Merged Specs
 
-For each spec file in the delta:
+**IMPORTANT**: Skip template files (files starting with underscore like _skeleton.md).
+
+For each spec file in the delta (excluding templates):
 1. Read the delta spec: agentd/changes/${CHANGE_ID}/specs/[file]
 2. Read the merged spec: agentd/specs/[file]
 3. Verify ALL changes from delta are present in merged spec
@@ -827,7 +829,7 @@ Now perform the review and update the ARCHIVE_REVIEW.md file.
 EOF
 )
 
-codex exec --full-auto "$PROMPT"
+cd "$PROJECT_ROOT" && codex exec --full-auto "$PROMPT"
 
 echo "✅ Review complete: $REVIEW_PATH"
 "#;
