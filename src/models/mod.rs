@@ -13,7 +13,10 @@ pub use archive_review::{
     ArchiveIssueCategory, ArchiveReview, ArchiveReviewIssue, ArchiveReviewVerdict,
 };
 pub use challenge::{Challenge, ChallengeIssue, ChallengeVerdict, IssueSeverity};
-pub use change::{AgentdConfig, Change, ChangePhase};
+pub use change::{
+    AgentdConfig, Change, ChangePhase, ClaudeConfig, ClaudeModelConfig, CodexConfig,
+    CodexModelConfig, Complexity, GeminiConfig, GeminiModelConfig,
+};
 pub use delta_metrics::{decide_merging_strategy, DeltaMetrics, MergingStrategy, StrategyDecision};
 pub use frontmatter::{
     // Document frontmatter types

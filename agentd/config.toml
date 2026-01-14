@@ -1,9 +1,79 @@
 project_name = "agentd"
-gemini_command = "gemini"
-claude_command = "claude"
-codex_command = "codex"
 scripts_dir = "/Users/chrischeng/projects/agentd/agentd/scripts"
 
+# =============================================================================
+# Gemini Configuration
+# =============================================================================
+[gemini]
+command = "gemini"
+default = "flash"  # Default model ID
+
+[[gemini.models]]
+id = "flash"
+model = "gemini-3-flash-preview"
+complexity = "medium"  # Handles up to Medium complexity
+
+[[gemini.models]]
+id = "pro"
+model = "gemini-3-pro-preview"
+complexity = "critical"  # Handles up to Critical complexity
+
+# =============================================================================
+# Codex Configuration
+# =============================================================================
+[codex]
+command = "codex"
+default = "balanced"  # Default model ID
+
+[[codex.models]]
+id = "fast"
+model = "gpt-5.2-codex"
+reasoning = "low"
+complexity = "low"
+
+[[codex.models]]
+id = "balanced"
+model = "gpt-5.2-codex"
+reasoning = "medium"
+complexity = "medium"
+
+[[codex.models]]
+id = "deep"
+model = "gpt-5.2-codex"
+reasoning = "high"
+complexity = "high"
+
+[[codex.models]]
+id = "max"
+model = "gpt-5.2-codex"
+reasoning = "extra high"
+complexity = "critical"
+
+# =============================================================================
+# Claude Configuration
+# =============================================================================
+[claude]
+command = "claude"
+default = "balanced"  # Default model ID
+
+[[claude.models]]
+id = "fast"
+model = "haiku"
+complexity = "low"
+
+[[claude.models]]
+id = "balanced"
+model = "sonnet"
+complexity = "medium"
+
+[[claude.models]]
+id = "deep"
+model = "opus"
+complexity = "critical"
+
+# =============================================================================
+# Validation Rules
+# =============================================================================
 [validation]
 required_headings = [
     "Specification:",
