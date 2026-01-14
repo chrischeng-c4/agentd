@@ -229,7 +229,14 @@ fn collect_spec_files(specs_dir: &Path) -> Result<Vec<PathBuf>> {
     {
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
-            files.push(path.to_path_buf());
+            // Skip template/skeleton files (files starting with underscore)
+            let should_skip = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map_or(false, |name| name.starts_with('_'));
+            if !should_skip {
+                files.push(path.to_path_buf());
+            }
         }
     }
 
