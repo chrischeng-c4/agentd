@@ -14,11 +14,11 @@ Software development with Large Language Models (LLMs) often faces a trilemma of
 - Single-model workflows often drift from specifications.
 
 **Agentd solves this by orchestrating the right tool for the right job:**
-- **Gemini CLI** (configurable, default: Gemini 1.5 Pro with 2M context): Deep codebase exploration and proposal generation. High context, low cost.
-- **Codex CLI** (configurable, default: GPT-4 or o1): Rigorous code review, testing, and quality gating. High precision for code analysis.
-- **Claude Code** (Claude 3.5 Sonnet): Interactive implementation with best-in-class coding capability.
+- **Gemini CLI** (default: `gemini-3-flash-preview`): Deep codebase exploration and proposal generation. 2M token context, low cost.
+- **Codex CLI** (default: `gpt-5.2-codex medium`): Rigorous code review, testing, and quality gating. High precision with configurable reasoning levels.
+- **Claude Code** (default: `sonnet`): Interactive implementation with best-in-class coding capability.
 
-> **Note**: Model selection is configurable through external CLI tools. The defaults listed above represent recommended configurations for optimal cost/quality balance.
+> **Note**: Agentd automatically selects models based on task complexity. Simple tasks use faster/cheaper models; complex tasks escalate to more capable models. See [Dynamic Model Selection](#dynamic-model-selection).
 
 ## Why Agentd?
 
@@ -46,11 +46,13 @@ By specializing model usage, Agentd can significantly reduce token costs compare
 
 ## Key Features
 
+- **Dynamic Model Selection**: Automatically chooses the right model based on task complexity (Low → Critical).
 - **Automated Challenge-Reproposal Loop**: Proposal workflow automatically challenges and refines the plan before implementation.
 - **Iterative Refinement**: Built-in quality gates ensure plans are solid before code is written.
 - **Conflict Resolution**: Automatic detection and resolution of conflicting change-ids.
 - **Safety Rollbacks**: Integrated backup and rollback systems during critical phases like archiving.
 - **Context Awareness**: Leverages 2M+ token context windows for holistic project understanding.
+- **Validation System**: Local validation with `--strict`, `--verbose`, and `--json` output modes.
 
 ## Installation
 
@@ -156,7 +158,7 @@ When you run `agentd proposal`, the system automatically:
 5. **Outcome:** A vetted, high-quality spec ready for implementation
 
 ### 2. Implementation (Interactive)
-**Agent:** Claude Code (Claude 3.5 Sonnet)
+**Agent:** Claude Code (haiku/sonnet/opus based on complexity)
 
 **Important**: Implementation requires Claude Code interactive environment.
 - Executes the tasks defined in `tasks.md`
@@ -229,6 +231,18 @@ project/
 | `agentd fix <id>` | Fix issues found during review |
 | `agentd archive <id>` | Archive completed change (7-step quality gate) |
 
+### Validation Commands
+
+| Command | Description |
+|---------|-------------|
+| `agentd validate-proposal <id>` | Validate proposal format (local, no AI) |
+| `agentd validate-challenge <id>` | Validate challenge format (local, no AI) |
+
+**Validation flags:**
+- `--strict` - Treat warnings (MEDIUM/LOW) as errors
+- `--verbose` - Show file:line details for each error
+- `--json` - Output results as JSON (for CI/CD integration)
+
 ### Utility Commands
 
 | Command | Description |
@@ -236,6 +250,63 @@ project/
 | `agentd list` | List active changes |
 | `agentd list --archived` | List archived changes |
 | `agentd status <id>` | Show detailed change status |
+| `agentd status <id> --json` | Output status as JSON |
+
+## Dynamic Model Selection
+
+Agentd automatically selects the appropriate model based on task complexity, optimizing for cost without sacrificing quality.
+
+### Complexity Levels
+
+| Level | Description | Typical Tasks |
+|-------|-------------|---------------|
+| **Low** | Simple changes, < 5 files | Bug fixes, config updates |
+| **Medium** | Moderate scope, 5-15 files | New features, refactoring |
+| **High** | Large scope, 15+ files | Major features, cross-module changes |
+| **Critical** | Architectural changes | System redesign, breaking changes |
+
+### Model Selection Matrix
+
+| Tool | Low | Medium | High | Critical |
+|------|-----|--------|------|----------|
+| **Gemini** | flash | flash | pro | pro |
+| **Codex** | gpt-5.2-codex low | gpt-5.2-codex medium | gpt-5.2-codex high | gpt-5.2-codex extra high |
+| **Claude** | haiku | sonnet | opus | opus |
+
+### Configuration
+
+Model selection is configured in `agentd/config.toml`:
+
+```toml
+[gemini]
+command = "gemini"
+default = "flash"
+
+[[gemini.models]]
+id = "flash"
+model = "gemini-3-flash-preview"
+complexity = "medium"
+
+[[gemini.models]]
+id = "pro"
+model = "gemini-3-pro-preview"
+complexity = "critical"
+
+[codex]
+command = "codex"
+default = "balanced"
+
+[[codex.models]]
+id = "balanced"
+model = "gpt-5.2-codex"
+reasoning = "medium"
+complexity = "medium"
+```
+
+Scripts receive model info via environment variables:
+- `AGENTD_MODEL` - Full model argument (e.g., `gpt-5.2-codex medium`)
+- `AGENTD_MODEL_COMMAND` - CLI command (e.g., `codex`)
+- `AGENTD_MODEL_REASONING` - Codex reasoning level (e.g., `medium`)
 
 ## Architecture
 
