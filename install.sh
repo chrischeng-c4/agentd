@@ -1,8 +1,13 @@
 #!/bin/bash
-# Specter installation script
-# Usage: curl -fsSL https://raw.githubusercontent.com/your-repo/agentd/main/install.sh | sh
+# Agentd installer script
+# Usage: curl -fsSL https://raw.githubusercontent.com/chrischeng-c4/agentd/main/install.sh | bash
 
-set -e
+set -euo pipefail
+
+# Configuration
+REPO="chrischeng-c4/agentd"
+INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+BINARY_NAME="agentd"
 
 # Colors
 RED='\033[0;31m'
@@ -11,133 +16,139 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-echo ""
-echo -e "${CYAN}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NC}"
-echo -e "${CYAN}┃  Specter Installation Script   ┃${NC}"
-echo -e "${CYAN}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NC}"
-echo ""
+info() { echo -e "${CYAN}$1${NC}"; }
+success() { echo -e "${GREEN}$1${NC}"; }
+warn() { echo -e "${YELLOW}$1${NC}"; }
+error() { echo -e "${RED}$1${NC}" >&2; }
 
-# Detect OS
-OS="$(uname -s)"
-ARCH="$(uname -m)"
+# Detect OS and architecture
+detect_platform() {
+    local os arch
 
-echo -e "${CYAN}Detecting system...${NC}"
-echo "  OS: $OS"
-echo "  Architecture: $ARCH"
-echo ""
+    os="$(uname -s)"
+    arch="$(uname -m)"
 
-# Check if Rust is installed
-if ! command -v cargo &> /dev/null; then
-    echo -e "${YELLOW}Rust is not installed.${NC}"
-    echo ""
-    echo "Would you like to install Rust now? (y/n)"
-    read -r INSTALL_RUST
+    case "$os" in
+        Darwin) os="darwin" ;;
+        Linux) os="linux" ;;
+        MINGW*|MSYS*|CYGWIN*) os="windows" ;;
+        *)
+            error "Unsupported OS: $os"
+            exit 1
+            ;;
+    esac
 
-    if [ "$INSTALL_RUST" = "y" ] || [ "$INSTALL_RUST" = "Y" ]; then
-        echo -e "${CYAN}Installing Rust...${NC}"
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-        source "$HOME/.cargo/env"
-        echo -e "${GREEN}✓ Rust installed successfully${NC}"
-    else
-        echo -e "${RED}✗ Rust is required to install Specter${NC}"
-        echo "  Install Rust from: https://rustup.rs"
+    case "$arch" in
+        x86_64|amd64) arch="x86_64" ;;
+        arm64|aarch64) arch="aarch64" ;;
+        *)
+            error "Unsupported architecture: $arch"
+            exit 1
+            ;;
+    esac
+
+    echo "${os}-${arch}"
+}
+
+# Get latest release version from GitHub API
+get_latest_version() {
+    local version
+    version=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+
+    if [[ -z "$version" ]]; then
+        error "Failed to get latest version"
         exit 1
     fi
-else
-    echo -e "${GREEN}✓ Rust is installed${NC}"
-fi
 
-# Check Rust version
-RUST_VERSION=$(rustc --version | awk '{print $2}')
-echo "  Rust version: $RUST_VERSION"
-echo ""
+    echo "$version"
+}
 
-# Check if Git is installed
-if ! command -v git &> /dev/null; then
-    echo -e "${RED}✗ Git is not installed${NC}"
-    echo "  Please install Git and try again"
-    exit 1
-else
-    echo -e "${GREEN}✓ Git is installed${NC}"
-fi
-echo ""
+# Download and install binary
+install_binary() {
+    local version="$1"
+    local platform="$2"
+    local download_url="https://github.com/${REPO}/releases/download/${version}/agentd-${platform}.tar.gz"
+    local tmp_dir
 
-# Clone or update Specter repository
-SPECTER_DIR="$HOME/.agentd-install"
+    info "Downloading agentd ${version} for ${platform}..."
 
-if [ -d "$SPECTER_DIR" ]; then
-    echo -e "${CYAN}Updating existing Specter repository...${NC}"
-    cd "$SPECTER_DIR"
-    git pull
-else
-    echo -e "${CYAN}Cloning Specter repository...${NC}"
-    git clone https://github.com/your-repo/agentd.git "$SPECTER_DIR"
-    cd "$SPECTER_DIR"
-fi
-echo ""
+    tmp_dir=$(mktemp -d)
+    trap "rm -rf $tmp_dir" EXIT
 
-# Build and install
-echo -e "${CYAN}Building and installing Specter...${NC}"
-echo "  This may take a few minutes..."
-echo ""
-
-if cargo install --path . --locked; then
-    echo ""
-    echo -e "${GREEN}✓ Specter installed successfully!${NC}"
-else
-    echo ""
-    echo -e "${RED}✗ Installation failed${NC}"
-    exit 1
-fi
-
-# Verify installation
-INSTALL_PATH="$HOME/.cargo/bin/agentd"
-if [ -f "$INSTALL_PATH" ]; then
-    echo ""
-    echo -e "${GREEN}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NC}"
-    echo -e "${GREEN}┃   Installation Complete! 🎭    ┃${NC}"
-    echo -e "${GREEN}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NC}"
-    echo ""
-    echo "  Installed to: $INSTALL_PATH"
-    echo ""
-
-    # Check if cargo bin is in PATH
-    if echo "$PATH" | grep -q "$HOME/.cargo/bin"; then
-        echo -e "${GREEN}✓ $HOME/.cargo/bin is in your PATH${NC}"
-        echo ""
-        echo "You can now run:"
-        echo -e "  ${CYAN}agentd --version${NC}"
-        echo -e "  ${CYAN}agentd --help${NC}"
-    else
-        echo -e "${YELLOW}⚠ $HOME/.cargo/bin is NOT in your PATH${NC}"
-        echo ""
-        echo "Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):"
-        echo -e "  ${CYAN}export PATH=\"\$HOME/.cargo/bin:\$PATH\"${NC}"
-        echo ""
-        echo "Then reload your shell:"
-        echo -e "  ${CYAN}source ~/.bashrc${NC}  # or source ~/.zshrc"
+    # Download and extract
+    if ! curl -fsSL "$download_url" | tar xz -C "$tmp_dir"; then
+        error "Failed to download from: $download_url"
+        error "Make sure the release exists for your platform."
+        exit 1
     fi
 
-    echo ""
-    echo "Next steps:"
-    echo -e "  1. Initialize a project:  ${CYAN}agentd init${NC}"
-    echo -e "  2. Configure AI scripts:  ${CYAN}cp $SPECTER_DIR/examples/scripts/* .agentd/scripts/${NC}"
-    echo -e "  3. Read the docs:         ${CYAN}https://github.com/your-repo/agentd${NC}"
-    echo ""
-else
-    echo -e "${RED}✗ Installation verification failed${NC}"
-    exit 1
-fi
+    # Check if we need sudo
+    if [[ -w "$INSTALL_DIR" ]]; then
+        mv "$tmp_dir/agentd" "$INSTALL_DIR/$BINARY_NAME"
+    else
+        warn "Need sudo to install to $INSTALL_DIR"
+        sudo mv "$tmp_dir/agentd" "$INSTALL_DIR/$BINARY_NAME"
+    fi
 
-# Cleanup option
-echo ""
-echo "Remove installation files? (y/n) [Default: n]"
-read -r CLEANUP
-if [ "$CLEANUP" = "y" ] || [ "$CLEANUP" = "Y" ]; then
-    rm -rf "$SPECTER_DIR"
-    echo -e "${GREEN}✓ Cleaned up installation files${NC}"
-fi
+    chmod +x "$INSTALL_DIR/$BINARY_NAME"
+    success "Installed agentd to $INSTALL_DIR/$BINARY_NAME"
+}
 
-echo ""
-echo -e "${CYAN}Happy coding with Specter! 🎭${NC}"
-echo ""
+# Check if agentd is already initialized in current directory
+check_and_upgrade_configs() {
+    if [[ -d "agentd" ]]; then
+        info "Detected existing agentd installation, upgrading configs..."
+        "$INSTALL_DIR/$BINARY_NAME" init --force
+    fi
+}
+
+# Main
+main() {
+    echo ""
+    info "=================================="
+    info "   Agentd Installer"
+    info "=================================="
+    echo ""
+
+    # Check dependencies
+    if ! command -v curl &> /dev/null; then
+        error "curl is required but not installed."
+        exit 1
+    fi
+
+    # Detect platform
+    local platform version
+    platform=$(detect_platform)
+    info "Detected platform: $platform"
+
+    # Get latest version (or use specified version)
+    version="${VERSION:-$(get_latest_version)}"
+    info "Version: $version"
+    echo ""
+
+    # Install binary
+    install_binary "$version" "$platform"
+    echo ""
+
+    # Verify installation
+    if command -v agentd &> /dev/null; then
+        success "Installation successful!"
+        echo ""
+        agentd --version
+        echo ""
+
+        # Upgrade configs if in an agentd project
+        check_and_upgrade_configs
+
+        echo ""
+        info "Next steps:"
+        echo "  1. Navigate to your project directory"
+        echo "  2. Run: agentd init"
+        echo ""
+    else
+        warn "agentd installed but not in PATH"
+        warn "Add $INSTALL_DIR to your PATH"
+    fi
+}
+
+main "$@"
