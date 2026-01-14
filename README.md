@@ -138,7 +138,7 @@ After initialization, use these skills in Claude Code:
 | `/agentd:challenge` | `agentd challenge-proposal` | Challenge proposal |
 | `/agentd:reproposal` | `agentd reproposal` | Refine proposal |
 | `/agentd:implement` | `agentd implement` | Implement change |
-| `/agentd:verify` | `agentd review` | Verify implementation |
+| `/agentd:review` | `agentd review` | Review implementation |
 | `/agentd:fix` | `agentd fix` | Fix issues |
 | `/agentd:archive` | `agentd archive` | Archive change |
 

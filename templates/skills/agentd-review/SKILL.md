@@ -1,5 +1,5 @@
 ---
-name: agentd:verify
+name: agentd:review
 description: Generate and run tests
 user-invocable: true
 ---
