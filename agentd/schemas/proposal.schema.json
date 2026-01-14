@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentd.dev/schemas/proposal.schema.json",
+  "title": "Proposal Document",
+  "description": "YAML frontmatter schema for proposal.md",
+  "type": "object",
+  "required": ["id", "type", "version", "status"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Unique identifier for the change"
+    },
+    "type": {
+      "const": "proposal",
+      "description": "Document type"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Document version"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp"
+    },
+    "author": {
+      "type": "string",
+      "description": "Author of the proposal"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "challenged", "approved", "rejected"],
+      "description": "Current proposal status"
+    },
+    "iteration": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Iteration count for reproposals"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 20,
+      "description": "Brief summary of the change"
+    },
+    "impact": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["patch", "minor", "major"]
+        },
+        "affected_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "new_files": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["scope"]
+    },
+    "affected_specs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "path"],
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" }
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "properties": {
+        "external": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "version": { "type": "string" }
+            }
+          }
+        },
+        "internal": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "category", "description"],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "category": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}

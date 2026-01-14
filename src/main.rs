@@ -24,10 +24,46 @@ enum Commands {
         description: String,
     },
 
+    /// Validate proposal format (local validation, no AI)
+    ValidateProposal {
+        /// Change ID to validate
+        change_id: String,
+
+        /// Treat warnings (MEDIUM/LOW) as errors
+        #[arg(short, long)]
+        strict: bool,
+
+        /// Show verbose output with additional details
+        #[arg(short, long)]
+        verbose: bool,
+
+        /// Output results as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Challenge the proposal with Codex (code analysis)
-    Challenge {
+    ChallengeProposal {
         /// Change ID to challenge
         change_id: String,
+    },
+
+    /// Validate challenge format (local validation, no AI)
+    ValidateChallenge {
+        /// Change ID to validate
+        change_id: String,
+
+        /// Treat warnings (MEDIUM/LOW) as errors
+        #[arg(short, long)]
+        strict: bool,
+
+        /// Show verbose output with additional details
+        #[arg(short, long)]
+        verbose: bool,
+
+        /// Output results as JSON
+        #[arg(long)]
+        json: bool,
     },
 
     /// Regenerate proposal based on challenge feedback
@@ -120,12 +156,28 @@ async fn main() -> Result<()> {
             agentd::cli::proposal::run(&change_id, &description).await?;
         }
 
-        Commands::Challenge { change_id } => {
+        Commands::ValidateProposal { change_id, strict, verbose, json } => {
+            let options = agentd::models::ValidationOptions::new()
+                .with_strict(strict)
+                .with_verbose(verbose)
+                .with_json(json);
+            agentd::cli::validate_proposal::run(&change_id, &options).await?;
+        }
+
+        Commands::ChallengeProposal { change_id } => {
             println!(
                 "{}",
                 format!("🔍 Challenging proposal: {}", change_id).cyan()
             );
-            agentd::cli::challenge::run(&change_id).await?;
+            agentd::cli::challenge_proposal::run(&change_id).await?;
+        }
+
+        Commands::ValidateChallenge { change_id, strict, verbose, json } => {
+            let options = agentd::models::ValidationOptions::new()
+                .with_strict(strict)
+                .with_verbose(verbose)
+                .with_json(json);
+            agentd::cli::validate_challenge::run(&change_id, &options).await?;
         }
 
         Commands::Reproposal { change_id } => {

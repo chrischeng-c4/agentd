@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentd.dev/schemas/tasks.schema.json",
+  "title": "Tasks Document",
+  "description": "YAML frontmatter schema for tasks.md",
+  "type": "object",
+  "required": ["id", "type", "version"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Change identifier"
+    },
+    "type": {
+      "const": "tasks",
+      "description": "Document type"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Document version"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proposal_ref": {
+      "type": "string",
+      "description": "Reference to proposal file"
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "completed": { "type": "integer", "minimum": 0 },
+        "in_progress": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 },
+        "pending": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["total"]
+    },
+    "layers": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "object",
+          "properties": {
+            "task_count": { "type": "integer", "minimum": 0 },
+            "estimated_files": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["task_count"]
+        },
+        "logic": {
+          "type": "object",
+          "properties": {
+            "task_count": { "type": "integer", "minimum": 0 },
+            "estimated_files": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["task_count"]
+        },
+        "testing": {
+          "type": "object",
+          "properties": {
+            "task_count": { "type": "integer", "minimum": 0 },
+            "estimated_files": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["task_count"]
+        }
+      }
+    }
+  },
+  "definitions": {
+    "task_block": {
+      "type": "object",
+      "description": "Inline task block schema",
+      "required": ["id", "action", "file"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+$",
+          "description": "Task ID (e.g., '1.1', '2.3')"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["CREATE", "MODIFY", "DELETE", "RENAME"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in_progress", "completed", "blocked"],
+          "default": "pending"
+        },
+        "file": {
+          "type": "string",
+          "description": "Target file path"
+        },
+        "spec_ref": {
+          "type": "string",
+          "description": "Reference to spec (e.g., 'specs/auth.md#R1')"
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Task dependencies"
+        },
+        "estimated_lines": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

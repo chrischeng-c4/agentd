@@ -108,6 +108,10 @@ pub enum ErrorCategory {
     InvalidStructure,
     /// Empty or incomplete content
     EmptyContent,
+    /// Cross-file inconsistency (spec_ref mismatch, orphan specs)
+    Inconsistency,
+    /// Circular dependency in task graph
+    CircularDependency,
 }
 
 impl ErrorCategory {
@@ -122,6 +126,8 @@ impl ErrorCategory {
             ErrorCategory::BrokenReference => "Broken Reference",
             ErrorCategory::InvalidStructure => "Invalid Structure",
             ErrorCategory::EmptyContent => "Empty Content",
+            ErrorCategory::Inconsistency => "Inconsistency",
+            ErrorCategory::CircularDependency => "Circular Dependency",
         }
     }
 }
@@ -202,6 +208,8 @@ impl SeverityMap {
             ErrorCategory::BrokenReference => self.broken_reference,
             ErrorCategory::InvalidStructure => Severity::High,
             ErrorCategory::EmptyContent => Severity::High,
+            ErrorCategory::Inconsistency => Severity::High,
+            ErrorCategory::CircularDependency => Severity::High,
         }
     }
 }
@@ -249,5 +257,87 @@ impl ValidationResult {
             .map(|e| e.format())
             .collect::<Vec<_>>()
             .join("\n")
+    }
+}
+
+/// Validation CLI options
+#[derive(Debug, Clone, Default)]
+pub struct ValidationOptions {
+    /// Treat warnings (MEDIUM/LOW) as errors
+    pub strict: bool,
+    /// Show verbose output with additional details
+    pub verbose: bool,
+    /// Output results as JSON
+    pub json: bool,
+}
+
+impl ValidationOptions {
+    /// Create new options with defaults
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set strict mode
+    pub fn with_strict(mut self, strict: bool) -> Self {
+        self.strict = strict;
+        self
+    }
+
+    /// Set verbose mode
+    pub fn with_verbose(mut self, verbose: bool) -> Self {
+        self.verbose = verbose;
+        self
+    }
+
+    /// Set JSON output mode
+    pub fn with_json(mut self, json: bool) -> Self {
+        self.json = json;
+        self
+    }
+}
+
+/// JSON output format for validation results
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationJsonOutput {
+    /// Whether validation passed
+    pub valid: bool,
+    /// Counts by severity
+    pub counts: ValidationCounts,
+    /// List of all errors
+    pub errors: Vec<JsonValidationError>,
+    /// Stale files detected
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub stale_files: Vec<String>,
+}
+
+/// Validation counts by severity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationCounts {
+    pub high: usize,
+    pub medium: usize,
+    pub low: usize,
+}
+
+/// JSON-friendly validation error
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JsonValidationError {
+    pub severity: String,
+    pub category: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<usize>,
+}
+
+impl From<&ValidationError> for JsonValidationError {
+    fn from(error: &ValidationError) -> Self {
+        Self {
+            severity: error.severity.name().to_string(),
+            category: error.category.name().to_string(),
+            message: error.message.clone(),
+            file: Some(error.file.display().to_string()),
+            line: error.line,
+        }
     }
 }

@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentd.dev/schemas/state.schema.json",
+  "title": "State Document",
+  "description": "Schema for STATE.yaml",
+  "type": "object",
+  "required": ["change_id", "phase"],
+  "properties": {
+    "change_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Change identifier"
+    },
+    "schema_version": {
+      "type": "string",
+      "default": "2.0",
+      "description": "Schema version"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["proposed", "challenged", "implementing", "testing", "complete", "archived"],
+      "description": "Current workflow phase"
+    },
+    "iteration": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "last_action": {
+      "type": "string",
+      "description": "Last action performed"
+    },
+    "checksums": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["hash"],
+        "properties": {
+          "hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "validated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "validations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step"],
+        "properties": {
+          "step": { "type": "string" },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rules_version": { "type": "string" },
+          "rules_hash": { "type": "string" },
+          "mode": {
+            "type": "string",
+            "enum": ["normal", "strict"],
+            "default": "normal"
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "valid": { "type": "boolean" },
+              "high": { "type": "integer", "minimum": 0 },
+              "medium": { "type": "integer", "minimum": 0 },
+              "low": { "type": "integer", "minimum": 0 },
+              "verdict": { "type": "string" },
+              "issues_parsed": { "type": "integer", "minimum": 0 }
+            },
+            "required": ["valid"]
+          },
+          "errors": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "warnings": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "properties": {
+        "proposal": { "$ref": "#/definitions/llm_call" },
+        "challenge": { "$ref": "#/definitions/llm_call" },
+        "reproposal": { "$ref": "#/definitions/llm_call" }
+      }
+    }
+  },
+  "definitions": {
+    "llm_call": {
+      "type": "object",
+      "properties": {
+        "model": { "type": "string" },
+        "tokens_in": { "type": "integer", "minimum": 0 },
+        "tokens_out": { "type": "integer", "minimum": 0 },
+        "duration_ms": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

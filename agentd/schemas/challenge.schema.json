@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentd.dev/schemas/challenge.schema.json",
+  "title": "Challenge Document",
+  "description": "YAML frontmatter schema for CHALLENGE.md",
+  "type": "object",
+  "required": ["id", "type", "version", "verdict"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+-challenge$",
+      "description": "Challenge identifier"
+    },
+    "type": {
+      "const": "challenge",
+      "description": "Document type"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "challenger": {
+      "type": "string",
+      "description": "Entity that performed the challenge (e.g., 'codex')"
+    },
+    "change_ref": {
+      "type": "string",
+      "description": "Reference to the change being challenged"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["APPROVED", "NEEDS_REVISION", "REJECTED"],
+      "description": "Challenge verdict"
+    },
+    "verdict_reason": {
+      "type": "string",
+      "description": "Reason for the verdict"
+    },
+    "issues": {
+      "type": "object",
+      "required": ["total"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "high": { "type": "integer", "minimum": 0 },
+        "medium": { "type": "integer", "minimum": 0 },
+        "low": { "type": "integer", "minimum": 0 },
+        "by_category": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "source_checksums": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^sha256:[a-f0-9]{64}$"
+      },
+      "description": "Checksums of source files at challenge time"
+    }
+  },
+  "definitions": {
+    "issue_block": {
+      "type": "object",
+      "description": "Inline issue block schema",
+      "required": ["id", "severity", "category"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Issue ID"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["high", "medium", "low"]
+        },
+        "category": {
+          "type": "string",
+          "enum": ["security", "performance", "consistency", "missing", "unclear"]
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "file": { "type": "string" },
+            "line": { "type": "integer", "minimum": 1 },
+            "section": { "type": "string" }
+          },
+          "required": ["file"]
+        },
+        "affects_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^R\\d+$"
+          }
+        },
+        "auto_fixable": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

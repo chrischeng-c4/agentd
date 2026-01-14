@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentd.dev/schemas/spec.schema.json",
+  "title": "Spec Document",
+  "description": "YAML frontmatter schema for specs/*.md",
+  "type": "object",
+  "required": ["id", "type", "title", "version"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+-spec$",
+      "description": "Spec identifier"
+    },
+    "type": {
+      "const": "spec",
+      "description": "Document type"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Spec title"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "parent_spec": {
+      "type": ["string", "null"],
+      "description": "Parent spec ID for hierarchical specs"
+    },
+    "child_specs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "related_specs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "path"],
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" }
+        }
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^R\\d+$"
+          }
+        },
+        "by_priority": {
+          "type": "object",
+          "properties": {
+            "high": { "type": "integer", "minimum": 0 },
+            "medium": { "type": "integer", "minimum": 0 },
+            "low": { "type": "integer", "minimum": 0 }
+          }
+        }
+      },
+      "required": ["total"]
+    },
+    "design_elements": {
+      "type": "object",
+      "properties": {
+        "has_mermaid": { "type": "boolean", "default": false },
+        "has_json_schema": { "type": "boolean", "default": false },
+        "has_pseudo_code": { "type": "boolean", "default": false },
+        "has_api_spec": { "type": "boolean", "default": false }
+      }
+    }
+  },
+  "definitions": {
+    "requirement_block": {
+      "type": "object",
+      "description": "Inline requirement block schema",
+      "required": ["id", "priority"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^R\\d+$",
+          "description": "Requirement ID (e.g., 'R1', 'R2')"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["high", "medium", "low"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "reviewed", "approved"],
+          "default": "draft"
+        },
+        "scenarios": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of scenarios"
+        },
+        "acceptance_criteria": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of acceptance criteria"
+        }
+      }
+    }
+  }
+}

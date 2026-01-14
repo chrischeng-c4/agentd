@@ -1,4 +1,6 @@
-use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig};
+use crate::cli::validate_challenge::validate_challenge;
+use crate::cli::validate_proposal::validate_proposal;
+use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, ValidationOptions};
 use crate::orchestrator::ScriptRunner;
 use crate::parser::parse_challenge_verdict;
 use crate::Result;
@@ -9,6 +11,14 @@ use std::path::PathBuf;
 pub struct ProposalCommand;
 
 /// Main entry point for the proposal workflow with automatic challenge-reproposal loop
+///
+/// Workflow (6 steps):
+/// 1. Generate proposal (Gemini)
+/// 2. Validate proposal format (local)
+/// 3. Challenge proposal (Codex)
+/// 4. Validate challenge (local)
+/// 5. Reproposal (Gemini) - if NEEDS_REVISION
+/// 6. Re-challenge (Codex) - one loop only
 pub async fn run(change_id: &str, description: &str) -> Result<()> {
     let project_root = env::current_dir()?;
     let config = AgentdConfig::load(&project_root)?;
@@ -23,8 +33,14 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
     // Step 1: Generate proposal (resolves change-id conflicts)
     let resolved_change_id = run_proposal_step(change_id, description, &project_root, &config).await?;
 
-    // Step 2: First challenge (use resolved ID)
+    // Step 2: Validate proposal format (local, saves Codex tokens)
+    let _proposal_valid = run_validate_proposal_step(&resolved_change_id, &project_root)?;
+
+    // Step 3: First challenge (use resolved ID)
     let verdict = run_challenge_step(&resolved_change_id, &project_root, &config).await?;
+
+    // Step 4: Validate challenge format (local)
+    let _challenge_valid = run_validate_challenge_step(&resolved_change_id, &project_root)?;
 
     match verdict {
         ChallengeVerdict::Approved => {
@@ -44,10 +60,10 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
                 "⚠️  NEEDS_REVISION - Auto-fixing with Gemini...".yellow()
             );
 
-            // Step 3: Auto reproposal (one time only, resumes Gemini session)
+            // Step 5: Auto reproposal (one time only, resumes Gemini session)
             run_reproposal_step(&resolved_change_id, &project_root, &config).await?;
 
-            // Step 4: Second challenge (resumes Codex session)
+            // Step 6: Second challenge (resumes Codex session)
             let verdict2 = run_rechallenge_step(&resolved_change_id, &project_root, &config).await?;
 
             match verdict2 {
@@ -119,7 +135,7 @@ async fn run_proposal_step(
     project_root: &PathBuf,
     config: &AgentdConfig,
 ) -> Result<String> {
-    println!("{}", "🤖 [1/4] Generating proposal with Gemini...".cyan());
+    println!("{}", "🤖 [1/6] Generating proposal with Gemini...".cyan());
 
     // Create change directory
     let changes_dir = project_root.join("agentd/changes");
@@ -164,14 +180,38 @@ async fn run_proposal_step(
     }
 }
 
-/// Step 2/4: Run challenge with Codex
+/// Step 2: Validate proposal format (local validation, no AI)
+fn run_validate_proposal_step(
+    change_id: &str,
+    project_root: &PathBuf,
+) -> Result<bool> {
+    println!();
+    println!("{}", "📋 [2/6] Validating proposal format...".cyan());
+
+    let options = ValidationOptions::default();
+    let summary = validate_proposal(change_id, project_root, &options)?;
+
+    if summary.is_valid() {
+        println!("{}", "✅ Proposal format validation passed".green());
+        Ok(true)
+    } else {
+        println!(
+            "{}",
+            format!("⚠️  {} HIGH severity format errors found", summary.high_count).yellow()
+        );
+        // Continue anyway - let Codex find more issues
+        Ok(false)
+    }
+}
+
+/// Step 3: Run challenge with Codex
 async fn run_challenge_step(
     change_id: &str,
     project_root: &PathBuf,
     config: &AgentdConfig,
 ) -> Result<ChallengeVerdict> {
     println!();
-    println!("{}", "🔍 [2/4] Challenging proposal with Codex...".cyan());
+    println!("{}", "🔍 [3/6] Challenging proposal with Codex...".cyan());
 
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
@@ -205,14 +245,37 @@ async fn run_challenge_step(
     Ok(verdict)
 }
 
-/// Step 4: Run re-challenge with Codex (resumes session for cached context)
+/// Step 4: Validate challenge format (local validation, no AI)
+fn run_validate_challenge_step(
+    change_id: &str,
+    project_root: &PathBuf,
+) -> Result<bool> {
+    println!();
+    println!("{}", "📋 [4/6] Validating challenge format...".cyan());
+
+    let options = ValidationOptions::default();
+    let result = validate_challenge(change_id, project_root, &options)?;
+
+    if result.is_valid() {
+        println!("{}", "✅ Challenge format validation passed".green());
+        Ok(true)
+    } else {
+        println!(
+            "{}",
+            format!("⚠️  Challenge format issues: {:?}", result.errors).yellow()
+        );
+        Ok(false)
+    }
+}
+
+/// Step 6: Run re-challenge with Codex (resumes session for cached context)
 async fn run_rechallenge_step(
     change_id: &str,
     project_root: &PathBuf,
     config: &AgentdConfig,
 ) -> Result<ChallengeVerdict> {
     println!();
-    println!("{}", "🔍 [4/4] Re-challenging with Codex (cached session)...".cyan());
+    println!("{}", "🔍 [6/6] Re-challenging with Codex (cached session)...".cyan());
 
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
@@ -246,14 +309,14 @@ async fn run_rechallenge_step(
     Ok(verdict)
 }
 
-/// Step 3: Run reproposal with Gemini (resumes session for cached context)
+/// Step 5: Run reproposal with Gemini (resumes session for cached context)
 async fn run_reproposal_step(
     change_id: &str,
     project_root: &PathBuf,
     config: &AgentdConfig,
 ) -> Result<()> {
     println!();
-    println!("{}", "🔄 [3/4] Auto-fixing with Gemini reproposal...".cyan());
+    println!("{}", "🔄 [5/6] Auto-fixing with Gemini reproposal...".cyan());
 
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
@@ -352,7 +415,7 @@ fn display_remaining_issues(change_id: &str, project_root: &PathBuf) -> Result<(
     println!("     agentd/changes/{}/CHALLENGE.md (full report)", change_id);
     println!();
     println!("   Then run:");
-    println!("     agentd challenge {}", change_id);
+    println!("     agentd challenge-proposal {}", change_id);
     println!("     agentd reproposal {}  (if needed)", change_id);
 
     Ok(())

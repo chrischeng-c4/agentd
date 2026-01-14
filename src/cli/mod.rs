@@ -1,5 +1,5 @@
 pub mod archive;
-pub mod challenge;
+pub mod challenge_proposal;
 pub mod fix;
 pub mod implement;
 pub mod init;
@@ -10,3 +10,5 @@ pub mod reproposal;
 pub mod resolve_reviews;
 pub mod review;
 pub mod status;
+pub mod validate_challenge;
+pub mod validate_proposal;
