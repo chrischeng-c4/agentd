@@ -43,7 +43,7 @@ enum Commands {
     },
 
     /// Challenge the proposal with Codex (code analysis)
-    ChallengeProposal {
+    Challenge {
         /// Change ID to challenge
         change_id: String,
     },
@@ -164,7 +164,7 @@ async fn main() -> Result<()> {
             agentd::cli::validate_proposal::run(&change_id, &options).await?;
         }
 
-        Commands::ChallengeProposal { change_id } => {
+        Commands::Challenge { change_id } => {
             println!(
                 "{}",
                 format!("🔍 Challenging proposal: {}", change_id).cyan()

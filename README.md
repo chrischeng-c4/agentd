@@ -47,7 +47,7 @@ agentd archive add-oauth
 |---------|-------------|
 | `agentd init` | Initialize Agentd in current project |
 | `agentd proposal <id> "<description>"` | Create a new proposal |
-| `agentd challenge-proposal <id>` | Challenge proposal with code review |
+| `agentd challenge <id>` | Challenge proposal with code review |
 | `agentd reproposal <id>` | Refine proposal based on challenge feedback |
 | `agentd implement <id>` | Implement the change (requires Claude Code) |
 | `agentd review <id>` | Review implementation and run tests |
@@ -135,7 +135,7 @@ After initialization, use these skills in Claude Code:
 | Skill | CLI Equivalent | Description |
 |-------|----------------|-------------|
 | `/agentd:proposal` | `agentd proposal` | Generate proposal |
-| `/agentd:challenge` | `agentd challenge-proposal` | Challenge proposal |
+| `/agentd:challenge` | `agentd challenge` | Challenge proposal |
 | `/agentd:reproposal` | `agentd reproposal` | Refine proposal |
 | `/agentd:implement` | `agentd implement` | Implement change |
 | `/agentd:review` | `agentd review` | Review implementation |

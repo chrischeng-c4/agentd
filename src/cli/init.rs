@@ -8,7 +8,7 @@ const SKILL_PROPOSAL: &str = include_str!("../../templates/skills/agentd-proposa
 const SKILL_CHALLENGE: &str = include_str!("../../templates/skills/agentd-challenge/SKILL.md");
 const SKILL_REPROPOSAL: &str = include_str!("../../templates/skills/agentd-reproposal/SKILL.md");
 const SKILL_IMPLEMENT: &str = include_str!("../../templates/skills/agentd-implement/SKILL.md");
-const SKILL_VERIFY: &str = include_str!("../../templates/skills/agentd-verify/SKILL.md");
+const SKILL_REVIEW: &str = include_str!("../../templates/skills/agentd-review/SKILL.md");
 const SKILL_FIX: &str = include_str!("../../templates/skills/agentd-fix/SKILL.md");
 const SKILL_ARCHIVE: &str = include_str!("../../templates/skills/agentd-archive/SKILL.md");
 
@@ -20,7 +20,7 @@ const GEMINI_SETTINGS: &str = include_str!("../../templates/gemini/settings.json
 
 // Codex Prompts
 const CODEX_CHALLENGE: &str = include_str!("../../templates/codex/prompts/agentd-challenge.md");
-const CODEX_VERIFY: &str = include_str!("../../templates/codex/prompts/agentd-verify.md");
+const CODEX_REVIEW: &str = include_str!("../../templates/codex/prompts/agentd-review.md");
 
 // Project Context Template
 const PROJECT_TEMPLATE: &str = include_str!("../../templates/project.md");
@@ -127,7 +127,7 @@ pub async fn run(name: Option<&str>) -> Result<()> {
         "gemini agentd:reproposal".green()
     );
     println!("   {} - Code review", "codex agentd-challenge".green());
-    println!("   {} - Test generation", "codex agentd-verify".green());
+    println!("   {} - Test generation", "codex agentd-review".green());
     println!();
 
     println!(
@@ -183,7 +183,7 @@ fn install_claude_skills(skills_dir: &Path) -> Result<()> {
         ("challenge", SKILL_CHALLENGE),
         ("reproposal", SKILL_REPROPOSAL),
         ("implement", SKILL_IMPLEMENT),
-        ("verify", SKILL_VERIFY),
+        ("review", SKILL_REVIEW),
         ("fix", SKILL_FIX),
         ("archive", SKILL_ARCHIVE),
     ];
@@ -882,13 +882,13 @@ fn install_codex_prompts(prompts_dir: &Path) -> Result<()> {
     std::fs::create_dir_all(prompts_dir)?;
 
     let challenge_path = prompts_dir.join("agentd-challenge.md");
-    let verify_path = prompts_dir.join("agentd-verify.md");
+    let review_path = prompts_dir.join("agentd-review.md");
 
     // Check if prompts already exist
     let challenge_exists = challenge_path.exists();
-    let verify_exists = verify_path.exists();
+    let review_exists = review_path.exists();
 
-    if challenge_exists || verify_exists {
+    if challenge_exists || review_exists {
         println!();
         println!(
             "   {} Codex prompts already exist in ~/.codex/prompts/",
@@ -918,10 +918,10 @@ fn install_codex_prompts(prompts_dir: &Path) -> Result<()> {
 
     // Install prompt files
     std::fs::write(&challenge_path, CODEX_CHALLENGE)?;
-    std::fs::write(&verify_path, CODEX_VERIFY)?;
+    std::fs::write(&review_path, CODEX_REVIEW)?;
 
     println!("   ✓ codex agentd-challenge (installed to ~/.codex/prompts/)");
-    println!("   ✓ codex agentd-verify (installed to ~/.codex/prompts/)");
+    println!("   ✓ codex agentd-review (installed to ~/.codex/prompts/)");
 
     Ok(())
 }
