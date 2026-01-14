@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Configuration
 REPO="chrischeng-c4/agentd"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 BINARY_NAME="agentd"
 
 # Colors
@@ -82,13 +82,11 @@ install_binary() {
         exit 1
     fi
 
-    # Check if we need sudo
-    if [[ -w "$INSTALL_DIR" ]]; then
-        mv "$tmp_dir/agentd" "$INSTALL_DIR/$BINARY_NAME"
-    else
-        warn "Need sudo to install to $INSTALL_DIR"
-        sudo mv "$tmp_dir/agentd" "$INSTALL_DIR/$BINARY_NAME"
-    fi
+    # Create install directory if needed
+    mkdir -p "$INSTALL_DIR"
+
+    # Install binary
+    mv "$tmp_dir/agentd" "$INSTALL_DIR/$BINARY_NAME"
 
     chmod +x "$INSTALL_DIR/$BINARY_NAME"
     success "Installed agentd to $INSTALL_DIR/$BINARY_NAME"
@@ -130,24 +128,35 @@ main() {
     install_binary "$version" "$platform"
     echo ""
 
+    # Check if INSTALL_DIR is in PATH
+    if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+        warn "Note: $INSTALL_DIR is not in your PATH"
+        echo ""
+        info "Add to your shell config (~/.bashrc, ~/.zshrc, etc.):"
+        echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+        echo ""
+        info "Then reload your shell or run:"
+        echo "  source ~/.zshrc  # or ~/.bashrc"
+        echo ""
+    fi
+
     # Verify installation
-    if command -v agentd &> /dev/null; then
+    if [[ -x "$INSTALL_DIR/$BINARY_NAME" ]]; then
         success "Installation successful!"
         echo ""
-        agentd --version
+        "$INSTALL_DIR/$BINARY_NAME" --version
         echo ""
 
         # Upgrade configs if in an agentd project
         check_and_upgrade_configs
 
-        echo ""
         info "Next steps:"
         echo "  1. Navigate to your project directory"
         echo "  2. Run: agentd init"
         echo ""
     else
-        warn "agentd installed but not in PATH"
-        warn "Add $INSTALL_DIR to your PATH"
+        error "Installation failed - binary not found"
+        exit 1
     fi
 }
 
