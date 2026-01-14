@@ -5,13 +5,8 @@ AI-powered spec-driven development orchestrator.
 ## Installation
 
 ```bash
-# From source
-git clone https://github.com/anthropics/agentd
-cd agentd
-cargo install --path .
-
-# Verify
-agentd --version
+brew tap anthropics/agentd
+brew install agentd
 ```
 
 ## Prerequisites
