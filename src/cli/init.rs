@@ -2,6 +2,7 @@ use crate::{models::AgentdConfig, Result};
 use colored::Colorize;
 use std::env;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 // Current version for tracking upgrades
 const AGENTD_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -27,6 +28,38 @@ const CODEX_REVIEW: &str = include_str!("../../templates/codex/prompts/agentd-re
 
 // Project Context Template
 const PROJECT_TEMPLATE: &str = include_str!("../../templates/project.md");
+
+// Prompt for generating project.md
+const PROJECT_INIT_PROMPT: &str = r#"Analyze this codebase and generate a project.md file.
+
+Output ONLY the markdown content, no explanations or code blocks.
+
+Format:
+# Project Context
+
+## Overview
+<!-- One sentence: What does this project do? -->
+
+## Tech Stack
+- Language: <detected language>
+- Framework: <detected framework or "None">
+- Key libraries: <main dependencies>
+
+## Conventions
+- Error handling: <detected patterns>
+- Naming: <detected style e.g. camelCase, snake_case>
+- Testing: <detected test framework>
+
+## Key Patterns
+<!-- Important abstractions and patterns to follow -->
+
+## Architecture
+<!-- Brief module/component overview - keep concise -->
+
+Analyze package.json, Cargo.toml, go.mod, pyproject.toml, or similar config files.
+Look at src/ structure and key files to understand architecture.
+Keep each section concise (2-4 lines max).
+"#;
 
 // AI Context Files (GEMINI.md and AGENTS.md) are now generated dynamically per change
 // from templates/GEMINI.md and templates/AGENTS.md
@@ -95,6 +128,9 @@ fn run_fresh_install(
     let project_md_path = agentd_dir.join("project.md");
     std::fs::write(&project_md_path, PROJECT_TEMPLATE)?;
     println!("   ✓ agentd/project.md");
+
+    // Try to auto-generate project.md with Gemini
+    generate_project_md(&project_md_path);
 
     // Create Claude Code skills directory
     let skills_dir = claude_dir.join("skills");
@@ -272,6 +308,89 @@ fn print_init_success() {
         "      {}",
         "/agentd:proposal my-feature \"Add awesome feature\"".cyan()
     );
+}
+
+/// Try to generate project.md using Gemini, or print prompt if unavailable
+fn generate_project_md(project_md_path: &Path) {
+    println!();
+    println!("{}", "🤖 Generating project context...".cyan());
+
+    // Check if gemini CLI is available
+    let gemini_available = Command::new("gemini")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if gemini_available {
+        // Run gemini to generate project.md
+        println!("   Running Gemini to analyze codebase...");
+
+        let output = Command::new("gemini")
+            .args(["prompt", "-m", "gemini-2.0-flash", PROJECT_INIT_PROMPT])
+            .output();
+
+        match output {
+            Ok(result) if result.status.success() => {
+                let raw_content = String::from_utf8_lossy(&result.stdout);
+
+                // Extract markdown content - find # Project Context and take from there
+                let content = if let Some(start) = raw_content.find("# Project Context") {
+                    let section = &raw_content[start..];
+                    // Remove trailing code blocks or extra text
+                    if let Some(end) = section.find("\n```\n") {
+                        &section[..end]
+                    } else {
+                        section.trim_end_matches("```").trim()
+                    }
+                } else {
+                    // Try to strip code blocks
+                    raw_content
+                        .trim()
+                        .trim_start_matches("```markdown")
+                        .trim_start_matches("```md")
+                        .trim_start_matches("```")
+                        .trim_end_matches("```")
+                        .trim()
+                };
+
+                // Only write if we got meaningful content with actual data
+                let has_content = content.contains("## Overview")
+                    && content.len() > 200
+                    && (content.contains("Language:") || content.contains("- Language"));
+
+                if has_content && !content.contains("<!-- One sentence") {
+                    if let Err(e) = std::fs::write(project_md_path, content) {
+                        println!("   {} Failed to write: {}", "⚠️".yellow(), e);
+                    } else {
+                        println!("   {} project.md auto-generated!", "✓".green());
+                        return;
+                    }
+                } else {
+                    println!("   {} Gemini output incomplete, using template", "⚠️".yellow());
+                }
+            }
+            Ok(result) => {
+                let stderr = String::from_utf8_lossy(&result.stderr);
+                println!("   {} Gemini failed: {}", "⚠️".yellow(), stderr.trim());
+            }
+            Err(e) => {
+                println!("   {} Failed to run Gemini: {}", "⚠️".yellow(), e);
+            }
+        }
+    } else {
+        println!("   {} Gemini CLI not found", "⚠️".yellow());
+    }
+
+    // Print prompt for manual use
+    println!();
+    println!("{}", "📋 To generate project.md manually, run:".yellow());
+    println!();
+    println!("   gemini prompt -m gemini-2.0-flash \\");
+    println!("     \"{}\" > agentd/project.md", "Analyze this codebase and generate project.md with Overview, Tech Stack, Conventions, Key Patterns, Architecture sections");
+    println!();
+    println!("   Or ask Claude Code:");
+    println!("     {}", "\"Read agentd/project.md and help me fill it out\"".cyan());
 }
 
 /// Check if upgrade is available and optionally auto-upgrade
