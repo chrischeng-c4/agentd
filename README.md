@@ -132,12 +132,15 @@ default = "balanced"
 
 After initialization, use these skills in Claude Code:
 
-- `/agentd-proposal` - Generate proposal
-- `/agentd-challenge` - Challenge proposal
-- `/agentd-reproposal` - Refine proposal
-- `/agentd-implement` - Implement change
-- `/agentd-verify` - Verify implementation
-- `/agentd-archive` - Archive change
+| Skill | CLI Equivalent | Description |
+|-------|----------------|-------------|
+| `/agentd-proposal` | `agentd proposal` | Generate proposal |
+| `/agentd-challenge` | `agentd challenge-proposal` | Challenge proposal |
+| `/agentd-reproposal` | `agentd reproposal` | Refine proposal |
+| `/agentd-implement` | `agentd implement` | Implement change |
+| `/agentd-verify` | `agentd review` | Verify implementation |
+| `/agentd-fix` | `agentd fix` | Fix issues |
+| `/agentd-archive` | `agentd archive` | Archive change |
 
 ## License
 
