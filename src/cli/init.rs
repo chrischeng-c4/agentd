@@ -450,7 +450,6 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 echo "🔍 Analyzing proposal with Codex: $CHANGE_ID"
 
 # Use change-specific AGENTS.md context (generated dynamically by agentd CLI)
-# Note: Set CODEX_INSTRUCTIONS_FILE if your Codex CLI supports it
 export CODEX_INSTRUCTIONS_FILE="$PROJECT_ROOT/agentd/changes/$CHANGE_ID/AGENTS.md"
 
 # Build prompt with context
@@ -480,8 +479,34 @@ Be thorough and constructive. Reference specific files and provide actionable re
 EOF
 )
 
-# Run non-interactively with full auto mode
-cd "$PROJECT_ROOT" && codex exec --full-auto "$PROMPT"
+# Run with JSON streaming and parse output
+cd "$PROJECT_ROOT" && codex exec --full-auto --json "$PROMPT" | while IFS= read -r line; do
+  type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
+  case "$type" in
+    item.completed)
+      item_type=$(echo "$line" | jq -r '.item.type // empty' 2>/dev/null)
+      case "$item_type" in
+        reasoning)
+          text=$(echo "$line" | jq -r '.item.text // empty' 2>/dev/null)
+          [ -n "$text" ] && echo "💭 $text"
+          ;;
+        command_execution)
+          cmd=$(echo "$line" | jq -r '.item.command // empty' 2>/dev/null)
+          status=$(echo "$line" | jq -r '.item.status // empty' 2>/dev/null)
+          [ -n "$cmd" ] && echo "⚡ $cmd ($status)"
+          ;;
+        agent_message)
+          # Final message - just note completion
+          echo "✅ Challenge analysis complete"
+          ;;
+      esac
+      ;;
+    turn.completed)
+      tokens=$(echo "$line" | jq -r '.usage.input_tokens // 0' 2>/dev/null)
+      echo "📊 Tokens used: $tokens"
+      ;;
+  esac
+done
 "#;
 
     let codex_review = r#"#!/bin/bash
@@ -580,8 +605,33 @@ Be thorough but fair. Include iteration number in REVIEW.md.
 EOF
 )
 
-# Run non-interactively with full auto mode
-cd "$PROJECT_ROOT" && codex exec --full-auto "$PROMPT"
+# Run with JSON streaming
+cd "$PROJECT_ROOT" && codex exec --full-auto --json "$PROMPT" | while IFS= read -r line; do
+  type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
+  case "$type" in
+    item.completed)
+      item_type=$(echo "$line" | jq -r '.item.type // empty' 2>/dev/null)
+      case "$item_type" in
+        reasoning)
+          text=$(echo "$line" | jq -r '.item.text // empty' 2>/dev/null)
+          [ -n "$text" ] && echo "💭 $text"
+          ;;
+        command_execution)
+          cmd=$(echo "$line" | jq -r '.item.command // empty' 2>/dev/null)
+          status=$(echo "$line" | jq -r '.item.status // empty' 2>/dev/null)
+          [ -n "$cmd" ] && echo "⚡ $cmd ($status)"
+          ;;
+        agent_message)
+          echo "✅ Review analysis complete"
+          ;;
+      esac
+      ;;
+    turn.completed)
+      tokens=$(echo "$line" | jq -r '.usage.input_tokens // 0' 2>/dev/null)
+      echo "📊 Tokens used: $tokens"
+      ;;
+  esac
+done
 
 # Cleanup temp files
 rm -rf "$TEMP_DIR"
@@ -633,8 +683,33 @@ Focus on whether the previous issues have been addressed.
 EOF
 )
 
-# Resume the previous session to reuse cached codebase context
-cd "$PROJECT_ROOT" && codex resume --last "$PROMPT"
+# Resume the previous session with JSON streaming
+cd "$PROJECT_ROOT" && codex resume --last --json "$PROMPT" | while IFS= read -r line; do
+  type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
+  case "$type" in
+    item.completed)
+      item_type=$(echo "$line" | jq -r '.item.type // empty' 2>/dev/null)
+      case "$item_type" in
+        reasoning)
+          text=$(echo "$line" | jq -r '.item.text // empty' 2>/dev/null)
+          [ -n "$text" ] && echo "💭 $text"
+          ;;
+        command_execution)
+          cmd=$(echo "$line" | jq -r '.item.command // empty' 2>/dev/null)
+          status=$(echo "$line" | jq -r '.item.status // empty' 2>/dev/null)
+          [ -n "$cmd" ] && echo "⚡ $cmd ($status)"
+          ;;
+        agent_message)
+          echo "✅ Re-challenge analysis complete"
+          ;;
+      esac
+      ;;
+    turn.completed)
+      tokens=$(echo "$line" | jq -r '.usage.input_tokens // 0' 2>/dev/null)
+      echo "📊 Tokens used: $tokens"
+      ;;
+  esac
+done
 "#;
 
     std::fs::write(scripts_dir.join("gemini-proposal.sh"), gemini_proposal)?;
@@ -1000,7 +1075,32 @@ Now perform the review and update the ARCHIVE_REVIEW.md file.
 EOF
 )
 
-cd "$PROJECT_ROOT" && codex exec --full-auto "$PROMPT"
+cd "$PROJECT_ROOT" && codex exec --full-auto --json "$PROMPT" | while IFS= read -r line; do
+  type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
+  case "$type" in
+    item.completed)
+      item_type=$(echo "$line" | jq -r '.item.type // empty' 2>/dev/null)
+      case "$item_type" in
+        reasoning)
+          text=$(echo "$line" | jq -r '.item.text // empty' 2>/dev/null)
+          [ -n "$text" ] && echo "💭 $text"
+          ;;
+        command_execution)
+          cmd=$(echo "$line" | jq -r '.item.command // empty' 2>/dev/null)
+          status=$(echo "$line" | jq -r '.item.status // empty' 2>/dev/null)
+          [ -n "$cmd" ] && echo "⚡ $cmd ($status)"
+          ;;
+        agent_message)
+          echo "✅ Archive review complete"
+          ;;
+      esac
+      ;;
+    turn.completed)
+      tokens=$(echo "$line" | jq -r '.usage.input_tokens // 0' 2>/dev/null)
+      echo "📊 Tokens used: $tokens"
+      ;;
+  esac
+done
 
 echo "✅ Review complete: $REVIEW_PATH"
 "#;
