@@ -16,7 +16,7 @@ PROMPT=$(cat << EOF
 Implement the proposal for agentd/changes/${CHANGE_ID}/.
 
 ## Instructions
-1. Read proposal.md, tasks.md, diagrams.md, and specs/
+1. Read proposal.md, tasks.md, and specs/
 2. Implement ALL tasks in tasks.md (or only ${TASKS} if specified)
 3. **Write tests for all implemented features** (unit + integration)
    - Test all spec scenarios (WHEN/THEN cases)

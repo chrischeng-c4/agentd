@@ -28,8 +28,7 @@ The proposal has been revised based on previous feedback.
 2. Read the UPDATED proposal files in agentd/changes/${CHANGE_ID}/:
    - proposal.md (revised)
    - tasks.md (revised)
-   - diagrams.md (revised)
-   - specs/*.md (revised)
+   - specs/*.md (revised - with Mermaid diagrams, JSON Schema, interfaces, acceptance criteria)
 
 3. Re-fill the CHALLENGE.md with your findings:
    - **Internal Consistency Issues** (HIGH): Check if revised proposal docs now match each other
@@ -42,5 +41,30 @@ Focus on whether the previous issues have been addressed.
 EOF
 )
 
-# Resume the previous session to reuse cached codebase context
-codex resume --last "$PROMPT"
+# Run with JSON streaming (codex resume doesn't support --json, use exec instead)
+cd "$PROJECT_ROOT" && codex exec --full-auto --json "$PROMPT" | while IFS= read -r line; do
+  type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
+  case "$type" in
+    item.completed)
+      item_type=$(echo "$line" | jq -r '.item.type // empty' 2>/dev/null)
+      case "$item_type" in
+        reasoning)
+          text=$(echo "$line" | jq -r '.item.text // empty' 2>/dev/null)
+          [ -n "$text" ] && echo "💭 $text"
+          ;;
+        command_execution)
+          cmd=$(echo "$line" | jq -r '.item.command // empty' 2>/dev/null)
+          status=$(echo "$line" | jq -r '.item.status // empty' 2>/dev/null)
+          [ -n "$cmd" ] && echo "⚡ $cmd ($status)"
+          ;;
+        agent_message)
+          echo "✅ Re-challenge analysis complete"
+          ;;
+      esac
+      ;;
+    turn.completed)
+      tokens=$(echo "$line" | jq -r '.usage.input_tokens // 0' 2>/dev/null)
+      echo "📊 Tokens used: $tokens"
+      ;;
+  esac
+done

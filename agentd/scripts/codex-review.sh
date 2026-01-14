@@ -94,8 +94,33 @@ Be thorough but fair. Include iteration number in REVIEW.md.
 EOF
 )
 
-# Run non-interactively with full auto mode
-codex exec --full-auto "$PROMPT"
+# Run with JSON streaming
+cd "$PROJECT_ROOT" && codex exec --full-auto --json "$PROMPT" | while IFS= read -r line; do
+  type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
+  case "$type" in
+    item.completed)
+      item_type=$(echo "$line" | jq -r '.item.type // empty' 2>/dev/null)
+      case "$item_type" in
+        reasoning)
+          text=$(echo "$line" | jq -r '.item.text // empty' 2>/dev/null)
+          [ -n "$text" ] && echo "💭 $text"
+          ;;
+        command_execution)
+          cmd=$(echo "$line" | jq -r '.item.command // empty' 2>/dev/null)
+          status=$(echo "$line" | jq -r '.item.status // empty' 2>/dev/null)
+          [ -n "$cmd" ] && echo "⚡ $cmd ($status)"
+          ;;
+        agent_message)
+          echo "✅ Review analysis complete"
+          ;;
+      esac
+      ;;
+    turn.completed)
+      tokens=$(echo "$line" | jq -r '.usage.input_tokens // 0' 2>/dev/null)
+      echo "📊 Tokens used: $tokens"
+      ;;
+  esac
+done
 
 # Cleanup temp files
 rm -rf "$TEMP_DIR"

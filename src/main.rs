@@ -5,7 +5,7 @@ use agentd::Result;
 #[derive(Parser)]
 #[command(name = "agentd")]
 #[command(author = "Chris Cheng <chris.cheng@shopee.com>")]
-#[command(version = "0.1.0")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "Spec-driven Development Orchestrator", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {

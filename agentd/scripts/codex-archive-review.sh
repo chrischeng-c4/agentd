@@ -59,7 +59,9 @@ You need to verify that Gemini correctly merged the spec deltas:
 
 ### 1. Compare Delta vs Merged Specs
 
-For each spec file in the delta:
+**IMPORTANT**: Skip template files (files starting with underscore like _skeleton.md).
+
+For each spec file in the delta (excluding templates):
 1. Read the delta spec: agentd/changes/${CHANGE_ID}/specs/[file]
 2. Read the merged spec: agentd/specs/[file]
 3. Verify ALL changes from delta are present in merged spec
@@ -130,6 +132,31 @@ Now perform the review and update the ARCHIVE_REVIEW.md file.
 EOF
 )
 
-codex exec --full-auto "$PROMPT"
+cd "$PROJECT_ROOT" && codex exec --full-auto --json "$PROMPT" | while IFS= read -r line; do
+  type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
+  case "$type" in
+    item.completed)
+      item_type=$(echo "$line" | jq -r '.item.type // empty' 2>/dev/null)
+      case "$item_type" in
+        reasoning)
+          text=$(echo "$line" | jq -r '.item.text // empty' 2>/dev/null)
+          [ -n "$text" ] && echo "💭 $text"
+          ;;
+        command_execution)
+          cmd=$(echo "$line" | jq -r '.item.command // empty' 2>/dev/null)
+          status=$(echo "$line" | jq -r '.item.status // empty' 2>/dev/null)
+          [ -n "$cmd" ] && echo "⚡ $cmd ($status)"
+          ;;
+        agent_message)
+          echo "✅ Archive review complete"
+          ;;
+      esac
+      ;;
+    turn.completed)
+      tokens=$(echo "$line" | jq -r '.usage.input_tokens // 0' 2>/dev/null)
+      echo "📊 Tokens used: $tokens"
+      ;;
+  esac
+done
 
 echo "✅ Review complete: $REVIEW_PATH"
