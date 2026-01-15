@@ -142,6 +142,16 @@ pub enum ErrorCategory {
 }
 
 impl ErrorCategory {
+    /// Check if this error category can be automatically fixed
+    pub fn is_fixable(&self) -> bool {
+        matches!(
+            self,
+            ErrorCategory::MissingHeading
+                | ErrorCategory::MissingWhenThen
+                | ErrorCategory::MissingScenario
+        )
+    }
+
     /// Get display name for category
     pub fn name(&self) -> &'static str {
         match self {
@@ -360,6 +370,8 @@ pub struct ValidationOptions {
     pub verbose: bool,
     /// Output results as JSON
     pub json: bool,
+    /// Attempt to auto-fix fixable errors
+    pub fix: bool,
 }
 
 impl ValidationOptions {
@@ -383,6 +395,12 @@ impl ValidationOptions {
     /// Set JSON output mode
     pub fn with_json(mut self, json: bool) -> Self {
         self.json = json;
+        self
+    }
+
+    /// Set fix mode
+    pub fn with_fix(mut self, fix: bool) -> Self {
+        self.fix = fix;
         self
     }
 }

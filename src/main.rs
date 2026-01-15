@@ -42,6 +42,10 @@ enum Commands {
         /// Output results as JSON
         #[arg(long)]
         json: bool,
+
+        /// Auto-fix fixable errors (missing headings, WHEN/THEN)
+        #[arg(short, long)]
+        fix: bool,
     },
 
     /// Challenge the proposal with Codex (code analysis)
@@ -196,11 +200,12 @@ async fn main() -> Result<()> {
             agentd::cli::proposal::run(&change_id, &description).await?;
         }
 
-        Commands::ValidateProposal { change_id, strict, verbose, json } => {
+        Commands::ValidateProposal { change_id, strict, verbose, json, fix } => {
             let options = agentd::models::ValidationOptions::new()
                 .with_strict(strict)
                 .with_verbose(verbose)
-                .with_json(json);
+                .with_json(json)
+                .with_fix(fix);
             agentd::cli::validate_proposal::run(&change_id, &options).await?;
         }
 

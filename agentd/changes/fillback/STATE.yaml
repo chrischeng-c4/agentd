@@ -1,0 +1,152 @@
+change_id: fillback
+schema_version: '2.0'
+created_at: 2026-01-15T06:09:36.425999Z
+updated_at: 2026-01-15T06:16:39.107112Z
+phase: proposed
+iteration: 1
+last_action: validate-proposal
+checksums:
+  specs/_skeleton.md:
+    hash: sha256:ef0b284e162071cd8f3cb80d03a7f068ba6e6adda2f726a89c36d8a4ca219798
+    validated_at: 2026-01-15T06:16:39.107070Z
+  specs/fillback_command.md:
+    hash: sha256:5ea0663078cbd5138a2ea237e1bf537f13c8a6a35c9ff78d8285099320df213e
+    validated_at: 2026-01-15T06:16:39.106689Z
+  tasks.md:
+    hash: sha256:034c53f81644968c7ef00ab53bac09ee04bdf0d14a2895ab2b7ed3de61611cf2
+    validated_at: 2026-01-15T06:16:39.106193Z
+  proposal.md:
+    hash: sha256:d80a7fdcd109f3441bb52eb4df33245425740dd4fff1712477561165edb3c5b0
+    validated_at: 2026-01-15T06:16:39.105935Z
+  specs/interfaces.md:
+    hash: sha256:ee7545519b3fc49157ae21bf65b850b4b2ce657680b291bd55886a24d292447f
+    validated_at: 2026-01-15T06:16:39.106450Z
+validations:
+- step: validate-proposal
+  timestamp: 2026-01-15T06:09:36.426098Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 15
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/interfaces.md] Requirement heading ''ImportStrategy Trait'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''OpenSpecStrategy'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''SpeckitStrategy'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''CodeStrategy'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''SpecGenerationRequest'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Missing required heading: Specification:'
+  - '[specs/interfaces.md] Missing required heading: Requirements'
+  - '[specs/interfaces.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/interfaces.md] Missing **WHEN** clause in scenarios'
+  - '[specs/interfaces.md] Missing **THEN** clause in scenarios'
+  - '[specs/fillback_command.md] Missing required heading: Specification:'
+  - '[specs/fillback_command.md] Missing required heading: Requirements'
+  - '[specs/fillback_command.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/fillback_command.md] Missing **WHEN** clause in scenarios'
+  - '[specs/fillback_command.md] Missing **THEN** clause in scenarios'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-15T06:11:02.646552Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 10
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/interfaces.md] Requirement heading ''ImportStrategy Trait Definition'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''SpecGenerationRequest'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''Scenario: Code Strategy GitIgnore'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''Scenario: OpenSpec Format Support'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''Scenario: Output Location'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/fillback_command.md] Requirement heading ''Scenario: Code Strategy Execution'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/fillback_command.md] Requirement heading ''Scenario: Invalid Strategy'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/fillback_command.md] Requirement heading ''Scenario: OpenSpec Conversion'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/fillback_command.md] Found 0 scenarios, but minimum 1 required'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-15T06:11:57.179059Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 10
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/interfaces.md] Requirement heading ''ImportStrategy Trait Definition'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''SpecGenerationRequest'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''Scenario: Code Strategy GitIgnore'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''Scenario: OpenSpec Format Support'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Requirement heading ''Scenario: Output Location'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/interfaces.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/fillback_command.md] Requirement heading ''Scenario: Code Strategy Execution'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/fillback_command.md] Requirement heading ''Scenario: Invalid Strategy'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/fillback_command.md] Requirement heading ''Scenario: OpenSpec Conversion'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/fillback_command.md] Found 0 scenarios, but minimum 1 required'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-15T06:15:36.113652Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 2
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/interfaces.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/fillback_command.md] Found 0 scenarios, but minimum 1 required'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-15T06:16:16.246580Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 6
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/interfaces.md] Scenario heading ''Scenario: Code Strategy GitIgnore'' doesn''t match pattern ''^### Scenario:'''
+  - '[specs/interfaces.md] Scenario heading ''Scenario: OpenSpec Format Support'' doesn''t match pattern ''^### Scenario:'''
+  - '[specs/interfaces.md] Scenario heading ''Scenario: Output Location'' doesn''t match pattern ''^### Scenario:'''
+  - '[specs/fillback_command.md] Scenario heading ''Scenario: Code Strategy Execution'' doesn''t match pattern ''^### Scenario:'''
+  - '[specs/fillback_command.md] Scenario heading ''Scenario: Invalid Strategy'' doesn''t match pattern ''^### Scenario:'''
+  - '[specs/fillback_command.md] Scenario heading ''Scenario: OpenSpec Conversion'' doesn''t match pattern ''^### Scenario:'''
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-15T06:16:39.105702Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 0
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors: []
+  warnings: []
+telemetry: null

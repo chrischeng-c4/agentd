@@ -5,7 +5,7 @@ use crate::models::{
 };
 use crate::parser::has_frontmatter;
 use crate::state::StateManager;
-use crate::validator::{ConsistencyValidator, SchemaValidator, SpecFormatValidator, SemanticValidator};
+use crate::validator::{AutoFixer, ConsistencyValidator, SchemaValidator, SpecFormatValidator, SemanticValidator};
 use crate::Result;
 use colored::Colorize;
 use std::env;
@@ -146,7 +146,61 @@ pub async fn run(change_id: &str, options: &ValidationOptions) -> Result<()> {
         println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
     }
 
-    let summary = validate_proposal(change_id, &project_root, options)?;
+    let mut summary = validate_proposal(change_id, &project_root, options)?;
+
+    // If --fix is enabled and there are fixable errors, attempt to fix them
+    if options.fix && summary.high_count > 0 {
+        let fixable_count = summary.validation_errors.iter()
+            .filter(|e| e.category.is_fixable())
+            .count();
+
+        if fixable_count > 0 {
+            if !options.json {
+                println!();
+                println!("{}", "🔧 Attempting auto-fix...".cyan());
+            }
+
+            let fixer = AutoFixer::new(&project_root);
+            let fix_result = fixer.fix_errors(&summary.validation_errors)?;
+
+            if !options.json {
+                for detail in &fix_result.fix_details {
+                    println!("   ✓ {}", detail.green());
+                }
+
+                if fix_result.errors_fixed > 0 {
+                    println!(
+                        "   {} {} error(s) fixed in {} file(s)",
+                        "✨".green(),
+                        fix_result.errors_fixed,
+                        fix_result.files_modified
+                    );
+
+                    // Re-run validation after fixes
+                    println!();
+                    println!("{}", "🔄 Re-validating after fixes...".cyan());
+                    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+
+                    // Create new options without fix to avoid infinite loop
+                    let revalidate_options = ValidationOptions::new()
+                        .with_strict(options.strict)
+                        .with_verbose(options.verbose)
+                        .with_json(false)
+                        .with_fix(false);
+
+                    summary = validate_proposal(change_id, &project_root, &revalidate_options)?;
+                }
+
+                if !fix_result.unfixable_errors.is_empty() {
+                    println!(
+                        "   {} {} error(s) could not be auto-fixed",
+                        "⚠️".yellow(),
+                        fix_result.unfixable_errors.len()
+                    );
+                }
+            }
+        }
+    }
 
     // JSON output mode
     if options.json {
