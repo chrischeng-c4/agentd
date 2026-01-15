@@ -1,6 +1,10 @@
 #!/bin/bash
 # Claude implement script - writes code AND tests
 # Usage: ./claude-implement.sh <change-id> [--tasks "1.1,1.2"]
+#
+# Environment variables:
+#   AGENTD_MODEL - Model to use (e.g., "sonnet", "opus", "haiku")
+#
 set -euo pipefail
 
 CHANGE_ID="$1"
@@ -23,7 +27,10 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-echo "🎨 Implementing with Claude: $CHANGE_ID"
+# Model selection: default to sonnet
+MODEL="${AGENTD_MODEL:-sonnet}"
+
+echo "🎨 Implementing with Claude ($MODEL): $CHANGE_ID"
 
 # Build task filter instruction
 TASK_FILTER=""
@@ -57,5 +64,6 @@ EOF
 # Run Claude CLI in headless mode
 cd "$PROJECT_ROOT"
 echo "$PROMPT" | claude -p \
+    --model "$MODEL" \
     --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
     --output-format stream-json

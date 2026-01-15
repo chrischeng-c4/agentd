@@ -1057,6 +1057,10 @@ echo "$CONTEXT" | gemini agentd:fillback --output-format stream-json
     let claude_implement = r#"#!/bin/bash
 # Claude implement script - writes code AND tests
 # Usage: ./claude-implement.sh <change-id> [--tasks "1.1,1.2"]
+#
+# Environment variables:
+#   AGENTD_MODEL - Model to use (e.g., "sonnet", "opus", "haiku")
+#
 set -euo pipefail
 
 CHANGE_ID="$1"
@@ -1079,7 +1083,10 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-echo "🎨 Implementing with Claude: $CHANGE_ID"
+# Model selection: default to sonnet
+MODEL="${AGENTD_MODEL:-sonnet}"
+
+echo "🎨 Implementing with Claude ($MODEL): $CHANGE_ID"
 
 # Build task filter instruction
 TASK_FILTER=""
@@ -1113,6 +1120,7 @@ EOF
 # Run Claude CLI in headless mode
 cd "$PROJECT_ROOT"
 echo "$PROMPT" | claude -p \
+    --model "$MODEL" \
     --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
     --output-format stream-json
 "#;
@@ -1122,6 +1130,10 @@ echo "$PROMPT" | claude -p \
     let claude_resolve = r#"#!/bin/bash
 # Claude resolve script - fixes issues from code review
 # Usage: ./claude-resolve.sh <change-id>
+#
+# Environment variables:
+#   AGENTD_MODEL - Model to use (e.g., "sonnet", "opus", "haiku")
+#
 set -euo pipefail
 
 CHANGE_ID="$1"
@@ -1129,7 +1141,10 @@ CHANGE_ID="$1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-echo "🔧 Resolving review issues with Claude: $CHANGE_ID"
+# Model selection: default to sonnet
+MODEL="${AGENTD_MODEL:-sonnet}"
+
+echo "🔧 Resolving review issues with Claude ($MODEL): $CHANGE_ID"
 
 PROMPT=$(cat << EOF
 # Agentd Resolve Reviews Task
@@ -1155,6 +1170,7 @@ EOF
 # Run Claude CLI in headless mode
 cd "$PROJECT_ROOT"
 echo "$PROMPT" | claude -p \
+    --model "$MODEL" \
     --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
     --output-format stream-json
 "#;
@@ -1164,6 +1180,10 @@ echo "$PROMPT" | claude -p \
     let claude_fix = r#"#!/bin/bash
 # Claude fix script - fixes issues from verification
 # Usage: ./claude-fix.sh <change-id>
+#
+# Environment variables:
+#   AGENTD_MODEL - Model to use (e.g., "sonnet", "opus", "haiku")
+#
 set -euo pipefail
 
 CHANGE_ID="$1"
@@ -1171,7 +1191,10 @@ CHANGE_ID="$1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-echo "🔧 Fixing verification issues with Claude: $CHANGE_ID"
+# Model selection: default to sonnet
+MODEL="${AGENTD_MODEL:-sonnet}"
+
+echo "🔧 Fixing verification issues with Claude ($MODEL): $CHANGE_ID"
 
 PROMPT=$(cat << EOF
 # Agentd Fix Task
@@ -1198,6 +1221,7 @@ EOF
 # Run Claude CLI in headless mode
 cd "$PROJECT_ROOT"
 echo "$PROMPT" | claude -p \
+    --model "$MODEL" \
     --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
     --output-format stream-json
 "#;
