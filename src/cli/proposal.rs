@@ -80,14 +80,40 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
                 }
                 ChallengeVerdict::NeedsRevision => {
                     println!();
-                    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
                     println!(
                         "{}",
-                        "⚠️  Automatic refinement limit reached (1 iteration)".yellow().bold()
+                        "⚠️  Still NEEDS_REVISION - Auto-fixing (iteration 2)...".yellow()
                     );
-                    println!();
-                    display_remaining_issues(&resolved_change_id, &project_root)?;
-                    Ok(())
+
+                    // Step 7: Second reproposal
+                    run_reproposal_step(&resolved_change_id, &project_root, &config).await?;
+
+                    // Step 8: Third challenge
+                    let verdict3 = run_rechallenge_step(&resolved_change_id, &project_root, &config).await?;
+
+                    match verdict3 {
+                        ChallengeVerdict::Approved => {
+                            println!();
+                            println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                            println!("{}", "✨ Fixed and approved (iteration 2)!".green().bold());
+                            println!("   Location: agentd/changes/{}", resolved_change_id);
+                            println!();
+                            println!("{}", "⏭️  Next steps:".yellow());
+                            println!("   agentd implement {}", resolved_change_id);
+                            Ok(())
+                        }
+                        _ => {
+                            println!();
+                            println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                            println!(
+                                "{}",
+                                "⚠️  Automatic refinement limit reached (2 iterations)".yellow().bold()
+                            );
+                            println!();
+                            display_remaining_issues(&resolved_change_id, &project_root)?;
+                            Ok(())
+                        }
+                    }
                 }
                 ChallengeVerdict::Rejected => {
                     println!();

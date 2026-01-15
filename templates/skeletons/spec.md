@@ -1,4 +1,4 @@
-# Spec: [Feature Name]
+# Specification: [Feature Name]
 
 <!--
 Technical Design + Acceptance Criteria.
@@ -8,6 +8,14 @@ NO actual implementation code.
 
 ## Overview
 [Brief description of what this spec covers]
+
+## Requirements
+
+### R1: [First Requirement Title]
+[Description of the requirement]
+
+### R2: [Second Requirement Title]
+[Description of the requirement]
 
 ## Flow
 ```mermaid
@@ -51,6 +59,15 @@ FUNCTION another_function() -> void
 ```
 
 ## Acceptance Criteria
-- WHEN [trigger condition] THEN [expected behavior]
-- WHEN [error condition] THEN [error handling]
-- WHEN [edge case] THEN [expected behavior]
+
+### Scenario: [Happy Path]
+- **WHEN** [trigger condition]
+- **THEN** [expected behavior]
+
+### Scenario: [Error Case]
+- **WHEN** [error condition]
+- **THEN** [error handling behavior]
+
+### Scenario: [Edge Case]
+- **WHEN** [edge case condition]
+- **THEN** [expected behavior]
