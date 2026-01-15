@@ -43,4 +43,5 @@ cd "$PROJECT_ROOT"
 echo "$PROMPT" | claude -p \
     --model "$MODEL" \
     --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
-    --output-format stream-json
+    --output-format stream-json \
+    --verbose
