@@ -90,7 +90,7 @@ required_headings = [
     "Requirements",
 ]
 requirement_pattern = '^R\d+:'
-scenario_pattern = "^Scenario:"
+scenario_pattern = "Scenario:"
 scenario_min_count = 1
 require_when_then = true
 when_pattern = '- \*\*WHEN\*\*'

@@ -83,8 +83,15 @@ impl SpecFormatValidator {
                         // Track headings
                         state.add_heading(heading_level, text_str.to_string());
 
-                        // Check for requirement pattern (### R\d+:)
-                        if heading_level == 3 {
+                        // Track which section we're in based on level 2 headings
+                        if heading_level == 2 {
+                            let lower = text_str.to_lowercase();
+                            state.in_requirements_section = lower.contains("requirements");
+                            state.in_acceptance_criteria = lower.contains("acceptance criteria");
+                        }
+
+                        // Check for requirement pattern (### R\d+:) - only in Requirements section
+                        if heading_level == 3 && state.in_requirements_section {
                             let line_num = find_line_number(&lines, text_str);
                             errors.extend(self.validate_requirement_heading(
                                 text_str,
@@ -93,8 +100,8 @@ impl SpecFormatValidator {
                             ));
                         }
 
-                        // Check for scenario pattern (#### Scenario:)
-                        if heading_level == 4 {
+                        // Check for scenario pattern (### Scenario:) - only in Acceptance Criteria section
+                        if heading_level == 3 && state.in_acceptance_criteria {
                             let line_num = find_line_number(&lines, text_str);
                             errors.extend(self.validate_scenario_heading(
                                 text_str,
@@ -309,6 +316,8 @@ struct ValidationState {
     current_heading_level: Option<usize>,
     headings: Vec<(usize, String)>,
     in_requirement: bool,
+    in_requirements_section: bool,
+    in_acceptance_criteria: bool,
     has_when: bool,
     has_then: bool,
 }
@@ -320,6 +329,8 @@ impl ValidationState {
             current_heading_level: None,
             headings: Vec::new(),
             in_requirement: false,
+            in_requirements_section: false,
+            in_acceptance_criteria: false,
             has_when: false,
             has_then: false,
         }
