@@ -2,6 +2,14 @@ project_name = "agentd"
 scripts_dir = "agentd/scripts"
 
 # =============================================================================
+# Workflow Iteration Settings
+# =============================================================================
+[workflow]
+planning_iterations = 2        # proposal ↔ challenge iterations
+implementation_iterations = 2  # implement ↔ review iterations
+archive_iterations = 1         # archive review iterations
+
+# =============================================================================
 # Gemini Configuration
 # =============================================================================
 [gemini]

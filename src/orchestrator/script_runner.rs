@@ -390,4 +390,19 @@ impl ScriptRunner {
         self.run_script_with_model("claude-fix.sh", &[change_id.to_string()], true, model)
             .await
     }
+
+    /// Run Claude archive fix (fix issues from archive review)
+    pub async fn run_claude_archive_fix(&self, change_id: &str) -> Result<String> {
+        self.run_claude_archive_fix_with_model(change_id, None).await
+    }
+
+    /// Run Claude archive fix with model selection
+    pub async fn run_claude_archive_fix_with_model(
+        &self,
+        change_id: &str,
+        model: Option<&SelectedModel>,
+    ) -> Result<String> {
+        self.run_script_with_model("claude-archive-fix.sh", &[change_id.to_string()], true, model)
+            .await
+    }
 }

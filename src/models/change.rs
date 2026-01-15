@@ -528,11 +528,45 @@ impl ClaudeConfig {
 // Agentd Configuration
 // =============================================================================
 
+/// Workflow iteration settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowConfig {
+    /// Max iterations for planning phase (proposal ↔ challenge)
+    #[serde(default = "default_planning_iterations")]
+    pub planning_iterations: u32,
+
+    /// Max iterations for implementation phase (implement ↔ review)
+    #[serde(default = "default_implementation_iterations")]
+    pub implementation_iterations: u32,
+
+    /// Max iterations for archive phase (archive review)
+    #[serde(default = "default_archive_iterations")]
+    pub archive_iterations: u32,
+}
+
+fn default_planning_iterations() -> u32 { 2 }
+fn default_implementation_iterations() -> u32 { 2 }
+fn default_archive_iterations() -> u32 { 1 }
+
+impl Default for WorkflowConfig {
+    fn default() -> Self {
+        Self {
+            planning_iterations: default_planning_iterations(),
+            implementation_iterations: default_implementation_iterations(),
+            archive_iterations: default_archive_iterations(),
+        }
+    }
+}
+
 /// Agentd configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentdConfig {
     /// Project name
     pub project_name: String,
+
+    /// Workflow iteration settings
+    #[serde(default)]
+    pub workflow: WorkflowConfig,
 
     /// Gemini configuration
     #[serde(default)]
@@ -569,6 +603,7 @@ impl Default for AgentdConfig {
     fn default() -> Self {
         Self {
             project_name: "My Project".to_string(),
+            workflow: WorkflowConfig::default(),
             gemini: GeminiConfig::default(),
             codex: CodexConfig::default(),
             claude: ClaudeConfig::default(),

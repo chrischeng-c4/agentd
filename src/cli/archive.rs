@@ -113,7 +113,7 @@ pub async fn run(change_id: &str) -> Result<()> {
     generate_changelog_entry(change_id, &project_root, &config).await?;
     println!("   {} CHANGELOG updated", "✅".green());
 
-    // Step 6: Quality review with Codex
+    // Step 6: Quality review with Codex (with iteration support)
     println!();
     println!("{}", "🔍 [6/7] Reviewing with Codex...".cyan());
 
@@ -126,49 +126,90 @@ pub async fn run(change_id: &str) -> Result<()> {
         "mixed"
     };
 
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    script_runner
-        .run_codex_archive_review(change_id, review_strategy)
-        .await?;
+    // First review
+    let verdict = run_archive_review_step(change_id, review_strategy, &project_root, &config, 0).await?;
 
-    // Parse review verdict
-    let review_path = change_dir.join("ARCHIVE_REVIEW.md");
-    let verdict = parse_archive_review_verdict(&review_path)?;
+    // Archive review iteration loop
+    let max_iterations = config.workflow.archive_iterations;
+    let mut current_verdict = verdict;
+    let mut iteration = 0;
 
-    match verdict {
-        ArchiveReviewVerdict::Approved => {
-            println!("   {} Quality review passed", "✅".green());
-        }
-        ArchiveReviewVerdict::NeedsFix | ArchiveReviewVerdict::Rejected => {
-            println!();
-            println!("{}", "❌ Quality review failed".red().bold());
-            display_review_issues(&review_path)?;
-            println!();
-            println!(
-                "{}",
-                "🛑 Archive blocked. Restoring original specs...".yellow()
-            );
+    loop {
+        match current_verdict {
+            ArchiveReviewVerdict::Approved => {
+                if iteration == 0 {
+                    println!("   {} Quality review passed", "✅".green());
+                } else {
+                    println!("   {} Quality review passed (iteration {})", "✅".green(), iteration);
+                }
+                break; // Exit loop and continue to step 7
+            }
+            ArchiveReviewVerdict::NeedsFix => {
+                iteration += 1;
+                if iteration > max_iterations {
+                    println!();
+                    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                    println!(
+                        "{}",
+                        format!("⚠️  Automatic fix limit reached ({} iterations)", max_iterations).yellow().bold()
+                    );
+                    display_review_issues(&change_dir.join("ARCHIVE_REVIEW.md"))?;
+                    println!();
+                    println!(
+                        "{}",
+                        "🛑 Archive blocked. Restoring original specs...".yellow()
+                    );
+                    restore_original_specs(&project_root)?;
+                    println!();
+                    println!("Fix issues manually and re-run: agentd archive {}", change_id);
+                    return Ok(());
+                }
 
-            restore_original_specs(&project_root)?;
+                println!();
+                println!(
+                    "{}",
+                    format!("⚠️  NEEDS_FIX - Auto-fixing (iteration {})...", iteration).yellow()
+                );
 
-            println!();
-            println!("Fix issues and re-run: agentd archive {}", change_id);
-            return Ok(());
-        }
-        ArchiveReviewVerdict::Unknown => {
-            println!("   ⚠️  Could not parse review verdict");
-            println!("   Review report: {}", review_path.display());
-            println!();
-            println!(
-                "{}",
-                "🛑 Archive blocked due to unknown verdict. Restoring original specs...".yellow()
-            );
+                // Fix merged specs with Claude
+                run_archive_fix_step(change_id, &project_root, &config).await?;
 
-            restore_original_specs(&project_root)?;
+                // Re-review with Codex
+                println!();
+                println!("{}", format!("🔍 Re-reviewing (iteration {})...", iteration).cyan());
+                current_verdict = run_archive_review_step(change_id, review_strategy, &project_root, &config, iteration).await?;
+            }
+            ArchiveReviewVerdict::Rejected => {
+                println!();
+                println!("{}", "❌ Quality review rejected - fundamental problems".red().bold());
+                display_review_issues(&change_dir.join("ARCHIVE_REVIEW.md"))?;
+                println!();
+                println!(
+                    "{}",
+                    "🛑 Archive blocked. Restoring original specs...".yellow()
+                );
 
-            println!();
-            println!("Check review report and re-run: agentd archive {}", change_id);
-            return Ok(());
+                restore_original_specs(&project_root)?;
+
+                println!();
+                println!("Fix issues and re-run: agentd archive {}", change_id);
+                return Ok(());
+            }
+            ArchiveReviewVerdict::Unknown => {
+                println!("   ⚠️  Could not parse review verdict");
+                println!("   Review report: {}", change_dir.join("ARCHIVE_REVIEW.md").display());
+                println!();
+                println!(
+                    "{}",
+                    "🛑 Archive blocked due to unknown verdict. Restoring original specs...".yellow()
+                );
+
+                restore_original_specs(&project_root)?;
+
+                println!();
+                println!("Check review report and re-run: agentd archive {}", change_id);
+                return Ok(());
+            }
         }
     }
 
@@ -465,4 +506,85 @@ fn display_review_issues(review_path: &Path) -> Result<()> {
     println!();
     println!("Full report: {}", review_path.display());
     Ok(())
+}
+
+/// Run archive review step with Codex
+async fn run_archive_review_step(
+    change_id: &str,
+    strategy: &str,
+    project_root: &PathBuf,
+    config: &AgentdConfig,
+    iteration: u32,
+) -> Result<ArchiveReviewVerdict> {
+    let change_dir = project_root.join("agentd/changes").join(change_id);
+
+    // Create/update ARCHIVE_REVIEW.md skeleton
+    crate::context::create_archive_review_skeleton(&change_dir, change_id, iteration)?;
+
+    // Run Codex archive review
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(project_root));
+    script_runner
+        .run_codex_archive_review(change_id, strategy)
+        .await?;
+
+    // Parse verdict
+    let review_path = change_dir.join("ARCHIVE_REVIEW.md");
+    let verdict = parse_archive_review_verdict(&review_path)?;
+
+    // Display summary
+    display_archive_review_summary(&review_path, &verdict, iteration)?;
+
+    Ok(verdict)
+}
+
+/// Run archive fix step with Claude
+async fn run_archive_fix_step(
+    change_id: &str,
+    project_root: &PathBuf,
+    config: &AgentdConfig,
+) -> Result<()> {
+    let change_dir = project_root.join("agentd/changes").join(change_id);
+    let review_path = change_dir.join("ARCHIVE_REVIEW.md");
+
+    if !review_path.exists() {
+        anyhow::bail!("ARCHIVE_REVIEW.md not found for fixing issues");
+    }
+
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(project_root));
+    script_runner.run_claude_archive_fix(change_id).await?;
+
+    println!("{}", "✅ Archive issues fixed".green());
+    Ok(())
+}
+
+/// Display archive review summary
+fn display_archive_review_summary(
+    review_path: &Path,
+    verdict: &ArchiveReviewVerdict,
+    _iteration: u32,
+) -> Result<()> {
+    if !review_path.exists() {
+        return Ok(());
+    }
+
+    let content = std::fs::read_to_string(review_path)?;
+
+    // Count issues
+    let high_count = content.matches("**Severity**: High").count();
+    let medium_count = content.matches("**Severity**: Medium").count();
+
+    println!();
+    println!("   Issues: {} high, {} medium", high_count, medium_count);
+    println!("   Verdict: {}", format_archive_verdict(verdict));
+
+    Ok(())
+}
+
+fn format_archive_verdict(verdict: &ArchiveReviewVerdict) -> colored::ColoredString {
+    match verdict {
+        ArchiveReviewVerdict::Approved => "APPROVED".green().bold(),
+        ArchiveReviewVerdict::NeedsFix => "NEEDS_FIX".yellow().bold(),
+        ArchiveReviewVerdict::Rejected => "REJECTED".red().bold(),
+        ArchiveReviewVerdict::Unknown => "UNKNOWN".bright_black(),
+    }
 }

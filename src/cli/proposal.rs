@@ -43,113 +43,70 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
     // Step 4: Validate challenge format (local)
     let _challenge_valid = run_validate_challenge_step(&resolved_change_id, &project_root)?;
 
-    match verdict {
-        ChallengeVerdict::Approved => {
-            println!();
-            println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-            println!("{}", "✨ Proposal completed and approved!".green().bold());
-            println!("   Location: agentd/changes/{}", resolved_change_id);
-            println!();
-            println!("{}", "⏭️  Next steps:".yellow());
-            println!("   agentd implement {}", resolved_change_id);
-            return Ok(());
-        }
-        ChallengeVerdict::NeedsRevision => {
-            println!();
-            println!(
-                "{}",
-                "⚠️  NEEDS_REVISION - Auto-fixing with Gemini...".yellow()
-            );
+    // Planning iteration loop
+    let max_iterations = config.workflow.planning_iterations;
+    let mut current_verdict = verdict;
+    let mut iteration = 0;
 
-            // Step 5: Auto reproposal (one time only, resumes Gemini session)
-            run_reproposal_step(&resolved_change_id, &project_root, &config).await?;
-
-            // Step 6: Second challenge (resumes Codex session)
-            let verdict2 = run_rechallenge_step(&resolved_change_id, &project_root, &config).await?;
-
-            match verdict2 {
-                ChallengeVerdict::Approved => {
+    loop {
+        match current_verdict {
+            ChallengeVerdict::Approved => {
+                println!();
+                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                if iteration == 0 {
+                    println!("{}", "✨ Proposal completed and approved!".green().bold());
+                } else {
+                    println!("{}", format!("✨ Fixed and approved (iteration {})!", iteration).green().bold());
+                }
+                println!("   Location: agentd/changes/{}", resolved_change_id);
+                println!();
+                println!("{}", "⏭️  Next steps:".yellow());
+                println!("   agentd implement {}", resolved_change_id);
+                return Ok(());
+            }
+            ChallengeVerdict::NeedsRevision => {
+                iteration += 1;
+                if iteration > max_iterations {
                     println!();
                     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-                    println!("{}", "✨ Fixed and approved!".green().bold());
-                    println!("   Location: agentd/changes/{}", resolved_change_id);
-                    println!();
-                    println!("{}", "⏭️  Next steps:".yellow());
-                    println!("   agentd implement {}", resolved_change_id);
-                    Ok(())
-                }
-                ChallengeVerdict::NeedsRevision => {
-                    println!();
                     println!(
                         "{}",
-                        "⚠️  Still NEEDS_REVISION - Auto-fixing (iteration 2)...".yellow()
+                        format!("⚠️  Automatic refinement limit reached ({} iterations)", max_iterations).yellow().bold()
                     );
-
-                    // Step 7: Second reproposal
-                    run_reproposal_step(&resolved_change_id, &project_root, &config).await?;
-
-                    // Step 8: Third challenge
-                    let verdict3 = run_rechallenge_step(&resolved_change_id, &project_root, &config).await?;
-
-                    match verdict3 {
-                        ChallengeVerdict::Approved => {
-                            println!();
-                            println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-                            println!("{}", "✨ Fixed and approved (iteration 2)!".green().bold());
-                            println!("   Location: agentd/changes/{}", resolved_change_id);
-                            println!();
-                            println!("{}", "⏭️  Next steps:".yellow());
-                            println!("   agentd implement {}", resolved_change_id);
-                            Ok(())
-                        }
-                        _ => {
-                            println!();
-                            println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-                            println!(
-                                "{}",
-                                "⚠️  Automatic refinement limit reached (2 iterations)".yellow().bold()
-                            );
-                            println!();
-                            display_remaining_issues(&resolved_change_id, &project_root)?;
-                            Ok(())
-                        }
-                    }
-                }
-                ChallengeVerdict::Rejected => {
-                    println!();
-                    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-                    println!("{}", "❌ Proposal rejected".red().bold());
                     println!();
                     display_remaining_issues(&resolved_change_id, &project_root)?;
-                    Ok(())
+                    return Ok(());
                 }
-                ChallengeVerdict::Unknown => {
-                    println!();
-                    println!(
-                        "{}",
-                        "⚠️  Could not parse challenge verdict".yellow()
-                    );
-                    println!("   Please review: agentd/changes/{}/CHALLENGE.md", resolved_change_id);
-                    Ok(())
-                }
+
+                println!();
+                println!(
+                    "{}",
+                    format!("⚠️  NEEDS_REVISION - Auto-fixing (iteration {})...", iteration).yellow()
+                );
+
+                // Reproposal with Gemini
+                run_reproposal_step(&resolved_change_id, &project_root, &config).await?;
+
+                // Re-challenge with Codex
+                current_verdict = run_rechallenge_step(&resolved_change_id, &project_root, &config).await?;
             }
-        }
-        ChallengeVerdict::Rejected => {
-            println!();
-            println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-            println!("{}", "❌ Proposal rejected".red().bold());
-            println!();
-            display_remaining_issues(&resolved_change_id, &project_root)?;
-            Ok(())
-        }
-        ChallengeVerdict::Unknown => {
-            println!();
-            println!(
-                "{}",
-                "⚠️  Could not parse challenge verdict".yellow()
-            );
-            println!("   Please review: agentd/changes/{}/CHALLENGE.md", resolved_change_id);
-            Ok(())
+            ChallengeVerdict::Rejected => {
+                println!();
+                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                println!("{}", "❌ Proposal rejected".red().bold());
+                println!();
+                display_remaining_issues(&resolved_change_id, &project_root)?;
+                return Ok(());
+            }
+            ChallengeVerdict::Unknown => {
+                println!();
+                println!(
+                    "{}",
+                    "⚠️  Could not parse challenge verdict".yellow()
+                );
+                println!("   Please review: agentd/changes/{}/CHALLENGE.md", resolved_change_id);
+                return Ok(());
+            }
         }
     }
 }

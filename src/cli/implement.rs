@@ -20,96 +20,73 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
     println!();
 
     // Step 1: Implementation (Claude writes code + tests)
-    println!("{}", "🎨 [1/6] Implementing with Claude...".cyan());
+    println!("{}", "🎨 [1/N] Implementing with Claude...".cyan());
     run_implement_step(change_id, tasks, &project_root, &config).await?;
 
     // Step 2: First review (iteration 0)
     println!();
-    println!("{}", "🔍 [2/6] Reviewing with Codex (iteration 0)...".cyan());
+    println!("{}", "🔍 [2/N] Reviewing with Codex (iteration 0)...".cyan());
     let verdict = run_review_step(change_id, &project_root, &config, 0).await?;
 
-    match verdict {
-        ReviewVerdict::Approved => {
-            println!();
-            println!("{}", "✨ Implementation approved!".green().bold());
-            println!("\n{}", "⏭️  Next:".yellow());
-            println!("   agentd archive {}", change_id);
-            return Ok(());
-        }
-        ReviewVerdict::NeedsChanges => {
-            println!();
-            println!("{}", "⚠️  NEEDS_CHANGES - Auto-fixing (iteration 1)...".yellow());
+    // Implementation iteration loop
+    let max_iterations = config.workflow.implementation_iterations;
+    let mut current_verdict = verdict;
+    let mut iteration = 0;
 
-            // Step 3: First resolve
-            println!();
-            println!("{}", "🔧 [3/6] Resolving issues (iteration 1)...".cyan());
-            run_resolve_step(change_id, &project_root, &config).await?;
-
-            // Step 4: Second review (iteration 1)
-            println!();
-            println!("{}", "🔍 [4/6] Re-reviewing (iteration 1)...".cyan());
-            let verdict2 = run_review_step(change_id, &project_root, &config, 1).await?;
-
-            match verdict2 {
-                ReviewVerdict::Approved => {
+    loop {
+        match current_verdict {
+            ReviewVerdict::Approved => {
+                println!();
+                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                if iteration == 0 {
+                    println!("{}", "✨ Implementation approved!".green().bold());
+                } else {
+                    println!("{}", format!("✨ Fixed and approved (iteration {})!", iteration).green().bold());
+                }
+                println!("\n{}", "⏭️  Next:".yellow());
+                println!("   agentd archive {}", change_id);
+                return Ok(());
+            }
+            ReviewVerdict::NeedsChanges => {
+                iteration += 1;
+                if iteration > max_iterations {
                     println!();
-                    println!("{}", "✨ Fixed and approved!".green().bold());
-                    println!("\n{}", "⏭️  Next:".yellow());
-                    println!("   agentd archive {}", change_id);
+                    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                    println!(
+                        "{}",
+                        format!("⚠️  Automatic refinement limit reached ({} iterations)", max_iterations).yellow().bold()
+                    );
+                    display_remaining_issues(change_id, &project_root)?;
                     return Ok(());
                 }
-                ReviewVerdict::NeedsChanges => {
-                    println!();
-                    println!("{}", "⚠️  Still needs changes - Auto-fixing (iteration 2)...".yellow());
 
-                    // Step 5: Second resolve
-                    println!();
-                    println!("{}", "🔧 [5/6] Resolving issues (iteration 2)...".cyan());
-                    run_resolve_step(change_id, &project_root, &config).await?;
+                println!();
+                println!(
+                    "{}",
+                    format!("⚠️  NEEDS_CHANGES - Auto-fixing (iteration {})...", iteration).yellow()
+                );
 
-                    // Step 6: Final review (iteration 2)
-                    println!();
-                    println!("{}", "🔍 [6/6] Final review (iteration 2)...".cyan());
-                    let verdict3 = run_review_step(change_id, &project_root, &config, 2).await?;
+                // Resolve with Claude
+                println!();
+                println!("{}", format!("🔧 Resolving issues (iteration {})...", iteration).cyan());
+                run_resolve_step(change_id, &project_root, &config).await?;
 
-                    match verdict3 {
-                        ReviewVerdict::Approved => {
-                            println!();
-                            println!("{}", "✨ Fixed and approved!".green().bold());
-                            println!("\n{}", "⏭️  Next:".yellow());
-                            println!("   agentd archive {}", change_id);
-                            Ok(())
-                        }
-                        _ => {
-                            println!();
-                            println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-                            println!("{}", "⚠️  Automatic refinement limit reached (2 iterations)".yellow().bold());
-                            display_remaining_issues(change_id, &project_root)?;
-                            Ok(())
-                        }
-                    }
-                }
-                ReviewVerdict::MajorIssues => {
-                    println!();
-                    println!("{}", "❌ Major issues remain after iteration 1".red().bold());
-                    display_remaining_issues(change_id, &project_root)?;
-                    Ok(())
-                }
-                ReviewVerdict::Unknown => {
-                    println!("{}", "⚠️  Could not parse review verdict".yellow());
-                    Ok(())
-                }
+                // Re-review with Codex
+                println!();
+                println!("{}", format!("🔍 Re-reviewing (iteration {})...", iteration).cyan());
+                current_verdict = run_review_step(change_id, &project_root, &config, iteration).await?;
             }
-        }
-        ReviewVerdict::MajorIssues => {
-            println!();
-            println!("{}", "❌ Major issues found".red().bold());
-            display_remaining_issues(change_id, &project_root)?;
-            Ok(())
-        }
-        ReviewVerdict::Unknown => {
-            println!("{}", "⚠️  Could not parse review verdict".yellow());
-            Ok(())
+            ReviewVerdict::MajorIssues => {
+                println!();
+                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                println!("{}", "❌ Major issues found".red().bold());
+                display_remaining_issues(change_id, &project_root)?;
+                return Ok(());
+            }
+            ReviewVerdict::Unknown => {
+                println!("{}", "⚠️  Could not parse review verdict".yellow());
+                return Ok(());
+            }
         }
     }
 }

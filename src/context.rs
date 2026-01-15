@@ -13,6 +13,7 @@ const TASKS_SKELETON: &str = include_str!("../templates/skeletons/tasks.md");
 const SPEC_SKELETON: &str = include_str!("../templates/skeletons/spec.md");
 const CHALLENGE_SKELETON: &str = include_str!("../templates/skeletons/challenge.md");
 const REVIEW_SKELETON: &str = include_str!("../templates/skeletons/review.md");
+const ARCHIVE_REVIEW_SKELETON: &str = include_str!("../templates/skeletons/archive_review.md");
 
 /// Context phase determines which project.md sections to inject
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -232,6 +233,7 @@ fn get_embedded_template(name: &str) -> Result<String> {
         "spec.md" => Ok(SPEC_SKELETON.to_string()),
         "challenge.md" => Ok(CHALLENGE_SKELETON.to_string()),
         "review.md" => Ok(REVIEW_SKELETON.to_string()),
+        "archive_review.md" => Ok(ARCHIVE_REVIEW_SKELETON.to_string()),
         _ => anyhow::bail!("Unknown template: {}", name),
     }
 }
@@ -291,6 +293,17 @@ pub fn create_review_skeleton(change_dir: &Path, change_id: &str, iteration: u32
 
     let review_content = load_template("review.md", &project_root, &vars)?;
     std::fs::write(change_dir.join("REVIEW.md"), review_content)?;
+    Ok(())
+}
+
+/// Create ARCHIVE_REVIEW.md skeleton for archive quality review
+pub fn create_archive_review_skeleton(change_dir: &Path, change_id: &str, iteration: u32) -> Result<()> {
+    let project_root = derive_project_root(change_dir)?;
+    let iteration_str = iteration.to_string();
+    let vars = [("change_id", change_id), ("iteration", iteration_str.as_str())];
+
+    let archive_review_content = load_template("archive_review.md", &project_root, &vars)?;
+    std::fs::write(change_dir.join("ARCHIVE_REVIEW.md"), archive_review_content)?;
     Ok(())
 }
 
