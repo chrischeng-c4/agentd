@@ -537,7 +537,7 @@ async fn run_archive_review_step(
     Ok(verdict)
 }
 
-/// Run archive fix step with Claude
+/// Run archive fix step with Gemini
 async fn run_archive_fix_step(
     change_id: &str,
     project_root: &PathBuf,
@@ -551,7 +551,7 @@ async fn run_archive_fix_step(
     }
 
     let script_runner = ScriptRunner::new(config.resolve_scripts_dir(project_root));
-    script_runner.run_claude_archive_fix(change_id).await?;
+    script_runner.run_gemini_archive_fix(change_id).await?;
 
     println!("{}", "✅ Archive issues fixed".green());
     Ok(())

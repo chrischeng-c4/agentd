@@ -1,9 +1,9 @@
 #!/bin/bash
-# Claude archive fix script - fixes issues from archive review
-# Usage: ./claude-archive-fix.sh <change-id>
+# Gemini archive fix script - fixes issues from archive review
+# Usage: ./gemini-archive-fix.sh <change-id>
 #
 # Environment variables:
-#   AGENTD_MODEL - Model to use: "haiku" (fast), "sonnet" (default), "opus" (deep)
+#   AGENTD_MODEL - Model to use (e.g., "gemini-2.0-flash")
 #
 set -euo pipefail
 
@@ -12,19 +12,7 @@ CHANGE_ID="$1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Model selection: default to sonnet
-MODEL="${AGENTD_MODEL:-sonnet}"
-
-case "$MODEL" in
-    haiku|sonnet|opus) ;;
-    *) MODEL="sonnet" ;;
-esac
-
-if [ "$MODEL" = "opus" ]; then
-    echo "Warning: Using opus model (high cost)"
-fi
-
-echo "Fixing archive issues with Claude ($MODEL): $CHANGE_ID"
+echo "🔧 Fixing archive issues with Gemini: $CHANGE_ID"
 
 cd "$PROJECT_ROOT"
 
@@ -59,7 +47,5 @@ Edit the spec files in agentd/specs/ directly to fix the issues.
 PROMPT_END
 )
 
-echo "$PROMPT" | claude -p \
-    --model "$MODEL" \
-    --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
-    --output-format stream-json
+# Run Gemini CLI
+echo "$PROMPT" | gemini agentd:archive-fix --output-format stream-json

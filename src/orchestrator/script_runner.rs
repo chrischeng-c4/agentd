@@ -393,18 +393,24 @@ impl ScriptRunner {
             .await
     }
 
-    /// Run Claude archive fix (fix issues from archive review)
-    pub async fn run_claude_archive_fix(&self, change_id: &str) -> Result<String> {
-        self.run_claude_archive_fix_with_model(change_id, None).await
+    /// Run Gemini archive fix (fix issues from archive review)
+    pub async fn run_gemini_archive_fix(&self, change_id: &str) -> Result<String> {
+        self.run_gemini_archive_fix_with_model(change_id, None)
+            .await
     }
 
-    /// Run Claude archive fix with model selection
-    pub async fn run_claude_archive_fix_with_model(
+    /// Run Gemini archive fix with model selection
+    pub async fn run_gemini_archive_fix_with_model(
         &self,
         change_id: &str,
         model: Option<&SelectedModel>,
     ) -> Result<String> {
-        self.run_script_with_model("claude-archive-fix.sh", &[change_id.to_string()], true, model)
-            .await
+        self.run_script_with_model(
+            "gemini-archive-fix.sh",
+            &[change_id.to_string()],
+            true,
+            model,
+        )
+        .await
     }
 }
