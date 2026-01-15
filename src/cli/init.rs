@@ -1053,18 +1053,39 @@ echo "$CONTEXT" | gemini agentd:fillback --output-format stream-json
     std::fs::write(scripts_dir.join("codex-rechallenge.sh"), codex_rechallenge)?;
     std::fs::write(scripts_dir.join("codex-review.sh"), codex_review)?;
 
-    // Updated claude-implement.sh with emphasis on test writing
+    // claude-implement.sh - calls Claude CLI in headless mode
     let claude_implement = r#"#!/bin/bash
 # Claude implement script - writes code AND tests
-# Usage: ./claude-implement.sh <change-id>
+# Usage: ./claude-implement.sh <change-id> [--tasks "1.1,1.2"]
+set -euo pipefail
 
 CHANGE_ID="$1"
-TASKS="${2:-}"
+shift || true
+TASKS=""
+
+# Parse optional --tasks argument
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --tasks)
+            TASKS="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "🎨 Implementing with Claude: $CHANGE_ID"
+
+# Build task filter instruction
+TASK_FILTER=""
+if [ -n "$TASKS" ]; then
+    TASK_FILTER="Only implement tasks: ${TASKS}"
+fi
 
 PROMPT=$(cat << EOF
 # Agentd Implement Task
@@ -1073,12 +1094,12 @@ Implement the proposal for agentd/changes/${CHANGE_ID}/.
 
 ## Instructions
 1. Read proposal.md, tasks.md, and specs/
-2. Implement ALL tasks in tasks.md (or only ${TASKS} if specified)
+2. Implement ALL tasks in tasks.md ${TASK_FILTER}
 3. **Write tests for all implemented features** (unit + integration)
    - Test all spec scenarios (WHEN/THEN cases)
    - Include edge cases and error handling
    - Use existing test framework patterns
-4. Update IMPLEMENTATION.md with progress notes
+4. Create/update IMPLEMENTATION.md with progress notes
 
 ## Code Quality
 - Follow existing code style and patterns
@@ -1089,16 +1110,19 @@ Implement the proposal for agentd/changes/${CHANGE_ID}/.
 EOF
 )
 
-# This is a placeholder - actual implementation happens via Claude Code Skills
-# When called from CLI, Claude IDE will handle the implementation
-echo "⚠️  This script is a placeholder - implementation happens via Claude Code Skills"
+# Run Claude CLI in headless mode
+cd "$PROJECT_ROOT"
+echo "$PROMPT" | claude -p \
+    --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
+    --output-format stream-json
 "#;
     std::fs::write(scripts_dir.join("claude-implement.sh"), claude_implement)?;
 
-    // claude-resolve.sh for fixing review issues
+    // claude-resolve.sh - calls Claude CLI to fix review issues
     let claude_resolve = r#"#!/bin/bash
 # Claude resolve script - fixes issues from code review
 # Usage: ./claude-resolve.sh <change-id>
+set -euo pipefail
 
 CHANGE_ID="$1"
 
@@ -1128,20 +1152,54 @@ Focus on HIGH severity issues first, then MEDIUM.
 EOF
 )
 
-# This is a placeholder - actual resolution happens via Claude Code Skills
-echo "⚠️  This script is a placeholder - resolution happens via Claude Code Skills"
+# Run Claude CLI in headless mode
+cd "$PROJECT_ROOT"
+echo "$PROMPT" | claude -p \
+    --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
+    --output-format stream-json
 "#;
     std::fs::write(scripts_dir.join("claude-resolve.sh"), claude_resolve)?;
 
-    // Placeholder for claude-fix.sh (kept for backward compatibility)
+    // claude-fix.sh - calls Claude CLI to fix verification issues
     let claude_fix = r#"#!/bin/bash
-# Claude fix script
+# Claude fix script - fixes issues from verification
 # Usage: ./claude-fix.sh <change-id>
+set -euo pipefail
 
 CHANGE_ID="$1"
 
-echo "🔧 Fixing issues: $CHANGE_ID"
-echo "⚠️  This script is a placeholder - fixing happens via Claude Code Skills"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+echo "🔧 Fixing verification issues with Claude: $CHANGE_ID"
+
+PROMPT=$(cat << EOF
+# Agentd Fix Task
+
+Fix issues identified during verification for agentd/changes/${CHANGE_ID}/.
+
+## Instructions
+1. Read REVIEW.md and STATE.yaml to understand verification issues
+2. Fix ALL failing tests and verification errors:
+   - Build errors
+   - Test failures
+   - Type errors
+   - Lint warnings
+3. Run tests to verify fixes work
+4. Update IMPLEMENTATION.md with fix notes
+
+## Code Quality
+- Don't break existing functionality
+- Ensure all tests pass after fixes
+- Follow existing code style
+EOF
+)
+
+# Run Claude CLI in headless mode
+cd "$PROJECT_ROOT"
+echo "$PROMPT" | claude -p \
+    --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
+    --output-format stream-json
 "#;
     std::fs::write(scripts_dir.join("claude-fix.sh"), claude_fix)?;
 

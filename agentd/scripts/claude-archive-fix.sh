@@ -59,4 +59,7 @@ Edit the spec files in agentd/specs/ directly to fix the issues.
 PROMPT_END
 )
 
-echo "$PROMPT" | claude --model "$MODEL" --print --output-format text
+echo "$PROMPT" | claude -p \
+    --model "$MODEL" \
+    --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
+    --output-format stream-json
