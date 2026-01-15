@@ -41,12 +41,14 @@ thiserror = "2"
 # File operations
 walkdir = "2"
 glob = "0.3"
+ignore = "0.4"
 
 # Git (vendored-openssl for cross-platform builds)
 git2 = { version = "0.20", features = ["vendored-openssl"] }
 
 # Process execution (for scripts)
 tokio = { version = "1", features = ["process", "io-util", "rt-multi-thread", "macros"] }
+async-trait = "0.1"
 
 # Terminal UI
 crossterm = "0.28"

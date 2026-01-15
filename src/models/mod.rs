@@ -6,6 +6,7 @@ pub mod frontmatter;
 pub mod requirement;
 pub mod review;
 pub mod scenario;
+pub mod spec_generation;
 pub mod validation;
 pub mod verification;
 
@@ -32,6 +33,7 @@ pub use frontmatter::{
 pub use requirement::{Requirement, RequirementDelta};
 pub use review::{IssueCategory, ReviewIssue, ReviewVerdict};
 pub use scenario::Scenario;
+pub use spec_generation::{SourceFile, SpecGenerationRequest};
 pub use validation::{
     DocumentType, ErrorCategory, JsonValidationError, Severity, SeverityMap, ValidationCounts,
     ValidationError, ValidationJsonOutput, ValidationOptions, ValidationResult, ValidationRules,

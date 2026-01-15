@@ -149,6 +149,20 @@ enum Commands {
         #[arg(short, long)]
         check: bool,
     },
+
+    /// Bootstrap Agentd specs from existing codebase or other spec formats
+    Fillback {
+        /// Change ID to create/populate
+        change_id: String,
+
+        /// Path to source directory or file
+        #[arg(short, long)]
+        path: Option<String>,
+
+        /// Import strategy (auto, openspec, speckit, code)
+        #[arg(short, long)]
+        strategy: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -254,6 +268,14 @@ async fn main() -> Result<()> {
 
         Commands::Update { check } => {
             agentd::cli::update::run(check).await?;
+        }
+
+        Commands::Fillback {
+            change_id,
+            path,
+            strategy,
+        } => {
+            agentd::cli::fillback::run(&change_id, path.as_deref(), strategy.as_deref()).await?;
         }
     }
 

@@ -3,6 +3,7 @@
 
 pub mod cli;
 pub mod context;
+pub mod fillback;
 pub mod models;
 pub mod orchestrator;
 pub mod parser;
