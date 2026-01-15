@@ -48,4 +48,4 @@ PROMPT_END
 )
 
 # Run Gemini CLI
-echo "$PROMPT" | gemini agentd:archive-fix --output-format stream-json
+echo "$PROMPT" | gemini agentd:archive-fix -m gemini-3-flash-preview --output-format stream-json

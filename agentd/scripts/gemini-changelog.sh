@@ -63,4 +63,4 @@ All notable changes to this project's specifications will be documented in this 
 EOF
 )
 
-gemini agentd:changelog --output-format stream-json "$PROMPT"
+echo "$PROMPT" | gemini agentd:changelog -m gemini-3-flash-preview --output-format stream-json

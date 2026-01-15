@@ -78,4 +78,4 @@ Focus on creating actionable, well-structured Agentd specifications that capture
 "
 
 # Call Gemini CLI with pre-defined command
-echo "$CONTEXT" | gemini agentd:fillback --output-format stream-json
+echo "$CONTEXT" | gemini agentd:fillback -m gemini-3-flash-preview --output-format stream-json
