@@ -7,13 +7,17 @@ use walkdir::WalkDir;
 const GEMINI_TEMPLATE: &str = include_str!("../templates/GEMINI.md");
 const AGENTS_TEMPLATE: &str = include_str!("../templates/AGENTS.md");
 
-// Skeleton templates (embedded defaults, can be overridden)
-const PROPOSAL_SKELETON: &str = include_str!("../templates/skeletons/proposal.md");
-const TASKS_SKELETON: &str = include_str!("../templates/skeletons/tasks.md");
-const SPEC_SKELETON: &str = include_str!("../templates/skeletons/spec.md");
-const CHALLENGE_SKELETON: &str = include_str!("../templates/skeletons/challenge.md");
-const REVIEW_SKELETON: &str = include_str!("../templates/skeletons/review.md");
-const ARCHIVE_REVIEW_SKELETON: &str = include_str!("../templates/skeletons/archive_review.md");
+// Planning phase skeletons
+const PROPOSAL_SKELETON: &str = include_str!("../templates/skeletons/planning/proposal.md");
+const TASKS_SKELETON: &str = include_str!("../templates/skeletons/planning/tasks.md");
+const SPEC_SKELETON: &str = include_str!("../templates/skeletons/planning/spec.md");
+const CHALLENGE_SKELETON: &str = include_str!("../templates/skeletons/planning/challenge.md");
+
+// Implementation phase skeletons
+const REVIEW_SKELETON: &str = include_str!("../templates/skeletons/impl/review.md");
+
+// Archive phase skeletons
+const ARCHIVE_REVIEW_SKELETON: &str = include_str!("../templates/skeletons/archive/archive_review.md");
 
 /// Context phase determines which project.md sections to inject
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +43,42 @@ impl ContextPhase {
             }
             ContextPhase::Implement | ContextPhase::Review => {
                 vec!["Overview", "Tech Stack", "Conventions", "Key Patterns"]
+            }
+        }
+    }
+}
+
+/// Proposal phase determines which skeleton to inject for sequential generation
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProposalPhase {
+    /// Generate proposal.md only
+    Proposal,
+    /// Generate one spec file
+    Spec,
+    /// Generate tasks.md
+    Tasks,
+    /// Generate all (proposal + specs + tasks) - legacy mode
+    All,
+}
+
+impl ProposalPhase {
+    /// Get the skeleton content for this phase
+    pub fn skeleton(&self) -> &'static str {
+        match self {
+            ProposalPhase::Proposal => PROPOSAL_SKELETON,
+            ProposalPhase::Spec => SPEC_SKELETON,
+            ProposalPhase::Tasks => TASKS_SKELETON,
+            ProposalPhase::All => {
+                // For backward compatibility, combine all skeletons
+                // This is a static string, so we use a const
+                concat!(
+                    "## Proposal Format\n\n",
+                    include_str!("../templates/skeletons/planning/proposal.md"),
+                    "\n\n---\n\n## Spec Format\n\n",
+                    include_str!("../templates/skeletons/planning/spec.md"),
+                    "\n\n---\n\n## Tasks Format\n\n",
+                    include_str!("../templates/skeletons/planning/tasks.md")
+                )
             }
         }
     }
@@ -101,14 +141,32 @@ pub fn load_project_sections(phase: ContextPhase) -> Result<String> {
     Ok(result.trim().to_string())
 }
 
-/// Generate GEMINI.md context file for a specific change
+/// Generate GEMINI.md context file for a specific change (legacy - injects all skeletons)
 pub fn generate_gemini_context(change_dir: &Path, phase: ContextPhase) -> Result<()> {
+    generate_gemini_context_with_skeleton(change_dir, phase, ProposalPhase::All)
+}
+
+/// Generate GEMINI.md context file with a specific skeleton for sequential generation
+///
+/// This function supports the new sequential generation workflow:
+/// - Phase 1: Generate proposal.md (ProposalPhase::Proposal)
+/// - Phase 2: Generate spec(s) (ProposalPhase::Spec) - called once per spec
+/// - Phase 3: Generate tasks.md (ProposalPhase::Tasks)
+///
+/// For backward compatibility, use ProposalPhase::All to inject all skeletons.
+pub fn generate_gemini_context_with_skeleton(
+    change_dir: &Path,
+    context_phase: ContextPhase,
+    proposal_phase: ProposalPhase,
+) -> Result<()> {
     let project_structure = scan_project_structure()?;
-    let project_context = load_project_sections(phase)?;
+    let project_context = load_project_sections(context_phase)?;
+    let skeleton = proposal_phase.skeleton();
 
     let content = GEMINI_TEMPLATE
         .replace("{{PROJECT_STRUCTURE}}", &project_structure)
-        .replace("{{PROJECT_CONTEXT}}", &project_context);
+        .replace("{{PROJECT_CONTEXT}}", &project_context)
+        .replace("{{SKELETON}}", skeleton);
 
     let output_path = change_dir.join("GEMINI.md");
     std::fs::write(&output_path, content)?;

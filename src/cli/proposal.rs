@@ -168,11 +168,44 @@ async fn run_proposal_step(
     // Create proposal skeleton
     crate::context::create_proposal_skeleton(&change_dir, &resolved_change_id)?;
 
-    // Run Gemini script
+    // Run Gemini script with retry
     let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    let _output = script_runner
-        .run_gemini_proposal(&resolved_change_id, description)
-        .await?;
+    let max_retries = config.workflow.script_retries;
+    let retry_delay = std::time::Duration::from_secs(config.workflow.retry_delay_secs);
+
+    let mut last_error = None;
+    for attempt in 0..=max_retries {
+        if attempt > 0 {
+            println!(
+                "{}",
+                format!("🔄 Retrying Gemini proposal (attempt {}/{})", attempt + 1, max_retries + 1).yellow()
+            );
+            tokio::time::sleep(retry_delay).await;
+        }
+
+        match script_runner.run_gemini_proposal(&resolved_change_id, description).await {
+            Ok(_output) => {
+                last_error = None;
+                break;
+            }
+            Err(e) => {
+                let err_msg = e.to_string();
+                if err_msg.contains("exit code") || err_msg.contains("connection") || err_msg.contains("timeout") {
+                    println!(
+                        "{}",
+                        format!("⚠️  Gemini proposal failed: {}", err_msg).yellow()
+                    );
+                    last_error = Some(e);
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    if let Some(e) = last_error {
+        return Err(e);
+    }
 
     // Create Change object
     let mut change = Change::new(&resolved_change_id, description);
@@ -240,9 +273,46 @@ async fn run_challenge_step(
     // Create CHALLENGE.md skeleton
     crate::context::create_challenge_skeleton(&change_dir, change_id)?;
 
-    // Run Codex script
+    // Run Codex script with retry
     let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    let _output = script_runner.run_codex_challenge(change_id).await?;
+    let max_retries = config.workflow.script_retries;
+    let retry_delay = std::time::Duration::from_secs(config.workflow.retry_delay_secs);
+
+    let mut last_error = None;
+    for attempt in 0..=max_retries {
+        if attempt > 0 {
+            println!(
+                "{}",
+                format!("🔄 Retrying Codex challenge (attempt {}/{})", attempt + 1, max_retries + 1).yellow()
+            );
+            tokio::time::sleep(retry_delay).await;
+        }
+
+        match script_runner.run_codex_challenge(change_id).await {
+            Ok(_output) => {
+                last_error = None;
+                break;
+            }
+            Err(e) => {
+                let err_msg = e.to_string();
+                // Check if it's a transient error (connection, timeout, etc.)
+                if err_msg.contains("exit code") || err_msg.contains("connection") || err_msg.contains("timeout") {
+                    println!(
+                        "{}",
+                        format!("⚠️  Codex challenge failed: {}", err_msg).yellow()
+                    );
+                    last_error = Some(e);
+                } else {
+                    // Non-transient error, don't retry
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    if let Some(e) = last_error {
+        return Err(e);
+    }
 
     // Parse verdict
     let challenge_path = change.challenge_path(project_root);
@@ -338,9 +408,44 @@ async fn run_reproposal_step(
     // Regenerate GEMINI.md context
     crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
 
-    // Run Gemini reproposal
+    // Run Gemini reproposal with retry
     let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    let _output = script_runner.run_gemini_reproposal(change_id).await?;
+    let max_retries = config.workflow.script_retries;
+    let retry_delay = std::time::Duration::from_secs(config.workflow.retry_delay_secs);
+
+    let mut last_error = None;
+    for attempt in 0..=max_retries {
+        if attempt > 0 {
+            println!(
+                "{}",
+                format!("🔄 Retrying Gemini reproposal (attempt {}/{})", attempt + 1, max_retries + 1).yellow()
+            );
+            tokio::time::sleep(retry_delay).await;
+        }
+
+        match script_runner.run_gemini_reproposal(change_id).await {
+            Ok(_output) => {
+                last_error = None;
+                break;
+            }
+            Err(e) => {
+                let err_msg = e.to_string();
+                if err_msg.contains("exit code") || err_msg.contains("connection") || err_msg.contains("timeout") {
+                    println!(
+                        "{}",
+                        format!("⚠️  Gemini reproposal failed: {}", err_msg).yellow()
+                    );
+                    last_error = Some(e);
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    if let Some(e) = last_error {
+        return Err(e);
+    }
 
     println!("{}", "✅ Proposal updated based on challenge feedback".green());
 

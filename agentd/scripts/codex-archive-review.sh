@@ -132,7 +132,7 @@ Now perform the review and update the ARCHIVE_REVIEW.md file.
 EOF
 )
 
-cd "$PROJECT_ROOT" && codex exec --full-auto --output-format stream-json "$PROMPT" | while IFS= read -r line; do
+cd "$PROJECT_ROOT" && codex exec --full-auto --json "$PROMPT" | while IFS= read -r line; do
   type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
   case "$type" in
     item.completed)

@@ -26,4 +26,5 @@ EOF
 
 # Call Gemini CLI with pre-defined command
 # Use --resume latest to reuse the proposal session (cached codebase context)
-echo "$CONTEXT" | gemini agentd:reproposal --resume latest --output-format stream-json
+# Use gemini-3-flash-preview model (has more quota)
+echo "$CONTEXT" | gemini agentd:reproposal --resume latest -m gemini-3-flash-preview --output-format stream-json

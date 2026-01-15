@@ -29,4 +29,5 @@ EOF
 )
 
 # Call Gemini CLI with pre-defined command
-echo "$CONTEXT" | gemini agentd:proposal --output-format stream-json
+# Use gemini-3-flash-preview model
+echo "$CONTEXT" | gemini agentd:proposal -m gemini-3-flash-preview --output-format stream-json

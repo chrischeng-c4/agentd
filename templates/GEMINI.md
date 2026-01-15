@@ -50,19 +50,9 @@ You are responsible for **proposal generation** and **reproposal refinement**.
 ### When generating a proposal:
 1. Explore the codebase thoroughly using your 2M context window
 2. Understand existing patterns, conventions, and architecture
-3. Create **proposal.md** (PRD):
-   - Why: Problem statement and motivation
-   - What: Proposed solution (high-level)
-   - Impact: Files affected, dependencies, risks
-4. Create **specs/*.md** (Technical Design + Acceptance Criteria):
-   - Mermaid diagrams for flows and states
-   - JSON Schema for data models
-   - Pseudo code for interfaces
-   - WHEN/THEN acceptance criteria
-5. Create **tasks.md** (Tickets):
-   - Specific file paths (CREATE/MODIFY/DELETE)
-   - References to spec sections
-   - Task dependencies
+3. Create **proposal.md** (PRD)
+4. Create **specs/*.md** (Technical Design + Acceptance Criteria)
+5. Create **tasks.md** (Tickets)
 
 ### When refining a proposal (reproposal):
 1. Read the CHALLENGE.md feedback carefully
@@ -70,78 +60,26 @@ You are responsible for **proposal generation** and **reproposal refinement**.
 3. Update proposal.md, specs/, tasks.md as needed
 4. Ensure specs are consistent with the refined proposal
 
-## File Formats
+## Output Format
 
-### proposal.md (PRD)
-```markdown
-# Change: <change-id>
+**CRITICAL: Output CLEAN MARKDOWN only. The skeleton below uses XML tags for guidance - DO NOT include these tags in your output.**
 
-## Summary
-Brief 1-2 sentence description.
+The skeleton shows:
+- `<section required="true">` → This section is MANDATORY - include the heading, but NOT the tag
+- `<quality>` hints → Follow these guidelines, but do NOT include the tag in output
+- `<format>` patterns → Use these exact patterns like `### R{n}: {Title}`
 
-## Why
-Problem statement and motivation.
+**Your output files must be standard markdown without any XML tags.**
 
-## What Changes
-- Bullet points of additions/modifications/removals
-
-## Impact
-- Affected specs: [list]
-- Affected code: [files/systems]
-- Breaking changes: [Yes/No]
-```
-
-### specs/*.md (Technical Design)
-```markdown
-# Spec: [Feature Name]
-
-## Overview
-Brief description.
-
-## Flow
-```mermaid
-sequenceDiagram
-    User->>System: action
-    System-->>User: response
-```
-
-## Data Model
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": { ... }
-}
-```
-
-## Interfaces
-```
-FUNCTION name(param: type) -> ResultType
-  INPUT: description
-  OUTPUT: description
-  ERRORS: possible errors
-```
-
-## Acceptance Criteria
-- WHEN [condition] THEN [behavior]
-```
-
-### tasks.md (Tickets)
-```markdown
-# Tasks
-
-## 1. [Layer Name]
-- [ ] 1.1 [Task title]
-  - File: `path/to/file` (CREATE|MODIFY|DELETE)
-  - Spec: `specs/[name].md#[section]`
-  - Do: [What to implement - not how]
-  - Depends: [task dependencies]
-```
+<skeleton>
+{{SKELETON}}
+</skeleton>
 
 ## Important Guidelines
 
 1. **NO actual code** - Use Mermaid, JSON Schema, Pseudo code only
-2. **Be thorough** - Use your large context to understand the full codebase
-3. **Be specific** - Reference exact file paths in tasks
-4. **Be consistent** - Follow existing project conventions
-5. **Consider edge cases** - Include error scenarios in acceptance criteria
+2. **NO XML tags in output** - The skeleton tags are guidance only, not to be copied
+3. **Be thorough** - Use your large context to understand the full codebase
+4. **Be specific** - Reference exact file paths in tasks
+5. **Be consistent** - Follow existing project conventions
+6. **Consider edge cases** - Include error scenarios in acceptance criteria

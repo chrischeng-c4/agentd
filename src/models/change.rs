@@ -546,12 +546,22 @@ pub struct WorkflowConfig {
     /// Max iterations for archive phase (archive review)
     #[serde(default = "default_archive_iterations")]
     pub archive_iterations: u32,
+
+    /// Number of retries for script execution on transient failures
+    #[serde(default = "default_script_retries")]
+    pub script_retries: u32,
+
+    /// Delay between retries in seconds
+    #[serde(default = "default_retry_delay_secs")]
+    pub retry_delay_secs: u64,
 }
 
 fn default_format_iterations() -> u32 { 2 }
 fn default_planning_iterations() -> u32 { 2 }
 fn default_implementation_iterations() -> u32 { 2 }
 fn default_archive_iterations() -> u32 { 1 }
+fn default_script_retries() -> u32 { 3 }
+fn default_retry_delay_secs() -> u64 { 5 }
 
 impl Default for WorkflowConfig {
     fn default() -> Self {
@@ -560,6 +570,8 @@ impl Default for WorkflowConfig {
             planning_iterations: default_planning_iterations(),
             implementation_iterations: default_implementation_iterations(),
             archive_iterations: default_archive_iterations(),
+            script_retries: default_script_retries(),
+            retry_delay_secs: default_retry_delay_secs(),
         }
     }
 }
