@@ -155,7 +155,7 @@ async fn run_proposal_step(
     crate::context::create_proposal_skeleton(&change_dir, &resolved_change_id)?;
 
     // Run Gemini script
-    let script_runner = ScriptRunner::new(config.scripts_dir.clone());
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let _output = script_runner
         .run_gemini_proposal(&resolved_change_id, description)
         .await?;
@@ -227,7 +227,7 @@ async fn run_challenge_step(
     crate::context::create_challenge_skeleton(&change_dir, change_id)?;
 
     // Run Codex script
-    let script_runner = ScriptRunner::new(config.scripts_dir.clone());
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let _output = script_runner.run_codex_challenge(change_id).await?;
 
     // Parse verdict
@@ -291,7 +291,7 @@ async fn run_rechallenge_step(
     crate::context::create_challenge_skeleton(&change_dir, change_id)?;
 
     // Run Codex rechallenge script (resumes session)
-    let script_runner = ScriptRunner::new(config.scripts_dir.clone());
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let _output = script_runner.run_codex_rechallenge(change_id).await?;
 
     // Parse verdict
@@ -325,7 +325,7 @@ async fn run_reproposal_step(
     crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
 
     // Run Gemini reproposal
-    let script_runner = ScriptRunner::new(config.scripts_dir.clone());
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let _output = script_runner.run_gemini_reproposal(change_id).await?;
 
     println!("{}", "✅ Proposal updated based on challenge feedback".green());
@@ -416,7 +416,7 @@ fn display_remaining_issues(change_id: &str, project_root: &PathBuf) -> Result<(
     println!("     agentd/changes/{}/CHALLENGE.md (full report)", change_id);
     println!();
     println!("   Then run:");
-    println!("     agentd challenge-proposal {}", change_id);
+    println!("     agentd challenge {}", change_id);
     println!("     agentd reproposal {}  (if needed)", change_id);
 
     Ok(())

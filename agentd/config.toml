@@ -1,5 +1,5 @@
 project_name = "agentd"
-scripts_dir = "/Users/chrischeng/projects/agentd/agentd/scripts"
+scripts_dir = "agentd/scripts"
 
 # =============================================================================
 # Gemini Configuration

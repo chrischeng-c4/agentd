@@ -7,6 +7,13 @@ use walkdir::WalkDir;
 const GEMINI_TEMPLATE: &str = include_str!("../templates/GEMINI.md");
 const AGENTS_TEMPLATE: &str = include_str!("../templates/AGENTS.md");
 
+// Skeleton templates (embedded defaults, can be overridden)
+const PROPOSAL_SKELETON: &str = include_str!("../templates/skeletons/proposal.md");
+const TASKS_SKELETON: &str = include_str!("../templates/skeletons/tasks.md");
+const SPEC_SKELETON: &str = include_str!("../templates/skeletons/spec.md");
+const CHALLENGE_SKELETON: &str = include_str!("../templates/skeletons/challenge.md");
+const REVIEW_SKELETON: &str = include_str!("../templates/skeletons/review.md");
+
 /// Context phase determines which project.md sections to inject
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContextPhase {
@@ -180,129 +187,87 @@ fn scan_directory(path: &Path, max_depth: usize) -> Result<String> {
     Ok(output)
 }
 
+/// Load a template file, checking for user override first, then falling back to embedded default.
+///
+/// - `name`: Template filename including extension (e.g., "proposal.md", "challenge.md")
+/// - `project_root`: Project root directory to check for overrides
+/// - `vars`: Key-value pairs for variable replacement (e.g., `change_id`, `iteration`)
+///
+/// Override path: `<project_root>/agentd/templates/<name>`
+/// Variables use `{{key}}` syntax in templates.
+pub fn load_template(name: &str, project_root: &Path, vars: &[(&str, &str)]) -> Result<String> {
+    // Try to load user override first
+    let override_path = project_root.join("agentd/templates").join(name);
+    let content = if override_path.exists() {
+        match std::fs::read_to_string(&override_path) {
+            Ok(content) => content,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // Shouldn't happen since we checked exists(), but handle gracefully
+                get_embedded_template(name)?
+            }
+            Err(e) => {
+                // Surface read errors (permissions, etc.) instead of silently falling back
+                anyhow::bail!("Failed to read template override '{}': {}", override_path.display(), e);
+            }
+        }
+    } else {
+        get_embedded_template(name)?
+    };
+
+    // Replace variables: {{key}} -> value
+    let mut result = content;
+    for (key, value) in vars {
+        let placeholder = format!("{{{{{}}}}}", key); // {{key}}
+        result = result.replace(&placeholder, value);
+    }
+
+    Ok(result)
+}
+
+/// Get embedded template by name
+fn get_embedded_template(name: &str) -> Result<String> {
+    match name {
+        "proposal.md" => Ok(PROPOSAL_SKELETON.to_string()),
+        "tasks.md" => Ok(TASKS_SKELETON.to_string()),
+        "spec.md" => Ok(SPEC_SKELETON.to_string()),
+        "challenge.md" => Ok(CHALLENGE_SKELETON.to_string()),
+        "review.md" => Ok(REVIEW_SKELETON.to_string()),
+        _ => anyhow::bail!("Unknown template: {}", name),
+    }
+}
+
+/// Derive project root from change directory
+/// change_dir is typically: <project_root>/agentd/changes/<change_id>
+fn derive_project_root(change_dir: &Path) -> Result<std::path::PathBuf> {
+    // Walk up: change_dir -> changes -> agentd -> project_root
+    change_dir
+        .parent() // changes
+        .and_then(|p| p.parent()) // agentd
+        .and_then(|p| p.parent()) // project_root
+        .map(|p| p.to_path_buf())
+        .ok_or_else(|| anyhow::anyhow!("Could not derive project root from change_dir: {:?}", change_dir))
+}
+
 /// Create proposal skeleton files with structure but no content
 /// This guides Gemini to fill in the right format while reducing token usage
 pub fn create_proposal_skeleton(change_dir: &Path, change_id: &str) -> Result<()> {
+    let project_root = derive_project_root(change_dir)?;
+    let vars = [("change_id", change_id)];
+
     // Create proposal.md skeleton
-    let proposal_skeleton = format!(
-        r#"# Change: {change_id}
+    let proposal_content = load_template("proposal.md", &project_root, &vars)?;
+    std::fs::write(change_dir.join("proposal.md"), proposal_content)?;
 
-## Summary
-[Brief 1-2 sentence description]
-
-## Why
-[Problem statement and motivation]
-
-## What Changes
-[Bullet points of what will be added/modified/removed]
-
-## Impact
-- Affected specs: [capabilities]
-- Affected code: [files/systems]
-- Breaking changes: [Yes/No]
-"#,
-        change_id = change_id
-    );
-    std::fs::write(change_dir.join("proposal.md"), proposal_skeleton)?;
-
-    // Create tasks.md skeleton (Ticket format)
-    let tasks_skeleton = r#"# Tasks
-
-<!--
-Each task is a dev ticket derived from specs.
-NO actual code - just file paths, actions, and references.
--->
-
-## 1. Data Layer
-- [ ] 1.1 [Task title]
-  - File: `path/to/file.rs` (CREATE|MODIFY|DELETE)
-  - Spec: `specs/[name].md#[section]`
-  - Do: [What to implement - not how]
-
-## 2. Logic Layer
-- [ ] 2.1 [Task title]
-  - File: `path/to/file.rs` (CREATE|MODIFY)
-  - Spec: `specs/[name].md#[section]`
-  - Do: [What to implement]
-  - Depends: 1.1
-
-## 3. Integration
-- [ ] 3.1 [Task title]
-  - File: `path/to/file.rs` (MODIFY)
-  - Do: [What to integrate]
-  - Depends: 2.1
-
-## 4. Testing
-- [ ] 4.1 [Test task title]
-  - File: `path/to/test.rs` (CREATE)
-  - Verify: `specs/[name].md#acceptance-criteria`
-  - Depends: [relevant tasks]
-"#;
-    std::fs::write(change_dir.join("tasks.md"), tasks_skeleton)?;
+    // Create tasks.md skeleton
+    let tasks_content = load_template("tasks.md", &project_root, &[])?;
+    std::fs::write(change_dir.join("tasks.md"), tasks_content)?;
 
     // Create specs directory with a skeleton file
     let specs_dir = change_dir.join("specs");
     std::fs::create_dir_all(&specs_dir)?;
 
-    // Spec skeleton: TD + AC format with diagrams (NO actual code)
-    let spec_skeleton = r#"# Spec: [Feature Name]
-
-<!--
-Technical Design + Acceptance Criteria.
-Use abstraction tools: Mermaid, JSON Schema, OpenAPI, Pseudo code.
-NO actual implementation code.
--->
-
-## Overview
-[Brief description of what this spec covers]
-
-## Flow
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant S as System
-    U->>S: [action]
-    S-->>U: [response]
-```
-
-## State (if applicable)
-```mermaid
-stateDiagram-v2
-    [*] --> State1
-    State1 --> State2: event
-    State2 --> [*]
-```
-
-## Data Model
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "field1": { "type": "string", "description": "..." },
-    "field2": { "type": "integer" }
-  },
-  "required": ["field1"]
-}
-```
-
-## Interfaces
-```
-FUNCTION function_name(param1: type, param2: type) -> ResultType
-  INPUT: [describe inputs]
-  OUTPUT: [describe outputs]
-  ERRORS: [possible error conditions]
-
-FUNCTION another_function() -> void
-  SIDE_EFFECTS: [what it modifies]
-```
-
-## Acceptance Criteria
-- WHEN [trigger condition] THEN [expected behavior]
-- WHEN [error condition] THEN [error handling]
-- WHEN [edge case] THEN [expected behavior]
-"#;
-    std::fs::write(specs_dir.join("_skeleton.md"), spec_skeleton)?;
+    let spec_content = load_template("spec.md", &project_root, &[])?;
+    std::fs::write(specs_dir.join("_skeleton.md"), spec_content)?;
 
     Ok(())
 }
@@ -310,148 +275,22 @@ FUNCTION another_function() -> void
 /// Create challenge skeleton file to guide Codex review
 /// This provides structure for consistent challenge reports
 pub fn create_challenge_skeleton(change_dir: &Path, change_id: &str) -> Result<()> {
-    let challenge_skeleton = format!(
-        r#"# Challenge Report: {change_id}
+    let project_root = derive_project_root(change_dir)?;
+    let vars = [("change_id", change_id)];
 
-## Summary
-[Overall assessment of the proposal quality and readiness]
-
-## Internal Consistency Issues
-[Check if proposal files are consistent with each other]
-[Examples: Does proposal.md match tasks.md? Do Mermaid diagrams in specs/ match descriptions? Do task spec refs exist?]
-[These are HIGH priority - must fix before implementation]
-
-### Issue: [Title]
-- **Severity**: High
-- **Category**: Completeness | Consistency
-- **Description**: [What's inconsistent]
-- **Location**: [Which files/sections]
-- **Recommendation**: [How to fix]
-
-## Code Alignment Issues
-[Check if proposal aligns with existing codebase]
-[Examples: Do file paths exist? Do APIs exist? Does architecture match patterns?]
-[IMPORTANT: If proposal mentions refactoring or BREAKING changes, deviations are EXPECTED]
-
-### Issue: [Title]
-- **Severity**: Medium | Low
-- **Category**: Conflict | Other
-- **Description**: [What differs from existing code]
-- **Location**: [File paths or components]
-- **Note**: [Is this intentional? Check proposal.md for refactor mentions]
-- **Recommendation**: [Clarify or confirm intention]
-
-## Quality Suggestions
-[Missing tests, error handling, edge cases, documentation]
-[These are LOW priority - nice to have improvements]
-
-### Issue: [Title]
-- **Severity**: Low
-- **Category**: Completeness | Other
-- **Description**: [What could be improved]
-- **Recommendation**: [Suggested enhancement]
-
-## Verdict
-- [ ] APPROVED - Ready for implementation
-- [ ] NEEDS_REVISION - Address issues above (specify which severity levels)
-- [ ] REJECTED - Fundamental problems, needs rethinking
-
-**Next Steps**: [What should be done based on verdict]
-"#,
-        change_id = change_id
-    );
-
-    std::fs::write(change_dir.join("CHALLENGE.md"), challenge_skeleton)?;
+    let challenge_content = load_template("challenge.md", &project_root, &vars)?;
+    std::fs::write(change_dir.join("CHALLENGE.md"), challenge_content)?;
     Ok(())
 }
 
 /// Create REVIEW.md skeleton for code review process
 pub fn create_review_skeleton(change_dir: &Path, change_id: &str, iteration: u32) -> Result<()> {
-    let review_skeleton = format!(
-        r#"# Code Review Report: {change_id}
+    let project_root = derive_project_root(change_dir)?;
+    let iteration_str = iteration.to_string();
+    let vars = [("change_id", change_id), ("iteration", iteration_str.as_str())];
 
-**Iteration**: {iteration}
-
-## Summary
-[Overall assessment: code quality, test results, security posture]
-
-## Test Results
-**Overall Status**: ✅ PASS | ❌ FAIL | ⚠️ PARTIAL
-
-### Test Summary
-- Total tests: X
-- Passed: X
-- Failed: X
-- Skipped: X
-- Coverage: X%
-
-### Failed Tests (if any)
-- `test_name`: [Error message]
-- `test_name_2`: [Error message]
-
-## Security Scan Results
-**Status**: ✅ CLEAN | ⚠️ WARNINGS | ❌ VULNERABILITIES
-
-### cargo audit (Dependency Vulnerabilities)
-- [List vulnerabilities or "No vulnerabilities found"]
-
-### semgrep (Code Pattern Scan)
-- [List security issues or "No issues found"]
-
-### Linter Security Rules
-- [List warnings or "No warnings"]
-
-## Best Practices Issues
-[HIGH priority - must fix]
-
-### Issue: [Title]
-- **Severity**: High
-- **Category**: Security | Performance | Style
-- **File**: path/to/file.rs:123
-- **Description**: [What's wrong]
-- **Recommendation**: [How to fix]
-
-## Requirement Compliance Issues
-[HIGH priority - must fix]
-
-### Issue: [Title]
-- **Severity**: High
-- **Category**: Missing Feature | Wrong Behavior
-- **Requirement**: [Which spec/task]
-- **Description**: [What's missing or wrong]
-- **Recommendation**: [How to fix]
-
-## Consistency Issues
-[MEDIUM priority - should fix]
-
-### Issue: [Title]
-- **Severity**: Medium
-- **Category**: Style | Architecture | Naming
-- **Location**: path/to/file
-- **Description**: [How it differs from codebase patterns]
-- **Recommendation**: [How to align]
-
-## Test Quality Issues
-[MEDIUM priority - should fix]
-
-### Issue: [Title]
-- **Severity**: Medium
-- **Category**: Coverage | Edge Case | Scenario
-- **Description**: [What's missing in tests]
-- **Recommendation**: [What to add]
-
-## Verdict
-- [ ] APPROVED - Ready for merge (all tests pass, no HIGH issues)
-- [ ] NEEDS_CHANGES - Address issues above (specify which)
-- [ ] MAJOR_ISSUES - Fundamental problems (failing tests or critical security)
-
-**Next Steps**: [What should be done]
-"#,
-        change_id = change_id,
-        iteration = iteration
-    );
-
-    std::fs::write(change_dir.join("REVIEW.md"), review_skeleton)?;
+    let review_content = load_template("review.md", &project_root, &vars)?;
+    std::fs::write(change_dir.join("REVIEW.md"), review_content)?;
     Ok(())
 }
 
@@ -646,5 +485,75 @@ fn prompt_conflict_resolution(
         0 => Ok(ConflictResolution::UseSuggested(suggested_id.to_string())),
         1 => Ok(ConflictResolution::Abort),
         _ => Ok(ConflictResolution::Abort),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_load_template_embedded_default() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+
+        // No override exists, should use embedded default
+        let result = load_template("proposal.md", project_root, &[]).unwrap();
+        assert!(result.contains("# Change: {{change_id}}"));
+    }
+
+    #[test]
+    fn test_load_template_with_variable_replacement() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+
+        let vars = [("change_id", "test-change")];
+        let result = load_template("proposal.md", project_root, &vars).unwrap();
+        assert!(result.contains("# Change: test-change"));
+        assert!(!result.contains("{{change_id}}"));
+    }
+
+    #[test]
+    fn test_load_template_override() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+
+        // Create override directory and file
+        let templates_dir = project_root.join("agentd/templates");
+        fs::create_dir_all(&templates_dir).unwrap();
+        fs::write(
+            templates_dir.join("proposal.md"),
+            "# Custom Template\n\nChange: {{change_id}}",
+        )
+        .unwrap();
+
+        let vars = [("change_id", "my-change")];
+        let result = load_template("proposal.md", project_root, &vars).unwrap();
+        assert!(result.contains("# Custom Template"));
+        assert!(result.contains("Change: my-change"));
+    }
+
+    #[test]
+    fn test_load_template_unknown_name() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+
+        let result = load_template("unknown.md", project_root, &[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_derive_project_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+
+        // Create change directory structure
+        let change_dir = project_root.join("agentd/changes/test-change");
+        fs::create_dir_all(&change_dir).unwrap();
+
+        let derived = derive_project_root(&change_dir).unwrap();
+        assert_eq!(derived, project_root);
     }
 }

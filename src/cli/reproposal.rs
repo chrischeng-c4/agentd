@@ -34,7 +34,7 @@ pub async fn run(change_id: &str) -> Result<()> {
         "🤖 Regenerating proposal with Gemini based on challenge feedback...".cyan()
     );
 
-    let script_runner = ScriptRunner::new(config.scripts_dir);
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let _output = script_runner.run_gemini_reproposal(change_id).await?;
 
     println!("\n{}", "✅ Proposal updated!".green().bold());

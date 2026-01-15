@@ -29,7 +29,7 @@ pub async fn run(change_id: &str) -> Result<()> {
         "🔧 Resolving review issues with Claude...".cyan()
     );
 
-    let script_runner = ScriptRunner::new(config.scripts_dir);
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let _output = script_runner.run_claude_resolve(change_id).await?;
 
     println!("\n{}", "✅ Issues resolved!".green().bold());

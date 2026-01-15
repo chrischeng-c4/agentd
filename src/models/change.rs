@@ -603,4 +603,55 @@ impl AgentdConfig {
         std::fs::write(&config_path, content)?;
         Ok(())
     }
+
+    /// Resolve scripts_dir to an absolute path.
+    ///
+    /// If `scripts_dir` is relative, joins it with `project_root`.
+    /// If `scripts_dir` is absolute, returns it unchanged.
+    pub fn resolve_scripts_dir(&self, project_root: &Path) -> PathBuf {
+        if self.scripts_dir.is_absolute() {
+            self.scripts_dir.clone()
+        } else {
+            project_root.join(&self.scripts_dir)
+        }
+    }
+}
+
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_scripts_dir_relative() {
+        let config = AgentdConfig {
+            scripts_dir: PathBuf::from("agentd/scripts"),
+            ..Default::default()
+        };
+
+        let project_root = PathBuf::from("/home/user/project");
+        let resolved = config.resolve_scripts_dir(&project_root);
+
+        assert_eq!(resolved, PathBuf::from("/home/user/project/agentd/scripts"));
+    }
+
+    #[test]
+    fn test_resolve_scripts_dir_absolute() {
+        let config = AgentdConfig {
+            scripts_dir: PathBuf::from("/opt/agentd/scripts"),
+            ..Default::default()
+        };
+
+        let project_root = PathBuf::from("/home/user/project");
+        let resolved = config.resolve_scripts_dir(&project_root);
+
+        // Absolute path should remain unchanged
+        assert_eq!(resolved, PathBuf::from("/opt/agentd/scripts"));
+    }
+
+    #[test]
+    fn test_default_scripts_dir_is_relative() {
+        let config = AgentdConfig::default();
+        assert!(!config.scripts_dir.is_absolute());
+        assert_eq!(config.scripts_dir, PathBuf::from("agentd/scripts"));
+    }
 }

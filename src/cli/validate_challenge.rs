@@ -114,7 +114,7 @@ pub async fn run(change_id: &str, options: &ValidationOptions) -> Result<()> {
         }
         println!();
         println!("   Re-run challenge to regenerate CHALLENGE.md:");
-        println!("   agentd challenge-proposal {}", change_id);
+        println!("   agentd challenge {}", change_id);
     }
 
     Ok(())
@@ -151,7 +151,7 @@ pub fn validate_challenge(
             high_count: 0,
             medium_count: 0,
             low_count: 0,
-            errors: vec!["CHALLENGE.md not found. Run 'agentd challenge-proposal' first.".to_string()],
+            errors: vec!["CHALLENGE.md not found. Run 'agentd challenge' first.".to_string()],
         });
     }
 

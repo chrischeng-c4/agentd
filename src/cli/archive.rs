@@ -95,6 +95,7 @@ pub async fn run(change_id: &str) -> Result<()> {
             change_id,
             strategy,
             relative_path.to_str().unwrap(),
+            &project_root,
             &config,
         )
         .await?;
@@ -125,7 +126,7 @@ pub async fn run(change_id: &str) -> Result<()> {
         "mixed"
     };
 
-    let script_runner = ScriptRunner::new(config.scripts_dir.clone());
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     script_runner
         .run_codex_archive_review(change_id, review_strategy)
         .await?;
@@ -324,9 +325,10 @@ async fn merge_spec_with_gemini(
     change_id: &str,
     strategy: &MergingStrategy,
     spec_file: &str,
+    project_root: &PathBuf,
     config: &AgentdConfig,
 ) -> Result<()> {
-    let script_runner = ScriptRunner::new(config.scripts_dir.clone());
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(project_root));
 
     script_runner
         .run_gemini_merge_specs(change_id, strategy.name(), spec_file)
@@ -341,7 +343,7 @@ async fn generate_changelog_entry(
     project_root: &Path,
     config: &AgentdConfig,
 ) -> Result<()> {
-    let script_runner = ScriptRunner::new(config.scripts_dir.clone());
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
 
     script_runner.run_gemini_changelog(change_id).await?;
 

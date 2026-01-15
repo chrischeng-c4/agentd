@@ -40,7 +40,7 @@ pub async fn run(change_id: &str) -> Result<()> {
     println!("   Running tests and security scans...");
 
     // Run Codex review script
-    let script_runner = ScriptRunner::new(config.scripts_dir);
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let output = script_runner.run_codex_review(change_id, 0).await?;
 
     println!("\n{}", "📊 Code Review Complete".green().bold());

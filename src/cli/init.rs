@@ -146,7 +146,7 @@ fn run_fresh_install(
     } else if let Some(dir_name) = project_root.file_name() {
         config.project_name = dir_name.to_string_lossy().to_string();
     }
-    config.scripts_dir = agentd_dir.join("scripts");
+    config.scripts_dir = PathBuf::from("agentd/scripts"); // Use relative path for portability
     config.save(project_root)?;
 
     // Install system files

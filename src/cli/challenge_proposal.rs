@@ -41,7 +41,7 @@ pub async fn run(change_id: &str) -> Result<()> {
     );
 
     // Run Codex script
-    let script_runner = ScriptRunner::new(config.scripts_dir);
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let output = script_runner.run_codex_challenge(change_id).await?;
 
     println!("\n{}", "📊 Challenge Report Generated".green().bold());

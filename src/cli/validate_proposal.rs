@@ -177,7 +177,7 @@ pub async fn run(change_id: &str, options: &ValidationOptions) -> Result<()> {
 
         println!();
         println!("{}", "⏭️  Next steps:".yellow());
-        println!("   agentd challenge-proposal {}", change_id);
+        println!("   agentd challenge {}", change_id);
     } else {
         println!();
         println!("{}", "❌ Proposal validation failed!".red().bold());

@@ -124,7 +124,7 @@ async fn run_implement_step(
     let change = Change::new(change_id, "");
     change.validate_structure(project_root)?;
 
-    let script_runner = ScriptRunner::new(config.scripts_dir.clone());
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let _output = script_runner
         .run_claude_implement(change_id, tasks)
         .await?;
@@ -149,7 +149,7 @@ async fn run_review_step(
     crate::context::create_review_skeleton(&change_dir, change_id, iteration)?;
 
     // Run Codex review script with iteration number
-    let script_runner = ScriptRunner::new(config.scripts_dir.clone());
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let _output = script_runner
         .run_codex_review(change_id, iteration)
         .await?;
@@ -178,7 +178,7 @@ async fn run_resolve_step(
         anyhow::bail!("REVIEW.md not found for resolving issues");
     }
 
-    let script_runner = ScriptRunner::new(config.scripts_dir.clone());
+    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
     let _output = script_runner.run_claude_resolve(change_id).await?;
 
     println!("{}", "✅ Issues resolved".green());
