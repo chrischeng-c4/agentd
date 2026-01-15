@@ -20,6 +20,7 @@ const SKILL_ARCHIVE: &str = include_str!("../../templates/skills/agentd-archive/
 const GEMINI_PROPOSAL: &str = include_str!("../../templates/gemini/commands/agentd/proposal.toml");
 const GEMINI_REPROPOSAL: &str =
     include_str!("../../templates/gemini/commands/agentd/reproposal.toml");
+const GEMINI_FILLBACK: &str = include_str!("../../templates/gemini/commands/agentd/fillback.toml");
 const GEMINI_SETTINGS: &str = include_str!("../../templates/gemini/settings.json");
 
 // Codex Prompts
@@ -238,6 +239,11 @@ fn install_system_files(
     println!();
     println!("{}", "📜 Updating helper scripts...".cyan());
     create_helper_scripts(&agentd_dir.join("scripts"))?;
+
+    // Install shell completions
+    println!();
+    println!("{}", "🐚 Installing shell completions...".cyan());
+    install_shell_completions()?;
 
     Ok(())
 }
@@ -956,8 +962,93 @@ cd "$PROJECT_ROOT" && codex exec --full-auto --json "$PROMPT" | while IFS= read 
 done
 "#;
 
+    // gemini-fillback.sh for reverse-engineering specs
+    let gemini_fillback = r#"#!/bin/bash
+# Gemini fillback (reverse-engineer specs) script
+# Usage: ./gemini-fillback.sh <change-id> <json-request>
+set -euo pipefail
+
+CHANGE_ID="$1"
+JSON_REQUEST="$2"
+
+# Get the project root (parent of scripts dir)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+echo "🤖 Reverse-engineering specs with Gemini: $CHANGE_ID"
+
+# Use change-specific GEMINI.md context (generated dynamically by agentd CLI)
+export GEMINI_SYSTEM_MD="$PROJECT_ROOT/agentd/changes/$CHANGE_ID/GEMINI.md"
+
+# Parse JSON request
+FILE_COUNT=$(echo "$JSON_REQUEST" | jq -r '.files | length')
+PROMPT=$(echo "$JSON_REQUEST" | jq -r '.prompt')
+
+echo "📊 Analyzing $FILE_COUNT source files..."
+
+# Build context for Gemini
+CONTEXT=$(cat << EOF
+## Change ID
+${CHANGE_ID}
+
+## Task
+${PROMPT}
+
+## Source Files
+The following source files have been scanned from the codebase:
+
+EOF
+)
+
+# Add file information
+for i in $(seq 0 $((FILE_COUNT - 1))); do
+    FILE_PATH=$(echo "$JSON_REQUEST" | jq -r ".files[$i].path")
+    CONTEXT="${CONTEXT}
+- ${FILE_PATH}"
+done
+
+CONTEXT="${CONTEXT}
+
+## Source Code
+\`\`\`
+"
+
+# Add file contents
+for i in $(seq 0 $((FILE_COUNT - 1))); do
+    FILE_PATH=$(echo "$JSON_REQUEST" | jq -r ".files[$i].path")
+    FILE_CONTENT=$(echo "$JSON_REQUEST" | jq -r ".files[$i].content")
+
+    CONTEXT="${CONTEXT}
+=== ${FILE_PATH} ===
+${FILE_CONTENT}
+
+"
+done
+
+CONTEXT="${CONTEXT}\`\`\`
+
+## Instructions
+Analyze the provided source code and generate:
+1. proposal.md in agentd/changes/${CHANGE_ID}/proposal.md
+2. Technical specifications in agentd/changes/${CHANGE_ID}/specs/*.md
+3. tasks.md in agentd/changes/${CHANGE_ID}/tasks.md
+
+The specifications should include:
+- High-level architecture and design patterns used
+- Key requirements and components
+- Data models and interfaces
+- Acceptance criteria based on code behavior
+
+Focus on creating actionable, well-structured Agentd specifications that capture the technical design.
+"
+
+# Call Gemini CLI with pre-defined command
+echo "$CONTEXT" | gemini agentd:fillback --output-format stream-json
+"#;
+
     std::fs::write(scripts_dir.join("gemini-proposal.sh"), gemini_proposal)?;
     std::fs::write(scripts_dir.join("gemini-reproposal.sh"), gemini_reproposal)?;
+    std::fs::write(scripts_dir.join("gemini-fillback.sh"), gemini_fillback)?;
     std::fs::write(scripts_dir.join("codex-challenge.sh"), codex_challenge)?;
     std::fs::write(scripts_dir.join("codex-rechallenge.sh"), codex_rechallenge)?;
     std::fs::write(scripts_dir.join("codex-review.sh"), codex_review)?;
@@ -1357,6 +1448,7 @@ echo "✅ Review complete: $REVIEW_PATH"
         for script in &[
             "gemini-proposal.sh",
             "gemini-reproposal.sh",
+            "gemini-fillback.sh",
             "gemini-merge-specs.sh",
             "gemini-changelog.sh",
             "codex-challenge.sh",
@@ -1383,9 +1475,11 @@ fn install_gemini_commands(gemini_dir: &Path) -> Result<()> {
     // Install command definitions
     std::fs::write(commands_dir.join("proposal.toml"), GEMINI_PROPOSAL)?;
     std::fs::write(commands_dir.join("reproposal.toml"), GEMINI_REPROPOSAL)?;
+    std::fs::write(commands_dir.join("fillback.toml"), GEMINI_FILLBACK)?;
 
     println!("   ✓ gemini agentd:proposal");
     println!("   ✓ gemini agentd:reproposal");
+    println!("   ✓ gemini agentd:fillback");
 
     // Install settings
     std::fs::write(gemini_dir.join("settings.json"), GEMINI_SETTINGS)?;
@@ -1401,6 +1495,61 @@ fn compute_checksum(content: &str) -> u64 {
     let mut hasher = DefaultHasher::new();
     content.hash(&mut hasher);
     hasher.finish()
+}
+
+/// Install shell completions for supported shells
+fn install_shell_completions() -> Result<()> {
+    let home_dir = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+
+    // Get current executable path
+    let current_exe = std::env::current_exe()?;
+
+    // Install zsh completions
+    let zsh_completions_dir = PathBuf::from(&home_dir).join(".zsh/completions");
+    std::fs::create_dir_all(&zsh_completions_dir)?;
+
+    let zsh_completion_file = zsh_completions_dir.join("_agentd");
+
+    // Generate zsh completions by running ourselves
+    let output = Command::new(&current_exe)
+        .args(["completions", "zsh"])
+        .output();
+
+    match output {
+        Ok(result) if result.status.success() => {
+            let completions = String::from_utf8_lossy(&result.stdout);
+            std::fs::write(&zsh_completion_file, completions.as_bytes())?;
+            println!("   ✓ zsh completions → ~/.zsh/completions/_agentd");
+
+            // Check if fpath is configured
+            let zshrc_path = PathBuf::from(&home_dir).join(".zshrc");
+            let fpath_configured = if zshrc_path.exists() {
+                std::fs::read_to_string(&zshrc_path)
+                    .map(|content| content.contains(".zsh/completions"))
+                    .unwrap_or(false)
+            } else {
+                false
+            };
+
+            if !fpath_configured {
+                println!();
+                println!("   {} Add to ~/.zshrc:", "💡".yellow());
+                println!("      fpath=(~/.zsh/completions $fpath)");
+                println!("      autoload -Uz compinit && compinit");
+            }
+        }
+        Ok(result) => {
+            let stderr = String::from_utf8_lossy(&result.stderr);
+            println!("   {} zsh completions failed: {}", "⚠️".yellow(), stderr.trim());
+        }
+        Err(e) => {
+            println!("   {} Failed to generate zsh completions: {}", "⚠️".yellow(), e);
+        }
+    }
+
+    Ok(())
 }
 
 fn install_codex_prompts(prompts_dir: &Path) -> Result<()> {

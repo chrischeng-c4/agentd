@@ -1,6 +1,8 @@
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Shell};
 use colored::Colorize;
 use agentd::Result;
+use std::io;
 
 #[derive(Parser)]
 #[command(name = "agentd")]
@@ -163,14 +165,21 @@ enum Commands {
         #[arg(short, long)]
         strategy: Option<String>,
     },
+
+    /// Generate shell completions
+    Completions {
+        /// Shell type (bash, zsh, fish, powershell)
+        #[arg(value_enum)]
+        shell: Shell,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Auto-upgrade check for all commands except init
-    if !matches!(cli.command, Commands::Init { .. }) {
+    // Auto-upgrade check for all commands except init and completions
+    if !matches!(cli.command, Commands::Init { .. } | Commands::Completions { .. }) {
         // Check for updates and auto-upgrade if available
         agentd::cli::init::check_and_auto_upgrade(true);
     }
@@ -276,6 +285,10 @@ async fn main() -> Result<()> {
             strategy,
         } => {
             agentd::cli::fillback::run(&change_id, path.as_deref(), strategy.as_deref()).await?;
+        }
+
+        Commands::Completions { shell } => {
+            generate(shell, &mut Cli::command(), "agentd", &mut io::stdout());
         }
     }
 
