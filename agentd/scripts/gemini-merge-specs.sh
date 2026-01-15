@@ -53,4 +53,4 @@ Ensure the output follows the spec schema with:
 EOF
 )
 
-gemini agentd:merge-specs --resume latest "$PROMPT"
+gemini agentd:merge-specs --resume latest --output-format stream-json "$PROMPT"

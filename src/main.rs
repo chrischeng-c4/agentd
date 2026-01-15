@@ -70,6 +70,10 @@ enum Commands {
         /// Output results as JSON
         #[arg(long)]
         json: bool,
+
+        /// Auto-fix fixable errors (missing headings)
+        #[arg(short, long)]
+        fix: bool,
     },
 
     /// Regenerate proposal based on challenge feedback
@@ -211,11 +215,12 @@ async fn main() -> Result<()> {
             agentd::cli::challenge_proposal::run(&change_id).await?;
         }
 
-        Commands::ValidateChallenge { change_id, strict, verbose, json } => {
+        Commands::ValidateChallenge { change_id, strict, verbose, json, fix } => {
             let options = agentd::models::ValidationOptions::new()
                 .with_strict(strict)
                 .with_verbose(verbose)
-                .with_json(json);
+                .with_json(json)
+                .with_fix(fix);
             agentd::cli::validate_challenge::run(&change_id, &options).await?;
         }
 

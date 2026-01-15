@@ -65,7 +65,65 @@ pub async fn run(change_id: &str, options: &ValidationOptions) -> Result<()> {
         println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
     }
 
-    let result = validate_challenge(change_id, &project_root, options)?;
+    let mut result = validate_challenge(change_id, &project_root, options)?;
+
+    // Auto-fix if requested and there are fixable errors
+    if options.fix && !result.has_valid_structure {
+        let change = Change::new(change_id, "");
+        let challenge_path = change.challenge_path(&project_root);
+
+        if challenge_path.exists() {
+            let mut content = std::fs::read_to_string(&challenge_path)?;
+            let mut fixes_applied = Vec::new();
+
+            // Fix missing # Challenge Report
+            if !content.contains("# Challenge Report") {
+                content = format!("# Challenge Report\n\n{}", content);
+                fixes_applied.push("Added '# Challenge Report' heading");
+            }
+
+            // Fix missing ## Verdict
+            if !content.contains("## Verdict") {
+                // Add after Challenge Report heading
+                if let Some(pos) = content.find("\n## ") {
+                    content.insert_str(pos, "\n\n## Verdict\n\n**Status**: NEEDS_REVISION\n");
+                } else {
+                    content.push_str("\n\n## Verdict\n\n**Status**: NEEDS_REVISION\n");
+                }
+                fixes_applied.push("Added '## Verdict' section");
+            }
+
+            // Fix missing ## Issues section
+            let has_issues_section = content.contains("## Issues")
+                || content.contains("## Internal Consistency Issues")
+                || content.contains("## Code Alignment Issues")
+                || content.contains("## Quality Suggestions");
+            if !has_issues_section {
+                content.push_str("\n\n## Issues\n\nNo issues documented.\n");
+                fixes_applied.push("Added '## Issues' section");
+            }
+
+            if !fixes_applied.is_empty() {
+                std::fs::write(&challenge_path, &content)?;
+                if !options.json {
+                    println!();
+                    println!("{}", "🔧 Auto-fixes applied:".cyan());
+                    for fix in &fixes_applied {
+                        println!("   {} {}", "✓".green(), fix);
+                    }
+                    println!();
+                    println!("{}", "Re-validating...".bright_black());
+                    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                }
+                // Re-validate after fixes
+                let revalidate_options = ValidationOptions::new()
+                    .with_strict(options.strict)
+                    .with_verbose(options.verbose)
+                    .with_json(options.json);
+                result = validate_challenge(change_id, &project_root, &revalidate_options)?;
+            }
+        }
+    }
 
     // JSON output mode
     if options.json {

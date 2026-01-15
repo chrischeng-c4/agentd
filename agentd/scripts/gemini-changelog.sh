@@ -63,4 +63,4 @@ All notable changes to this project's specifications will be documented in this 
 EOF
 )
 
-gemini agentd:changelog "$PROMPT"
+gemini agentd:changelog --output-format stream-json "$PROMPT"
