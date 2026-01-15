@@ -109,12 +109,6 @@ enum Commands {
         change_id: String,
     },
 
-    /// Fix issues found during verification with Claude
-    Fix {
-        /// Change ID to fix
-        change_id: String,
-    },
-
     /// Archive completed change
     Archive {
         /// Change ID to archive
@@ -251,11 +245,6 @@ async fn main() -> Result<()> {
         Commands::ResolveReviews { change_id } => {
             println!("{}", format!("🔧 Resolving reviews: {}", change_id).cyan());
             agentd::cli::resolve_reviews::run(&change_id).await?;
-        }
-
-        Commands::Fix { change_id } => {
-            println!("{}", format!("🔧 Fixing issues: {}", change_id).cyan());
-            agentd::cli::fix::run(&change_id).await?;
         }
 
         Commands::Archive { change_id } => {

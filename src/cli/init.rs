@@ -1176,57 +1176,6 @@ echo "$PROMPT" | claude -p \
 "#;
     std::fs::write(scripts_dir.join("claude-resolve.sh"), claude_resolve)?;
 
-    // claude-fix.sh - calls Claude CLI to fix verification issues
-    let claude_fix = r#"#!/bin/bash
-# Claude fix script - fixes issues from verification
-# Usage: ./claude-fix.sh <change-id>
-#
-# Environment variables:
-#   AGENTD_MODEL - Model to use (e.g., "sonnet", "opus", "haiku")
-#
-set -euo pipefail
-
-CHANGE_ID="$1"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
-# Model selection: default to sonnet
-MODEL="${AGENTD_MODEL:-sonnet}"
-
-echo "🔧 Fixing verification issues with Claude ($MODEL): $CHANGE_ID"
-
-PROMPT=$(cat << EOF
-# Agentd Fix Task
-
-Fix issues identified during verification for agentd/changes/${CHANGE_ID}/.
-
-## Instructions
-1. Read REVIEW.md and STATE.yaml to understand verification issues
-2. Fix ALL failing tests and verification errors:
-   - Build errors
-   - Test failures
-   - Type errors
-   - Lint warnings
-3. Run tests to verify fixes work
-4. Update IMPLEMENTATION.md with fix notes
-
-## Code Quality
-- Don't break existing functionality
-- Ensure all tests pass after fixes
-- Follow existing code style
-EOF
-)
-
-# Run Claude CLI in headless mode
-cd "$PROJECT_ROOT"
-echo "$PROMPT" | claude -p \
-    --model "$MODEL" \
-    --allowedTools "Write,Edit,Read,Bash,Glob,Grep" \
-    --output-format stream-json
-"#;
-    std::fs::write(scripts_dir.join("claude-fix.sh"), claude_fix)?;
-
     // gemini-merge-specs.sh for merging spec deltas
     let gemini_merge_specs = r#"#!/bin/bash
 # Gemini merge specs script - merges delta specs back to main specs
@@ -1533,13 +1482,13 @@ echo "✅ Review complete: $REVIEW_PATH"
             "gemini-fillback.sh",
             "gemini-merge-specs.sh",
             "gemini-changelog.sh",
+            "gemini-archive-fix.sh",
             "codex-challenge.sh",
             "codex-rechallenge.sh",
             "codex-review.sh",
             "codex-archive-review.sh",
             "claude-implement.sh",
             "claude-resolve.sh",
-            "claude-fix.sh",
         ] {
             let path = scripts_dir.join(script);
             let mut perms = std::fs::metadata(&path)?.permissions();
