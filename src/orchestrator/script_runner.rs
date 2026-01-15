@@ -103,8 +103,10 @@ impl ScriptRunner {
 
             if let Some(ref pb) = progress {
                 // Update progress message with recent output
-                let short_line = if line.len() > 60 {
-                    format!("{}...", &line[..60])
+                // Use char boundary to avoid panic with UTF-8
+                let short_line = if line.chars().count() > 60 {
+                    let truncated: String = line.chars().take(60).collect();
+                    format!("{}...", truncated)
                 } else {
                     line.clone()
                 };
