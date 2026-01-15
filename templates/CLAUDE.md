@@ -2,9 +2,10 @@
 
 {{PROJECT_CONTEXT}}
 
-## Agentd Workflow
+<!-- agentd:start -->
+## Agentd: Spec-Driven Development
 
-Use these skills for spec-driven development:
+**IMPORTANT**: Do NOT make direct code changes. Use the SDD workflow below.
 
 | Skill | Purpose |
 |-------|---------|
@@ -16,11 +17,5 @@ Use these skills for spec-driven development:
 | `/agentd:fix` | Fix issues from review |
 | `/agentd:archive` | Archive completed change |
 
-## File Structure
-
-- `agentd/project.md` - Project context
-- `agentd/specs/` - Main specifications
-- `agentd/changes/<id>/` - Active changes
-  - `proposal.md` - PRD (why, what)
-  - `tasks.md` - Implementation tasks
-  - `specs/` - Technical design + acceptance criteria
+Start with: `/agentd:proposal <id> "<description>"`
+<!-- agentd:end -->

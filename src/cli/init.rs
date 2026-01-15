@@ -402,21 +402,118 @@ fn generate_project_md(project_md_path: &Path) {
     println!("     {}", "\"Read agentd/project.md and help me fill it out\"".cyan());
 }
 
-/// Generate CLAUDE.md with project context injected
+// Agentd section markers
+const AGENTD_START_MARKER: &str = "<!-- agentd:start -->";
+const AGENTD_END_MARKER: &str = "<!-- agentd:end -->";
+
+/// Extract the Agentd section from template (between markers)
+fn get_agentd_section() -> &'static str {
+    let start = CLAUDE_TEMPLATE.find(AGENTD_START_MARKER).unwrap_or(0);
+    let end = CLAUDE_TEMPLATE
+        .find(AGENTD_END_MARKER)
+        .map(|i| i + AGENTD_END_MARKER.len())
+        .unwrap_or(CLAUDE_TEMPLATE.len());
+    &CLAUDE_TEMPLATE[start..end]
+}
+
+/// Remove old Agentd sections (without markers) from content
+fn remove_old_agentd_sections(content: &str) -> String {
+    let mut result = content.to_string();
+
+    // Pattern 1: "## Agentd Workflow" section (old format)
+    if let Some(start) = result.find("## Agentd Workflow") {
+        // Find the next ## heading or end of file
+        let after_start = &result[start + 18..]; // skip "## Agentd Workflow"
+        if let Some(next_heading) = after_start.find("\n## ") {
+            let end = start + 18 + next_heading + 1; // +1 to keep the newline before next heading
+            result = format!("{}{}", &result[..start], &result[end..]);
+        } else {
+            // No next heading - remove to end
+            result = result[..start].trim_end().to_string();
+        }
+    }
+
+    // Pattern 2: "## File Structure" section with agentd paths (old format)
+    if let Some(start) = result.find("## File Structure") {
+        let section_content = &result[start..];
+        // Only remove if it contains agentd-specific content
+        if section_content.contains("agentd/project.md") || section_content.contains("agentd/specs/") {
+            let after_start = &result[start + 17..]; // skip "## File Structure"
+            if let Some(next_heading) = after_start.find("\n## ") {
+                let end = start + 17 + next_heading + 1;
+                result = format!("{}{}", &result[..start], &result[end..]);
+            } else if let Some(next_heading) = after_start.find("\n# ") {
+                let end = start + 17 + next_heading + 1;
+                result = format!("{}{}", &result[..start], &result[end..]);
+            } else {
+                result = result[..start].trim_end().to_string();
+            }
+        }
+    }
+
+    // Clean up multiple consecutive newlines
+    while result.contains("\n\n\n") {
+        result = result.replace("\n\n\n", "\n\n");
+    }
+
+    result
+}
+
+/// Generate or update CLAUDE.md with Agentd section (upsert mode)
 fn generate_claude_md(project_root: &Path, agentd_dir: &Path) -> Result<()> {
     let project_md_path = agentd_dir.join("project.md");
     let claude_md_path = project_root.join("CLAUDE.md");
 
-    // Read project.md content
-    let project_content = std::fs::read_to_string(&project_md_path)
-        .unwrap_or_else(|_| PROJECT_TEMPLATE.to_string());
+    let agentd_section = get_agentd_section();
 
-    // Inject into CLAUDE.md template
-    let claude_content = CLAUDE_TEMPLATE.replace("{{PROJECT_CONTEXT}}", &project_content);
+    if claude_md_path.exists() {
+        // CLAUDE.md exists - upsert the Agentd section
+        let existing_content = std::fs::read_to_string(&claude_md_path)?;
 
-    // Write CLAUDE.md
-    std::fs::write(&claude_md_path, claude_content)?;
-    println!("   {} CLAUDE.md", "✓".green());
+        // First, remove old format sections (without markers)
+        let cleaned_content = remove_old_agentd_sections(&existing_content);
+
+        let new_content = if let (Some(start), Some(end)) = (
+            cleaned_content.find(AGENTD_START_MARKER),
+            cleaned_content.find(AGENTD_END_MARKER),
+        ) {
+            // Markers exist - replace content between them
+            let before = &cleaned_content[..start];
+            let after = &cleaned_content[end + AGENTD_END_MARKER.len()..];
+            format!("{}{}{}", before, agentd_section, after)
+        } else {
+            // No markers - prepend Agentd section after first heading or at top
+            if let Some(first_newline) = cleaned_content.find('\n') {
+                let first_line = &cleaned_content[..first_newline];
+                if first_line.starts_with('#') {
+                    // Insert after the first heading
+                    let after_heading = &cleaned_content[first_newline..];
+                    format!("{}\n\n{}{}", first_line, agentd_section, after_heading)
+                } else {
+                    // Prepend at top
+                    format!("{}\n\n{}", agentd_section, cleaned_content)
+                }
+            } else {
+                format!("{}\n\n{}", agentd_section, cleaned_content)
+            }
+        };
+
+        // Check if content changed
+        if new_content.trim() == existing_content.trim() {
+            println!("   {} CLAUDE.md (up to date)", "✓".green());
+        } else {
+            std::fs::write(&claude_md_path, new_content)?;
+            println!("   {} CLAUDE.md (updated)", "✓".green());
+        }
+    } else {
+        // CLAUDE.md doesn't exist - create with full template
+        let project_content = std::fs::read_to_string(&project_md_path)
+            .unwrap_or_else(|_| PROJECT_TEMPLATE.to_string());
+
+        let claude_content = CLAUDE_TEMPLATE.replace("{{PROJECT_CONTEXT}}", &project_content);
+        std::fs::write(&claude_md_path, claude_content)?;
+        println!("   {} CLAUDE.md (created)", "✓".green());
+    }
 
     Ok(())
 }
@@ -1297,6 +1394,15 @@ fn install_gemini_commands(gemini_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Compute a simple checksum for content comparison
+fn compute_checksum(content: &str) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    content.hash(&mut hasher);
+    hasher.finish()
+}
+
 fn install_codex_prompts(prompts_dir: &Path) -> Result<()> {
     // Create directory if it doesn't exist
     std::fs::create_dir_all(prompts_dir)?;
@@ -1304,14 +1410,32 @@ fn install_codex_prompts(prompts_dir: &Path) -> Result<()> {
     let challenge_path = prompts_dir.join("agentd-challenge.md");
     let review_path = prompts_dir.join("agentd-review.md");
 
-    // Check if prompts already exist
+    // Check if prompts already exist and compare checksums
+    let challenge_same = challenge_path.exists()
+        && std::fs::read_to_string(&challenge_path)
+            .map(|content| compute_checksum(&content) == compute_checksum(CODEX_CHALLENGE))
+            .unwrap_or(false);
+
+    let review_same = review_path.exists()
+        && std::fs::read_to_string(&review_path)
+            .map(|content| compute_checksum(&content) == compute_checksum(CODEX_REVIEW))
+            .unwrap_or(false);
+
+    // If both are the same, skip silently
+    if challenge_same && review_same {
+        println!("   ✓ codex agentd-challenge (up to date)");
+        println!("   ✓ codex agentd-review (up to date)");
+        return Ok(());
+    }
+
+    // Check if any prompts exist but differ
     let challenge_exists = challenge_path.exists();
     let review_exists = review_path.exists();
 
-    if challenge_exists || review_exists {
+    if (challenge_exists && !challenge_same) || (review_exists && !review_same) {
         println!();
         println!(
-            "   {} Codex prompts already exist in ~/.codex/prompts/",
+            "   {} Codex prompts differ from current version",
             "⚠️".yellow()
         );
 
