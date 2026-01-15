@@ -1,3 +1,4 @@
+use crate::context::{generate_gemini_context, ContextPhase};
 use crate::fillback::strategy::ImportStrategy;
 use crate::models::{SourceFile, SpecGenerationRequest};
 use crate::orchestrator::ScriptRunner;
@@ -112,6 +113,10 @@ impl CodeStrategy {
         // Use ScriptRunner to call the fillback script
         let current_dir = std::env::current_dir()?;
         let scripts_dir = current_dir.join("agentd/scripts");
+        let change_dir = current_dir.join("agentd/changes").join(change_id);
+
+        // Generate GEMINI.md context file before running the script
+        generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
 
         let runner = ScriptRunner::new(scripts_dir);
 
