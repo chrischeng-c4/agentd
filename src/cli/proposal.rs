@@ -35,7 +35,38 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
     let resolved_change_id = run_proposal_step(change_id, description, &project_root, &config).await?;
 
     // Step 2: Validate proposal format (local, saves Codex tokens)
-    let _proposal_valid = run_validate_proposal_step(&resolved_change_id, &project_root)?;
+    // Loop with Gemini reproposal until format is valid
+    let mut format_valid = run_validate_proposal_step(&resolved_change_id, &project_root)?;
+    let mut format_iteration = 0;
+    let max_format_iterations = config.workflow.format_iterations;
+
+    while !format_valid && format_iteration < max_format_iterations {
+        format_iteration += 1;
+        println!();
+        println!(
+            "{}",
+            format!("🔧 Format issues detected - Auto-fixing with Gemini (iteration {})...", format_iteration).yellow()
+        );
+
+        // Reproposal with Gemini to fix format
+        run_reproposal_step(&resolved_change_id, &project_root, &config).await?;
+
+        // Re-validate
+        println!();
+        println!("{}", format!("📋 Re-validating format (iteration {})...", format_iteration).cyan());
+        format_valid = run_validate_proposal_step(&resolved_change_id, &project_root)?;
+    }
+
+    if !format_valid {
+        println!();
+        println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+        println!(
+            "{}",
+            format!("⚠️  Format validation still failing after {} iterations", max_format_iterations).yellow().bold()
+        );
+        println!("   Fix manually and re-run: agentd challenge {}", resolved_change_id);
+        return Ok(());
+    }
 
     // Step 3: First challenge (use resolved ID)
     let verdict = run_challenge_step(&resolved_change_id, &project_root, &config).await?;

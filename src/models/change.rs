@@ -531,6 +531,10 @@ impl ClaudeConfig {
 /// Workflow iteration settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowConfig {
+    /// Max iterations for format validation (proposal format fix)
+    #[serde(default = "default_format_iterations")]
+    pub format_iterations: u32,
+
     /// Max iterations for planning phase (proposal ↔ challenge)
     #[serde(default = "default_planning_iterations")]
     pub planning_iterations: u32,
@@ -544,6 +548,7 @@ pub struct WorkflowConfig {
     pub archive_iterations: u32,
 }
 
+fn default_format_iterations() -> u32 { 2 }
 fn default_planning_iterations() -> u32 { 2 }
 fn default_implementation_iterations() -> u32 { 2 }
 fn default_archive_iterations() -> u32 { 1 }
@@ -551,6 +556,7 @@ fn default_archive_iterations() -> u32 { 1 }
 impl Default for WorkflowConfig {
     fn default() -> Self {
         Self {
+            format_iterations: default_format_iterations(),
             planning_iterations: default_planning_iterations(),
             implementation_iterations: default_implementation_iterations(),
             archive_iterations: default_archive_iterations(),

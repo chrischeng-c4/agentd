@@ -5,6 +5,7 @@ scripts_dir = "agentd/scripts"
 # Workflow Iteration Settings
 # =============================================================================
 [workflow]
+format_iterations = 2          # proposal format validation iterations
 planning_iterations = 2        # proposal ↔ challenge iterations
 implementation_iterations = 2  # implement ↔ review iterations
 archive_iterations = 1         # archive review iterations
