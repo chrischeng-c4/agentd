@@ -188,7 +188,7 @@ async fn run_proposal_step(
         let complexity = change.assess_complexity(&project_root);
 
         match orchestrator.run_proposal(&resolved_change_id, description, complexity).await {
-            Ok(_output) => {
+            Ok((_output, _usage)) => {
                 last_error = None;
                 break;
             }
@@ -297,7 +297,7 @@ async fn run_challenge_step(
         }
 
         match orchestrator.run_challenge(change_id, complexity).await {
-            Ok(_output) => {
+            Ok((_output, _usage)) => {
                 last_error = None;
                 break;
             }
@@ -387,7 +387,7 @@ async fn run_rechallenge_step(
 
     // Run Codex rechallenge orchestrator (resumes session)
     let orchestrator = CodexOrchestrator::new(config, project_root);
-    let _output = orchestrator.run_rechallenge(change_id, complexity).await?;
+    let (_output, _usage) = orchestrator.run_rechallenge(change_id, complexity).await?;
 
     // Parse verdict
     let challenge_path = change.challenge_path(project_root);
@@ -439,7 +439,7 @@ async fn run_reproposal_step(
         }
 
         match orchestrator.run_reproposal(change_id, complexity).await {
-            Ok(_output) => {
+            Ok((_output, _usage)) => {
                 last_error = None;
                 break;
             }

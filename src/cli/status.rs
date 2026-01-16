@@ -59,9 +59,69 @@ pub async fn run(change_id: &str, json: bool) -> Result<()> {
         if let Some(updated) = &state.updated_at {
             println!("   Updated:   {}", updated.format("%Y-%m-%d %H:%M:%S"));
         }
+
+        // Display usage/cost summary if telemetry exists
+        if let Some(telemetry) = &state.telemetry {
+            println!();
+            println!("{}", "💰 Usage Summary:".cyan());
+
+            // Show totals
+            println!("   Total tokens:  {} in / {} out",
+                format_number(telemetry.total_tokens_in),
+                format_number(telemetry.total_tokens_out));
+
+            if telemetry.total_cost_usd > 0.0 {
+                println!("   Total cost:    ${:.4}", telemetry.total_cost_usd);
+            }
+
+            // Show call count by step
+            if !telemetry.calls.is_empty() {
+                println!("   LLM calls:     {}", telemetry.calls.len());
+
+                // Group calls by step
+                let mut steps: std::collections::HashMap<&str, (u64, u64, f64)> = std::collections::HashMap::new();
+                for call in &telemetry.calls {
+                    let entry = steps.entry(&call.step).or_insert((0, 0, 0.0));
+                    entry.0 += call.tokens_in.unwrap_or(0);
+                    entry.1 += call.tokens_out.unwrap_or(0);
+                    entry.2 += call.cost_usd.unwrap_or(0.0);
+                }
+
+                // Show breakdown by step
+                println!();
+                println!("{}", "   Breakdown by step:".bright_black());
+                for (step, (tokens_in, tokens_out, cost)) in &steps {
+                    if *cost > 0.0 {
+                        println!("     {:12} {} in / {} out  (${:.4})",
+                            step,
+                            format_number(*tokens_in),
+                            format_number(*tokens_out),
+                            cost);
+                    } else {
+                        println!("     {:12} {} in / {} out",
+                            step,
+                            format_number(*tokens_in),
+                            format_number(*tokens_out));
+                    }
+                }
+            }
+        }
     }
 
     Ok(())
+}
+
+/// Format a number with thousands separators
+fn format_number(n: u64) -> String {
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
+        result.push(c);
+    }
+    result.chars().rev().collect()
 }
 
 #[cfg(test)]

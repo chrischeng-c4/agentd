@@ -1,6 +1,6 @@
 use super::cli_mapper::{LlmArg, LlmProvider};
 use super::prompts;
-use super::{ModelSelector, ScriptRunner, SelectedModel};
+use super::{ModelSelector, ScriptRunner, SelectedModel, UsageMetrics};
 use crate::models::{AgentdConfig, Complexity};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
@@ -65,7 +65,7 @@ impl<'a> CodexOrchestrator<'a> {
     }
 
     /// Run challenge (initial proposal review)
-    pub async fn run_challenge(&self, change_id: &str, complexity: Complexity) -> Result<String> {
+    pub async fn run_challenge(&self, change_id: &str, complexity: Complexity) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::codex_challenge_prompt(change_id);
         let env = self.build_env(change_id);
         // First call in Plan stage, no resume
@@ -79,7 +79,7 @@ impl<'a> CodexOrchestrator<'a> {
         &self,
         change_id: &str,
         complexity: Complexity,
-    ) -> Result<String> {
+    ) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::codex_rechallenge_prompt(change_id);
         let env = self.build_env(change_id);
         // Resume previous session (Plan stage)
@@ -164,7 +164,7 @@ impl<'a> CodexOrchestrator<'a> {
         change_id: &str,
         iteration: u32,
         complexity: Complexity,
-    ) -> Result<String> {
+    ) -> Result<(String, UsageMetrics)> {
         println!("🧪 Running tests...");
         println!("🔒 Running security scans...");
 
@@ -192,7 +192,7 @@ impl<'a> CodexOrchestrator<'a> {
     }
 
     /// Run verification
-    pub async fn run_verify(&self, change_id: &str, complexity: Complexity) -> Result<String> {
+    pub async fn run_verify(&self, change_id: &str, complexity: Complexity) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::codex_verify_prompt(change_id);
         let env = self.build_env(change_id);
         let args = self.build_args(complexity, false);
@@ -206,7 +206,7 @@ impl<'a> CodexOrchestrator<'a> {
         change_id: &str,
         strategy: &str,
         complexity: Complexity,
-    ) -> Result<String> {
+    ) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::codex_archive_review_prompt(change_id, strategy);
         let env = self.build_env(change_id);
         // First Codex call in Archive stage, no resume

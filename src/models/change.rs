@@ -265,6 +265,12 @@ pub struct GeminiModelConfig {
     pub model: String,
     /// Maximum complexity this model handles
     pub complexity: Complexity,
+    /// Cost per 1 million input tokens in USD
+    #[serde(default)]
+    pub cost_per_1m_input: Option<f64>,
+    /// Cost per 1 million output tokens in USD
+    #[serde(default)]
+    pub cost_per_1m_output: Option<f64>,
 }
 
 /// Gemini configuration
@@ -291,11 +297,15 @@ fn default_gemini_models() -> Vec<GeminiModelConfig> {
             id: "flash".to_string(),
             model: "gemini-3-flash-preview".to_string(),
             complexity: Complexity::Medium,
+            cost_per_1m_input: Some(0.10),
+            cost_per_1m_output: Some(0.40),
         },
         GeminiModelConfig {
             id: "pro".to_string(),
             model: "gemini-3-pro-preview".to_string(),
             complexity: Complexity::Critical,
+            cost_per_1m_input: Some(1.25),
+            cost_per_1m_output: Some(10.00),
         },
     ]
 }
@@ -347,6 +357,12 @@ pub struct CodexModelConfig {
     pub reasoning: Option<String>,
     /// Maximum complexity this model handles
     pub complexity: Complexity,
+    /// Cost per 1 million input tokens in USD
+    #[serde(default)]
+    pub cost_per_1m_input: Option<f64>,
+    /// Cost per 1 million output tokens in USD
+    #[serde(default)]
+    pub cost_per_1m_output: Option<f64>,
 }
 
 impl CodexModelConfig {
@@ -385,24 +401,32 @@ fn default_codex_models() -> Vec<CodexModelConfig> {
             model: "gpt-5.2-codex".to_string(),
             reasoning: Some("low".to_string()),
             complexity: Complexity::Low,
+            cost_per_1m_input: Some(2.00),
+            cost_per_1m_output: Some(8.00),
         },
         CodexModelConfig {
             id: "balanced".to_string(),
             model: "gpt-5.2-codex".to_string(),
             reasoning: Some("medium".to_string()),
             complexity: Complexity::Medium,
+            cost_per_1m_input: Some(2.00),
+            cost_per_1m_output: Some(8.00),
         },
         CodexModelConfig {
             id: "deep".to_string(),
             model: "gpt-5.2-codex".to_string(),
             reasoning: Some("high".to_string()),
             complexity: Complexity::High,
+            cost_per_1m_input: Some(2.00),
+            cost_per_1m_output: Some(8.00),
         },
         CodexModelConfig {
             id: "max".to_string(),
             model: "gpt-5.2-codex".to_string(),
             reasoning: Some("extra high".to_string()),
             complexity: Complexity::Critical,
+            cost_per_1m_input: Some(2.00),
+            cost_per_1m_output: Some(8.00),
         },
     ]
 }
@@ -450,6 +474,12 @@ pub struct ClaudeModelConfig {
     pub model: String,
     /// Maximum complexity this model handles
     pub complexity: Complexity,
+    /// Cost per 1 million input tokens in USD
+    #[serde(default)]
+    pub cost_per_1m_input: Option<f64>,
+    /// Cost per 1 million output tokens in USD
+    #[serde(default)]
+    pub cost_per_1m_output: Option<f64>,
 }
 
 /// Claude configuration
@@ -476,16 +506,22 @@ fn default_claude_models() -> Vec<ClaudeModelConfig> {
             id: "fast".to_string(),
             model: "haiku".to_string(),
             complexity: Complexity::Low,
+            cost_per_1m_input: Some(0.80),
+            cost_per_1m_output: Some(4.00),
         },
         ClaudeModelConfig {
             id: "balanced".to_string(),
             model: "sonnet".to_string(),
             complexity: Complexity::Medium,
+            cost_per_1m_input: Some(3.00),
+            cost_per_1m_output: Some(15.00),
         },
         ClaudeModelConfig {
             id: "deep".to_string(),
             model: "opus".to_string(),
             complexity: Complexity::Critical,
+            cost_per_1m_input: Some(15.00),
+            cost_per_1m_output: Some(75.00),
         },
     ]
 }

@@ -1,6 +1,6 @@
 use super::cli_mapper::{LlmArg, LlmProvider};
 use super::prompts;
-use super::{ModelSelector, ScriptRunner};
+use super::{ModelSelector, ScriptRunner, UsageMetrics};
 use crate::models::{AgentdConfig, Complexity};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -60,7 +60,7 @@ impl<'a> GeminiOrchestrator<'a> {
         change_id: &str,
         description: &str,
         complexity: Complexity,
-    ) -> Result<String> {
+    ) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::gemini_proposal_prompt(change_id, description);
         let env = self.build_env(change_id);
         let args = self.build_args("agentd:proposal", complexity, false);
@@ -73,7 +73,7 @@ impl<'a> GeminiOrchestrator<'a> {
         &self,
         change_id: &str,
         complexity: Complexity,
-    ) -> Result<String> {
+    ) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::gemini_reproposal_prompt(change_id);
         let env = self.build_env(change_id);
         // Resume previous session (Plan stage)
@@ -89,7 +89,7 @@ impl<'a> GeminiOrchestrator<'a> {
         strategy: &str,
         spec_file: &str,
         complexity: Complexity,
-    ) -> Result<String> {
+    ) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::gemini_merge_specs_prompt(change_id, strategy, spec_file);
         let env = self.build_env(change_id);
         let args = self.build_args("agentd:merge-specs", complexity, false);
@@ -98,7 +98,7 @@ impl<'a> GeminiOrchestrator<'a> {
     }
 
     /// Run changelog generation
-    pub async fn run_changelog(&self, change_id: &str, complexity: Complexity) -> Result<String> {
+    pub async fn run_changelog(&self, change_id: &str, complexity: Complexity) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::gemini_changelog_prompt(change_id);
         let env = self.build_env(change_id);
         // First call in Archive stage, no resume
@@ -114,7 +114,7 @@ impl<'a> GeminiOrchestrator<'a> {
         file_path: &str,
         placeholder: &str,
         complexity: Complexity,
-    ) -> Result<String> {
+    ) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::gemini_fillback_prompt(change_id, file_path, placeholder);
         let env = self.build_env(change_id);
         let args = self.build_args("agentd:fillback", complexity, false);
@@ -127,7 +127,7 @@ impl<'a> GeminiOrchestrator<'a> {
         &self,
         change_id: &str,
         complexity: Complexity,
-    ) -> Result<String> {
+    ) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::gemini_archive_fix_prompt(change_id);
         let env = self.build_env(change_id);
         // Resume previous session (Archive stage)

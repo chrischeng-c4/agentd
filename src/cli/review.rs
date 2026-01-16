@@ -44,7 +44,7 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     // Run Codex review orchestrator
     let orchestrator = CodexOrchestrator::new(&config, &project_root);
-    let output = orchestrator.run_review(change_id, 0, complexity).await?;
+    let (output, _usage) = orchestrator.run_review(change_id, 0, complexity).await?;
 
     println!("\n{}", "📊 Code Review Complete".green().bold());
 

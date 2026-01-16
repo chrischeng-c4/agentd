@@ -45,7 +45,7 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     // Run Codex orchestrator
     let orchestrator = CodexOrchestrator::new(&config, &project_root);
-    let output = orchestrator.run_challenge(change_id, complexity).await?;
+    let (output, _usage) = orchestrator.run_challenge(change_id, complexity).await?;
 
     println!("\n{}", "📊 Challenge Report Generated".green().bold());
 

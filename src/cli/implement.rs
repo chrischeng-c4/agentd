@@ -118,7 +118,7 @@ async fn run_implement_step(
     let complexity = change.assess_complexity(project_root);
 
     let orchestrator = ClaudeOrchestrator::new(config, project_root);
-    let _output = orchestrator
+    let (_output, _usage) = orchestrator
         .run_implement(change_id, tasks, complexity)
         .await?;
 
@@ -147,7 +147,7 @@ async fn run_review_step(
 
     // Run Codex review orchestrator with iteration number
     let orchestrator = CodexOrchestrator::new(config, project_root);
-    let _output = orchestrator
+    let (_output, _usage) = orchestrator
         .run_review(change_id, iteration, complexity)
         .await?;
 
@@ -178,7 +178,7 @@ async fn run_resolve_step(
     let complexity = change.assess_complexity(project_root);
 
     let orchestrator = ClaudeOrchestrator::new(config, project_root);
-    let _output = orchestrator.run_resolve(change_id, complexity).await?;
+    let (_output, _usage) = orchestrator.run_resolve(change_id, complexity).await?;
 
     println!("{}", "✅ Issues resolved".green());
     Ok(())

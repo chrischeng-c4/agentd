@@ -21,11 +21,15 @@ default = "flash"  # Default model ID
 id = "flash"
 model = "gemini-3-flash-preview"
 complexity = "medium"  # Handles up to Medium complexity
+cost_per_1m_input = 0.10   # USD per 1M input tokens
+cost_per_1m_output = 0.40  # USD per 1M output tokens
 
 [[gemini.models]]
 id = "pro"
 model = "gemini-3-pro-preview"
 complexity = "critical"  # Handles up to Critical complexity
+cost_per_1m_input = 1.25   # USD per 1M input tokens
+cost_per_1m_output = 10.00 # USD per 1M output tokens
 
 # =============================================================================
 # Codex Configuration
@@ -39,24 +43,32 @@ id = "fast"
 model = "gpt-5.2-codex"
 reasoning = "low"
 complexity = "low"
+cost_per_1m_input = 2.00   # USD per 1M input tokens
+cost_per_1m_output = 8.00  # USD per 1M output tokens
 
 [[codex.models]]
 id = "balanced"
 model = "gpt-5.2-codex"
 reasoning = "medium"
 complexity = "medium"
+cost_per_1m_input = 2.00   # USD per 1M input tokens
+cost_per_1m_output = 8.00  # USD per 1M output tokens
 
 [[codex.models]]
 id = "deep"
 model = "gpt-5.2-codex"
 reasoning = "high"
 complexity = "high"
+cost_per_1m_input = 2.00   # USD per 1M input tokens
+cost_per_1m_output = 8.00  # USD per 1M output tokens
 
 [[codex.models]]
 id = "max"
 model = "gpt-5.2-codex"
 reasoning = "extra high"
 complexity = "critical"
+cost_per_1m_input = 2.00   # USD per 1M input tokens
+cost_per_1m_output = 8.00  # USD per 1M output tokens
 
 # =============================================================================
 # Claude Configuration
@@ -69,16 +81,22 @@ default = "fast"  # Default model ID (haiku for testing)
 id = "fast"
 model = "haiku"
 complexity = "low"
+cost_per_1m_input = 0.80   # USD per 1M input tokens
+cost_per_1m_output = 4.00  # USD per 1M output tokens
 
 [[claude.models]]
 id = "balanced"
 model = "sonnet"
 complexity = "medium"
+cost_per_1m_input = 3.00   # USD per 1M input tokens
+cost_per_1m_output = 15.00 # USD per 1M output tokens
 
 [[claude.models]]
 id = "deep"
 model = "opus"
 complexity = "critical"
+cost_per_1m_input = 15.00  # USD per 1M input tokens
+cost_per_1m_output = 75.00 # USD per 1M output tokens
 
 # =============================================================================
 # Validation Rules

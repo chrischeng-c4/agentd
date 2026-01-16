@@ -1,6 +1,6 @@
 use super::cli_mapper::{LlmArg, LlmProvider};
 use super::prompts;
-use super::{ModelSelector, ScriptRunner};
+use super::{ModelSelector, ScriptRunner, UsageMetrics};
 use crate::models::{AgentdConfig, Complexity};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -42,7 +42,7 @@ impl<'a> ClaudeOrchestrator<'a> {
         change_id: &str,
         tasks: Option<&str>,
         complexity: Complexity,
-    ) -> Result<String> {
+    ) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::claude_implement_prompt(change_id, tasks);
         let env = HashMap::new();
         // First call in Impl stage, no resume
@@ -52,7 +52,7 @@ impl<'a> ClaudeOrchestrator<'a> {
     }
 
     /// Run resolve (fix issues from review)
-    pub async fn run_resolve(&self, change_id: &str, complexity: Complexity) -> Result<String> {
+    pub async fn run_resolve(&self, change_id: &str, complexity: Complexity) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::claude_resolve_prompt(change_id);
         let env = HashMap::new();
         // Resume previous session (Impl stage)

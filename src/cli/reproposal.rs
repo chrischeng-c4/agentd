@@ -39,7 +39,7 @@ pub async fn run(change_id: &str) -> Result<()> {
     );
 
     let orchestrator = GeminiOrchestrator::new(&config, &project_root);
-    let _output = orchestrator.run_reproposal(change_id, complexity).await?;
+    let (_output, _usage) = orchestrator.run_reproposal(change_id, complexity).await?;
 
     println!("\n{}", "✅ Proposal updated!".green().bold());
     println!("\n{}", "⏭️  Next steps:".yellow());

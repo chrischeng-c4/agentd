@@ -99,20 +99,29 @@
     "telemetry": {
       "type": "object",
       "properties": {
-        "proposal": { "$ref": "#/definitions/llm_call" },
-        "challenge": { "$ref": "#/definitions/llm_call" },
-        "reproposal": { "$ref": "#/definitions/llm_call" }
+        "calls": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/llm_call" }
+        },
+        "total_cost_usd": { "type": "number", "minimum": 0 },
+        "total_tokens_in": { "type": "integer", "minimum": 0 },
+        "total_tokens_out": { "type": "integer", "minimum": 0 }
       }
     }
   },
   "definitions": {
     "llm_call": {
       "type": "object",
+      "required": ["step"],
       "properties": {
+        "step": { "type": "string" },
+        "agentd_version": { "type": "string" },
         "model": { "type": "string" },
         "tokens_in": { "type": "integer", "minimum": 0 },
         "tokens_out": { "type": "integer", "minimum": 0 },
-        "duration_ms": { "type": "integer", "minimum": 0 }
+        "cost_usd": { "type": "number", "minimum": 0 },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "timestamp": { "type": "string", "format": "date-time" }
       }
     }
   }

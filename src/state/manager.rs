@@ -352,7 +352,16 @@ impl StateManager {
     // Telemetry
     // =========================================================================
 
-    /// Record LLM call telemetry
+    /// Record LLM call telemetry with cost calculation
+    ///
+    /// # Arguments
+    /// * `step` - The workflow step (e.g., "proposal", "challenge", "implement")
+    /// * `model` - The model name used
+    /// * `tokens_in` - Number of input tokens
+    /// * `tokens_out` - Number of output tokens
+    /// * `duration_ms` - Duration in milliseconds
+    /// * `cost_per_1m_input` - Cost per 1M input tokens (optional)
+    /// * `cost_per_1m_output` - Cost per 1M output tokens (optional)
     pub fn record_llm_call(
         &mut self,
         step: &str,
@@ -360,24 +369,75 @@ impl StateManager {
         tokens_in: Option<u64>,
         tokens_out: Option<u64>,
         duration_ms: Option<u64>,
+        cost_per_1m_input: Option<f64>,
+        cost_per_1m_output: Option<f64>,
     ) {
+        // Calculate cost if pricing info is available
+        let cost_usd = Self::calculate_cost(
+            tokens_in,
+            tokens_out,
+            cost_per_1m_input,
+            cost_per_1m_output,
+        );
+
         let call = LlmCall {
+            step: step.to_string(),
+            agentd_version: Some(env!("CARGO_PKG_VERSION").to_string()),
             model,
             tokens_in,
             tokens_out,
+            cost_usd,
             duration_ms,
+            timestamp: Some(Utc::now()),
         };
 
         let telemetry = self.state.telemetry.get_or_insert_with(Telemetry::default);
 
-        match step {
-            "proposal" => telemetry.proposal = Some(call),
-            "challenge" => telemetry.challenge = Some(call),
-            "reproposal" => telemetry.reproposal = Some(call),
-            _ => {}
+        // Update totals
+        if let Some(cost) = cost_usd {
+            telemetry.total_cost_usd += cost;
+        }
+        if let Some(tokens) = tokens_in {
+            telemetry.total_tokens_in += tokens;
+        }
+        if let Some(tokens) = tokens_out {
+            telemetry.total_tokens_out += tokens;
         }
 
+        // Append to calls list
+        telemetry.calls.push(call);
+
         self.dirty = true;
+    }
+
+    /// Calculate cost from token usage and pricing
+    fn calculate_cost(
+        tokens_in: Option<u64>,
+        tokens_out: Option<u64>,
+        cost_per_1m_input: Option<f64>,
+        cost_per_1m_output: Option<f64>,
+    ) -> Option<f64> {
+        let input_cost = match (tokens_in, cost_per_1m_input) {
+            (Some(tokens), Some(cost)) => (tokens as f64 / 1_000_000.0) * cost,
+            _ => 0.0,
+        };
+
+        let output_cost = match (tokens_out, cost_per_1m_output) {
+            (Some(tokens), Some(cost)) => (tokens as f64 / 1_000_000.0) * cost,
+            _ => 0.0,
+        };
+
+        let total = input_cost + output_cost;
+        if total > 0.0 {
+            Some(total)
+        } else {
+            None
+        }
+    }
+
+    /// Get telemetry summary for the change
+    pub fn telemetry_summary(&self) -> Option<&Telemetry> {
+        self.state.telemetry.as_ref()
     }
 }
 
@@ -726,5 +786,241 @@ mod tests {
                 Some("challenge".to_string())
             );
         }
+    }
+
+    // =========================================================================
+    // Telemetry and Cost Tracking Tests
+    // =========================================================================
+
+    #[test]
+    fn test_record_llm_call_basic() {
+        let (_temp, change_dir) = setup_test_change();
+
+        let mut manager = StateManager::load(&change_dir).unwrap();
+
+        // Record a basic LLM call without pricing
+        manager.record_llm_call(
+            "proposal",
+            Some("gemini-3-flash".to_string()),
+            Some(1000),
+            Some(500),
+            Some(5000),
+            None,
+            None,
+        );
+
+        let telemetry = manager.state().telemetry.as_ref().unwrap();
+        assert_eq!(telemetry.calls.len(), 1);
+        assert_eq!(telemetry.total_tokens_in, 1000);
+        assert_eq!(telemetry.total_tokens_out, 500);
+        assert_eq!(telemetry.total_cost_usd, 0.0); // No pricing info
+
+        let call = &telemetry.calls[0];
+        assert_eq!(call.step, "proposal");
+        assert_eq!(call.model, Some("gemini-3-flash".to_string()));
+        assert_eq!(call.tokens_in, Some(1000));
+        assert_eq!(call.tokens_out, Some(500));
+        assert_eq!(call.duration_ms, Some(5000));
+        assert!(call.timestamp.is_some());
+    }
+
+    #[test]
+    fn test_record_llm_call_with_cost() {
+        let (_temp, change_dir) = setup_test_change();
+
+        let mut manager = StateManager::load(&change_dir).unwrap();
+
+        // Record LLM call with pricing
+        // Gemini flash: $0.10/1M input, $0.40/1M output
+        manager.record_llm_call(
+            "proposal",
+            Some("gemini-3-flash".to_string()),
+            Some(1_000_000), // 1M input tokens
+            Some(500_000),   // 500K output tokens
+            Some(5000),
+            Some(0.10),      // $0.10/1M input
+            Some(0.40),      // $0.40/1M output
+        );
+
+        let telemetry = manager.state().telemetry.as_ref().unwrap();
+
+        // Expected cost: $0.10 (input) + $0.20 (output) = $0.30
+        assert!((telemetry.total_cost_usd - 0.30).abs() < 0.0001);
+
+        let call = &telemetry.calls[0];
+        assert!((call.cost_usd.unwrap() - 0.30).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_record_multiple_llm_calls() {
+        let (_temp, change_dir) = setup_test_change();
+
+        let mut manager = StateManager::load(&change_dir).unwrap();
+
+        // Record proposal call (Gemini)
+        manager.record_llm_call(
+            "proposal",
+            Some("gemini-3-flash".to_string()),
+            Some(100_000),
+            Some(50_000),
+            Some(5000),
+            Some(0.10),
+            Some(0.40),
+        );
+
+        // Record challenge call (Codex)
+        manager.record_llm_call(
+            "challenge",
+            Some("gpt-5.2-codex".to_string()),
+            Some(80_000),
+            Some(40_000),
+            Some(10000),
+            Some(2.00),
+            Some(8.00),
+        );
+
+        // Record implement call (Claude)
+        manager.record_llm_call(
+            "implement",
+            Some("claude-3-sonnet".to_string()),
+            Some(200_000),
+            Some(100_000),
+            Some(30000),
+            Some(3.00),
+            Some(15.00),
+        );
+
+        let telemetry = manager.state().telemetry.as_ref().unwrap();
+
+        // Verify totals
+        assert_eq!(telemetry.calls.len(), 3);
+        assert_eq!(telemetry.total_tokens_in, 380_000);
+        assert_eq!(telemetry.total_tokens_out, 190_000);
+
+        // Calculate expected costs:
+        // Proposal: 0.1M * $0.10 + 0.05M * $0.40 = $0.01 + $0.02 = $0.03
+        // Challenge: 0.08M * $2.00 + 0.04M * $8.00 = $0.16 + $0.32 = $0.48
+        // Implement: 0.2M * $3.00 + 0.1M * $15.00 = $0.60 + $1.50 = $2.10
+        // Total: $2.61
+        assert!((telemetry.total_cost_usd - 2.61).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_cost_calculation() {
+        // Test the static cost calculation method directly
+
+        // Test with full pricing info
+        let cost = StateManager::calculate_cost(
+            Some(1_000_000),
+            Some(500_000),
+            Some(1.0),  // $1/1M input
+            Some(2.0),  // $2/1M output
+        );
+        assert!((cost.unwrap() - 2.0).abs() < 0.0001); // $1.0 + $1.0 = $2.0
+
+        // Test with no tokens
+        let cost = StateManager::calculate_cost(None, None, Some(1.0), Some(2.0));
+        assert!(cost.is_none());
+
+        // Test with no pricing
+        let cost = StateManager::calculate_cost(
+            Some(1_000_000),
+            Some(500_000),
+            None,
+            None,
+        );
+        assert!(cost.is_none());
+
+        // Test with partial pricing (input only)
+        let cost = StateManager::calculate_cost(
+            Some(1_000_000),
+            Some(500_000),
+            Some(1.0),
+            None,
+        );
+        assert!((cost.unwrap() - 1.0).abs() < 0.0001); // Only input cost
+    }
+
+    #[test]
+    fn test_telemetry_persistence() {
+        let (_temp, change_dir) = setup_test_change();
+
+        // Record telemetry and save
+        {
+            let mut manager = StateManager::load(&change_dir).unwrap();
+            manager.record_llm_call(
+                "proposal",
+                Some("gemini-3-flash".to_string()),
+                Some(50_000),
+                Some(25_000),
+                Some(3000),
+                Some(0.10),
+                Some(0.40),
+            );
+            manager.save().unwrap();
+        }
+
+        // Load in new instance and verify
+        {
+            let manager = StateManager::load(&change_dir).unwrap();
+            let telemetry = manager.state().telemetry.as_ref().unwrap();
+
+            assert_eq!(telemetry.calls.len(), 1);
+            assert_eq!(telemetry.total_tokens_in, 50_000);
+            assert_eq!(telemetry.total_tokens_out, 25_000);
+
+            let call = &telemetry.calls[0];
+            assert_eq!(call.step, "proposal");
+            assert_eq!(call.model, Some("gemini-3-flash".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_telemetry_summary() {
+        let (_temp, change_dir) = setup_test_change();
+
+        let mut manager = StateManager::load(&change_dir).unwrap();
+
+        // No telemetry initially
+        assert!(manager.telemetry_summary().is_none());
+
+        // Record a call
+        manager.record_llm_call(
+            "test",
+            Some("test-model".to_string()),
+            Some(1000),
+            Some(500),
+            Some(1000),
+            None,
+            None,
+        );
+
+        // Now telemetry exists
+        assert!(manager.telemetry_summary().is_some());
+        assert_eq!(manager.telemetry_summary().unwrap().calls.len(), 1);
+    }
+
+    #[test]
+    fn test_small_token_cost_precision() {
+        let (_temp, change_dir) = setup_test_change();
+
+        let mut manager = StateManager::load(&change_dir).unwrap();
+
+        // Test with small token counts to verify precision
+        manager.record_llm_call(
+            "test",
+            Some("test-model".to_string()),
+            Some(100),   // 100 tokens
+            Some(50),    // 50 tokens
+            Some(500),
+            Some(0.10),  // $0.10/1M
+            Some(0.40),  // $0.40/1M
+        );
+
+        let telemetry = manager.state().telemetry.as_ref().unwrap();
+
+        // Expected cost: 0.0001 * $0.10 + 0.00005 * $0.40 = $0.00001 + $0.00002 = $0.00003
+        let expected = 0.00003;
+        assert!((telemetry.total_cost_usd - expected).abs() < 0.000001);
     }
 }

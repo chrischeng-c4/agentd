@@ -493,28 +493,49 @@ pub struct ValidationResult {
     pub issues_parsed: Option<u32>,
 }
 
-/// LLM telemetry
+/// LLM telemetry - tracks all LLM calls for a change
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Telemetry {
+    /// Collection of all LLM calls made during the change lifecycle
     #[serde(default)]
-    pub proposal: Option<LlmCall>,
+    pub calls: Vec<LlmCall>,
+    /// Total cost in USD across all calls
     #[serde(default)]
-    pub challenge: Option<LlmCall>,
+    pub total_cost_usd: f64,
+    /// Total input tokens across all calls
     #[serde(default)]
-    pub reproposal: Option<LlmCall>,
+    pub total_tokens_in: u64,
+    /// Total output tokens across all calls
+    #[serde(default)]
+    pub total_tokens_out: u64,
 }
 
 /// Single LLM call telemetry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmCall {
+    /// Step/phase name (e.g., "proposal", "challenge", "implement", "review")
+    pub step: String,
+    /// Agentd version that made this call
+    #[serde(default)]
+    pub agentd_version: Option<String>,
+    /// Model name used
     #[serde(default)]
     pub model: Option<String>,
+    /// Input tokens used
     #[serde(default)]
     pub tokens_in: Option<u64>,
+    /// Output tokens generated
     #[serde(default)]
     pub tokens_out: Option<u64>,
+    /// Cost in USD for this call
+    #[serde(default)]
+    pub cost_usd: Option<f64>,
+    /// Duration in milliseconds
     #[serde(default)]
     pub duration_ms: Option<u64>,
+    /// Timestamp when the call was made
+    #[serde(default)]
+    pub timestamp: Option<DateTime<Utc>>,
 }
 
 // =============================================================================

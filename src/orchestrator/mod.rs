@@ -11,4 +11,4 @@ pub use cli_mapper::{LlmArg, LlmProvider};
 pub use codex::CodexOrchestrator;
 pub use gemini::GeminiOrchestrator;
 pub use model_selector::{ModelSelector, SelectedModel};
-pub use script_runner::ScriptRunner;
+pub use script_runner::{ScriptRunner, UsageMetrics};

@@ -403,7 +403,7 @@ async fn generate_changelog_entry(
 
     let orchestrator = GeminiOrchestrator::new(config, project_root);
 
-    orchestrator.run_changelog(change_id, complexity).await?;
+    let (_output, _usage) = orchestrator.run_changelog(change_id, complexity).await?;
 
     // Verify CHANGELOG was updated
     let changelog_path = project_root.join("agentd/specs/CHANGELOG.md");
@@ -576,7 +576,7 @@ async fn run_archive_fix_step(
     let complexity = change.assess_complexity(project_root);
 
     let orchestrator = GeminiOrchestrator::new(config, project_root);
-    orchestrator.run_archive_fix(change_id, complexity).await?;
+    let (_output, _usage) = orchestrator.run_archive_fix(change_id, complexity).await?;
 
     println!("{}", "✅ Archive issues fixed".green());
     Ok(())
