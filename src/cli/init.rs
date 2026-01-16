@@ -81,7 +81,7 @@ Keep each section concise (2-4 lines max).
 // AI Context Files (GEMINI.md and AGENTS.md) are now generated dynamically per change
 // from templates/GEMINI.md and templates/AGENTS.md
 
-pub async fn run(name: Option<&str>, force: bool) -> Result<()> {
+pub async fn run(name: Option<&str>, _force: bool) -> Result<()> {
     let project_root = env::current_dir()?;
     let agentd_dir = project_root.join("agentd");
     let claude_dir = project_root.join(".claude");
@@ -90,28 +90,16 @@ pub async fn run(name: Option<&str>, force: bool) -> Result<()> {
     // Check if already initialized
     let is_initialized = agentd_dir.exists();
 
-    if is_initialized && !force {
-        // Check installed version
-        let installed_version = std::fs::read_to_string(&version_file)
+    if is_initialized {
+        // Update mode: overwrite system files, preserve project.md
+        let old_version = std::fs::read_to_string(&version_file)
             .unwrap_or_else(|_| "unknown".to_string());
-
-        println!("{}", "⚠️  Agentd is already initialized".yellow());
-        println!("   Installed version: {}", installed_version.trim());
-        println!("   Current version:   {}", AGENTD_VERSION);
-        println!();
-        println!("   Run {} to upgrade system files", "--force".cyan());
-        println!("   (preserves specs, changes, archive, and config)");
-        return Ok(());
-    }
-
-    if force && is_initialized {
-        // Smart upgrade mode
         println!(
             "{}",
-            format!("🔄 Upgrading Agentd to v{}...", AGENTD_VERSION).cyan().bold()
+            format!("🔄 Updating Agentd {} → {}...", old_version.trim(), AGENTD_VERSION).cyan().bold()
         );
         println!();
-        run_upgrade(&project_root, &agentd_dir, &claude_dir, &version_file)?;
+        run_update(name, &project_root, &agentd_dir, &claude_dir, &version_file)?;
     } else {
         // Fresh install
         println!(
@@ -178,22 +166,38 @@ fn run_fresh_install(
     Ok(())
 }
 
-/// Smart upgrade: only update system files, preserve user data
-fn run_upgrade(
+/// Update mode: overwrite config.toml, preserve project.md, update system files
+fn run_update(
+    name: Option<&str>,
     project_root: &Path,
     agentd_dir: &Path,
     claude_dir: &Path,
     version_file: &Path,
 ) -> Result<()> {
-    let old_version = std::fs::read_to_string(version_file)
-        .unwrap_or_else(|_| "unknown".to_string());
-
-    println!("{}", "📦 Preserving user data:".cyan());
+    println!("{}", "📦 User data:".cyan());
     println!("   ✓ agentd/specs/     (untouched)");
     println!("   ✓ agentd/changes/   (untouched)");
     println!("   ✓ agentd/archive/   (untouched)");
-    println!("   ✓ agentd/config.toml (untouched)");
-    println!("   ✓ agentd/project.md (untouched)");
+
+    // Overwrite config.toml (opinionated defaults)
+    let mut config = AgentdConfig::default();
+    if let Some(n) = name {
+        config.project_name = n.to_string();
+    } else if let Some(dir_name) = project_root.file_name() {
+        config.project_name = dir_name.to_string_lossy().to_string();
+    }
+    config.scripts_dir = PathBuf::from("agentd/scripts");
+    config.save(project_root)?;
+    println!("   {} agentd/config.toml (updated)", "✓".green());
+
+    // Preserve project.md (user content) - only create if missing
+    let project_md_path = agentd_dir.join("project.md");
+    if project_md_path.exists() {
+        println!("   ✓ agentd/project.md (preserved)");
+    } else {
+        std::fs::write(&project_md_path, PROJECT_TEMPLATE)?;
+        println!("   {} agentd/project.md (created)", "✓".green());
+    }
     println!();
 
     // Ensure scripts directory exists
@@ -209,12 +213,7 @@ fn run_upgrade(
     std::fs::write(version_file, AGENTD_VERSION)?;
 
     println!();
-    println!(
-        "{}",
-        format!("✅ Upgraded from {} to {}", old_version.trim(), AGENTD_VERSION)
-            .green()
-            .bold()
-    );
+    println!("{}", "✅ Update complete!".green().bold());
 
     Ok(())
 }
@@ -563,7 +562,7 @@ pub fn check_and_auto_upgrade(auto_upgrade: bool) -> bool {
         let agentd_dir = project_root.join("agentd");
         let claude_dir = project_root.join(".claude");
 
-        if let Err(e) = run_upgrade(&project_root, &agentd_dir, &claude_dir, &version_file) {
+        if let Err(e) = run_update(None, &project_root, &agentd_dir, &claude_dir, &version_file) {
             eprintln!("{}", format!("⚠️  Auto-upgrade failed: {}", e).yellow());
             return false;
         }
