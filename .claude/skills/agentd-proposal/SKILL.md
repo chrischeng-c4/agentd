@@ -1,43 +1,40 @@
 ---
 name: agentd:proposal
-description: Generate proposal using Agentd
+description: Generate proposal using Gemini (2M context)
 user-invocable: true
+deprecated: true
+deprecation_message: "Use /agentd:plan instead"
 ---
 
 # /agentd:proposal
 
+⚠️ **DEPRECATED**: Use `/agentd:plan` instead
+
 Generate spec-driven proposal with PRD, Technical Design, and Tickets.
 
-## Your Role
-
-Your job is to:
-1. **Understand** - Parse change-id and description from user input
-2. **Clarify** - If unclear, ask user to confirm
-3. **Transform** - Build the correct CLI command
-4. **Execute** - Run the command and report results
-
-**Important**: Do NOT explore the codebase yourself. Code exploration is done by Gemini internally when the CLI runs.
-
-## Parsing Rules
-
-User input format: `/agentd:proposal <change-id> "<description>"`
-
-Examples:
-- Input: `/agentd:proposal add-oauth "Add OAuth with Google"`
-- Execute: `agentd proposal add-oauth "Add OAuth with Google"`
-
-If user input is incomplete or unclear, use AskUserQuestion to clarify:
-- change-id should be kebab-case (e.g., add-oauth, fix-login-bug)
-- description should be a one-sentence description of the change
-
-## Execute Command
+## Usage
 
 ```bash
 agentd proposal <change-id> "<description>"
 ```
 
-## After Success
+## Example
 
-Report:
-- Generated files location: `agentd/changes/<change-id>/`
-- Suggest next step: `/agentd:challenge <change-id>`
+```bash
+agentd proposal add-oauth "Add OAuth authentication with Google and GitHub"
+```
+
+## What it does
+
+1. Creates `changes/<change-id>/` directory
+2. Calls Gemini to explore codebase and generate:
+   - `proposal.md` - PRD: Why, what, impact
+   - `specs/*.md` - TD: Mermaid diagrams, JSON Schema, Pseudo code, Acceptance Criteria
+   - `tasks.md` - Tickets: File paths, actions, spec references, dependencies
+3. Reports results
+
+**Note**: NO actual implementation code is generated - only abstractions.
+
+## Next step
+
+Run `/agentd:challenge <change-id>` to analyze the proposal.

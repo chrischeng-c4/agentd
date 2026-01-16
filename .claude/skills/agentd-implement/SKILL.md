@@ -2,9 +2,13 @@
 name: agentd:implement
 description: Implement tasks from proposal
 user-invocable: true
+deprecated: true
+deprecation_message: "Use /agentd:impl instead"
 ---
 
 # /agentd:implement
+
+⚠️ **DEPRECATED**: Use `/agentd:impl` instead
 
 Implement the approved proposal.
 

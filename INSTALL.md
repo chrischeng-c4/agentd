@@ -282,7 +282,7 @@ docker run -v $(pwd):/workspace -w /workspace agentd init
 或直接開始：
 ```bash
 agentd init
-agentd proposal my-first-change "Add awesome feature"
+agentd proposal my-first-change "Add awesome feature"  # 或用 /agentd:plan 在 Claude Code
 ```
 
 ## 需要幫助？

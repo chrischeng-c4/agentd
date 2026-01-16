@@ -2,9 +2,13 @@
 name: agentd:reproposal
 description: Refine proposal based on challenge feedback
 user-invocable: true
+deprecated: true
+deprecation_message: "Use /agentd:plan instead"
 ---
 
 # /agentd:reproposal
+
+⚠️ **DEPRECATED**: Use `/agentd:plan` instead
 
 Automatically fix issues found in challenge.
 

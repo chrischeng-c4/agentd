@@ -2,9 +2,13 @@
 name: agentd:review
 description: Generate and run tests
 user-invocable: true
+deprecated: true
+deprecation_message: "Use /agentd:impl instead"
 ---
 
-# /agentd:verify
+# /agentd:review
+
+⚠️ **DEPRECATED**: Use `/agentd:impl` instead
 
 Verify implementation with automated tests.
 

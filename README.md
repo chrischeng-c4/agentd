@@ -31,16 +31,13 @@ export ANTHROPIC_API_KEY="your-anthropic-key"
 cd your-project
 agentd init
 
-# 2. Create a proposal
-agentd proposal add-oauth "Add OAuth authentication with Google"
+# 2. Plan the change (Proposal → Challenge → Refine)
+agentd plan add-oauth "Add OAuth authentication with Google"
 
 # 3. Implement (opens Claude Code)
 agentd implement add-oauth
 
-# 4. Review and test
-agentd review add-oauth
-
-# 5. Archive when done
+# 4. Archive when done
 agentd archive add-oauth
 ```
 
@@ -51,49 +48,34 @@ agentd archive add-oauth
 | Command | Description |
 |---------|-------------|
 | `agentd init` | Initialize Agentd in current project |
-| `agentd proposal <id> "<description>"` | Create a new proposal |
-| `agentd challenge <id>` | Challenge proposal with code review |
-| `agentd reproposal <id>` | Refine proposal based on challenge feedback |
+| `agentd plan <id> "<description>"` | Plan a change (Proposal → Challenge loop) |
 | `agentd implement <id>` | Implement the change (requires Claude Code) |
-| `agentd review <id>` | Review implementation and run tests |
-| `agentd fix <id>` | Fix issues found during review |
 | `agentd archive <id>` | Archive completed change |
-
-### Validation Commands
-
-| Command | Description |
-|---------|-------------|
-| `agentd validate-proposal <id>` | Validate proposal format |
-| `agentd validate-challenge <id>` | Validate challenge format |
-
-Options:
-- `--strict` - Treat warnings as errors
-- `--verbose` - Show detailed error locations
-- `--json` - Output as JSON
-
-### Utility Commands
-
-| Command | Description |
-|---------|-------------|
 | `agentd list` | List active changes |
 | `agentd list --archived` | List archived changes |
 | `agentd status <id>` | Show change status |
-| `agentd update` | Update to latest version |
-| `agentd update --check` | Check for updates without installing |
+
+### Low-Level Commands (Advanced)
+
+| Command | Description |
+|---------|-------------|
+| `agentd proposal <id>` | Create a new proposal |
+| `agentd challenge <id>` | Challenge proposal with code review |
+| `agentd reproposal <id>` | Refine proposal based on feedback |
+| `agentd review <id>` | Review implementation and run tests |
+| `agentd resolve-reviews <id>` | Fix issues found during review |
+| `agentd validate-proposal <id>` | Validate proposal format |
+| `agentd validate-challenge <id>` | Validate challenge format |
 
 ## Workflow
 
 ```
-proposal → challenge → reproposal → implement → review → fix → archive
+plan (proposal ⇄ challenge) → implement (code ⇄ review) → archive
 ```
 
-1. **Proposal**: Generate PRD, tasks, and specs using Gemini
-2. **Challenge**: Review proposal for issues using Codex
-3. **Reproposal**: Refine based on feedback (automatic if issues found)
-4. **Implement**: Write code using Claude Code
-5. **Review**: Run tests and code review
-6. **Fix**: Address any issues
-7. **Archive**: Merge specs and archive the change
+1. **Plan**: Generate PRD/Specs (Gemini) and refine with reviews (Codex) until approved.
+2. **Implement**: Write code (Claude Code) and resolve issues until verified.
+3. **Archive**: Merge specs and archive the change.
 
 ## Project Structure
 
@@ -141,13 +123,12 @@ After initialization, use these skills in Claude Code:
 
 | Skill | CLI Equivalent | Description |
 |-------|----------------|-------------|
-| `/agentd:proposal` | `agentd proposal` | Generate proposal |
-| `/agentd:challenge` | `agentd challenge` | Challenge proposal |
-| `/agentd:reproposal` | `agentd reproposal` | Refine proposal |
-| `/agentd:implement` | `agentd implement` | Implement change |
-| `/agentd:review` | `agentd review` | Review implementation |
-| `/agentd:fix` | `agentd fix` | Fix issues |
-| `/agentd:archive` | `agentd archive` | Archive change |
+| `/agentd:plan` | `agentd plan` | Plan a change (Proposal → Challenge) |
+| `/agentd:impl` | `agentd implement` | Implement and verify change |
+| `/agentd:archive` | `agentd archive` | Archive completed change |
+
+### Deprecated Skills
+Granular skills (e.g., `/agentd:proposal`, `/agentd:challenge`) are available but deprecated.
 
 ## License
 

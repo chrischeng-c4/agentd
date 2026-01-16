@@ -2,9 +2,13 @@
 name: agentd:resolve-reviews
 description: Fix issues found during code review
 user-invocable: true
+deprecated: true
+deprecation_message: "Use /agentd:impl instead"
 ---
 
 # /agentd:resolve-reviews
+
+⚠️ **DEPRECATED**: Use `/agentd:impl` instead
 
 Fix code issues found during code review.
 
