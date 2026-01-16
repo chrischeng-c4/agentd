@@ -32,7 +32,7 @@ complexity = "critical"  # Handles up to Critical complexity
 # =============================================================================
 [codex]
 command = "codex"
-default = "balanced"  # Default model ID
+default = "fast"  # Default model ID (gpt-5.2-codex low for testing)
 
 [[codex.models]]
 id = "fast"
@@ -63,7 +63,7 @@ complexity = "critical"
 # =============================================================================
 [claude]
 command = "claude"
-default = "balanced"  # Default model ID
+default = "fast"  # Default model ID (haiku for testing)
 
 [[claude.models]]
 id = "fast"

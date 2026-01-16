@@ -1,0 +1,69 @@
+change_id: test-retry
+schema_version: '2.0'
+created_at: 2026-01-15T16:59:46.754729Z
+updated_at: 2026-01-15T17:06:05.575608Z
+phase: proposed
+iteration: 1
+last_action: validate-challenge
+checksums:
+  tasks.md:
+    hash: sha256:2bfac1eff5bf1f26a364221e56ea809022417efe87f5afb95c45a29e04ebbcda
+    validated_at: 2026-01-15T17:02:47.094846Z
+  CHALLENGE.md:
+    hash: sha256:2fc212aa7152d0ca716c3080f2a1248da254f1d2e93b7c970a95b0cc5a4ce21d
+    validated_at: 2026-01-15T17:06:05.575607Z
+  proposal.md:
+    hash: sha256:c4b2d2775f674a6dec808cffa5076fd9bb0ebe1e0bd59f8685b0b6d86e2c7490
+    validated_at: 2026-01-15T17:02:47.094730Z
+  specs/archived-command.md:
+    hash: sha256:0818ef91c092df6d78bfb8bd0e46422e9e0b7db6866ad8186fbe00d66fdc5c50
+    validated_at: 2026-01-15T17:02:47.095055Z
+  specs/_skeleton.md:
+    hash: sha256:b36a8641f8c91dcdda73cbb4ba9918e7ed1881a0d5c5de3fad5d6002b7429478
+    validated_at: 2026-01-15T17:02:47.095310Z
+validations:
+- step: validate-proposal
+  timestamp: 2026-01-15T16:59:46.754798Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 2
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/archived-command.md] Missing required heading: Overview'
+  - '[specs/archived-command.md] Missing required heading: Requirements'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-15T17:02:47.094561Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 0
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-15T17:06:05.575319Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 2
+    low: 3
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+telemetry: null

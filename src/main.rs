@@ -140,12 +140,15 @@ enum Commands {
         json: bool,
     },
 
-    /// List all changes
+    /// List all changes (for detailed archived view, use 'agentd archived')
     List {
         /// Show archived changes
         #[arg(short, long)]
         archived: bool,
     },
+
+    /// Show detailed list of archived changes
+    Archived,
 
     /// Update agentd to the latest version
     Update {
@@ -180,8 +183,8 @@ enum Commands {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Auto-upgrade check for all commands except init and completions
-    if !matches!(cli.command, Commands::Init { .. } | Commands::Completions { .. }) {
+    // Auto-upgrade check for all commands except init, completions, and archived
+    if !matches!(cli.command, Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived) {
         // Check for updates and auto-upgrade if available
         agentd::cli::init::check_and_auto_upgrade(true);
     }
@@ -271,7 +274,11 @@ async fn main() -> Result<()> {
         }
 
         Commands::List { archived } => {
-            agentd::cli::list::run(archived).await?;
+            agentd::cli::list::run(archived)?;
+        }
+
+        Commands::Archived => {
+            agentd::cli::list::run_archived_detailed()?;
         }
 
         Commands::Update { check } => {

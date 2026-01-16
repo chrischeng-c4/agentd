@@ -17,7 +17,7 @@ pub use inline_yaml::{
     extract_yaml_blocks, extract_yaml_blocks_with_lines, parse_issue_blocks,
     parse_requirement_blocks, parse_task_blocks, parse_typed_yaml_blocks, YamlBlock,
 };
-pub use markdown::MarkdownParser;
+pub use markdown::extract_heading_section;
 pub use requirement::RequirementParser;
 pub use review::parse_review_verdict;
 pub use scenario::ScenarioParser;
