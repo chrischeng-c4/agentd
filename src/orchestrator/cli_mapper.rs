@@ -92,6 +92,10 @@ impl LlmProvider {
         for arg in args {
             match arg {
                 LlmArg::Model(model) => {
+                    // Codex resume inherits model from session, skip --model
+                    if *self == LlmProvider::Codex && resume {
+                        continue;
+                    }
                     match self {
                         LlmProvider::Gemini => {
                             cli_args.push("-m".to_string());
@@ -104,6 +108,10 @@ impl LlmProvider {
                     }
                 }
                 LlmArg::Reasoning(level) => {
+                    // Codex resume inherits reasoning from session, skip --config
+                    if *self == LlmProvider::Codex && resume {
+                        continue;
+                    }
                     // Only Codex supports reasoning levels (via --config)
                     if *self == LlmProvider::Codex {
                         cli_args.push("--config".to_string());
@@ -111,6 +119,10 @@ impl LlmProvider {
                     }
                 }
                 LlmArg::Json => {
+                    // Codex resume doesn't support --json flag
+                    if *self == LlmProvider::Codex && resume {
+                        continue;
+                    }
                     match self {
                         LlmProvider::Codex => {
                             cli_args.push("--json".to_string());
@@ -239,17 +251,18 @@ mod tests {
 
     #[test]
     fn test_codex_args_with_resume() {
+        // Codex resume only supports --last and --full-auto
+        // --model, --json, --config are inherited from the session
         let args = vec![
             LlmArg::Model("gpt-5.2-codex".to_string()),
+            LlmArg::Reasoning("medium".to_string()),
             LlmArg::FullAuto,
             LlmArg::Json,
         ];
         let cli_args = LlmProvider::Codex.build_args(&args, true);
         assert_eq!(cli_args, vec![
             "resume", "--last",
-            "--model", "gpt-5.2-codex",
-            "--full-auto",
-            "--json"
+            "--full-auto"
         ]);
     }
 

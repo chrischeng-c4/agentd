@@ -1,65 +1,32 @@
 ---
 name: agentd:archive
-description: Archive workflow - merge specs and move to archive
+description: Archive completed change
 user-invocable: true
 ---
 
 # /agentd:archive
 
-Orchestrates the archival process, merging spec deltas to main specs and moving the change to the archive directory.
+Archive completed and verified change.
 
 ## Usage
 
 ```bash
-/agentd:archive <change-id>
+agentd archive <change-id>
 ```
 
 ## Example
 
 ```bash
-/agentd:archive add-oauth
+agentd archive add-oauth
 ```
-
-## How it works
-
-The skill checks the `phase` field in `STATE.yaml`:
-
-| Phase | Action |
-|-------|--------|
-| `complete` | ✅ Run `agentd archive` to merge and archive |
-| Other phases | ❌ **ChangeNotComplete** error - not ready for archive |
 
 ## What it does
 
-1. **Validates** spec files (zero token cost)
-2. **Analyzes** delta metrics and decides merge strategy
-3. **Backs up** original specs for rollback
-4. **Merges** spec deltas with Gemini (applies changes to `agentd/specs/`)
-5. **Generates** CHANGELOG entry
-6. **Reviews** merged specs with Codex (with auto-fix loop if needed)
-7. **Moves** change to `agentd/archive/YYYYMMDD-<change-id>/`
-8. Updates phase to `archived` in STATE.yaml
+1. Applies spec deltas to main `specs/` directory
+2. Moves change to `changes/archive/YYYY-MM-DD-<change-id>/`
+3. Updates `CHANGELOG.md`
+4. Shows archive location
 
-## Prerequisites
+## Result
 
-- Change must be complete (phase: `complete`)
-- All implementation artifacts must exist and pass validation
-
-## State transitions
-
-```
-complete → archived
-```
-
-## Error: ChangeNotComplete
-
-This error occurs when trying to archive before implementation is complete:
-
-```
-❌ ChangeNotComplete: Change must be in 'complete' phase
-
-Current phase: implementing
-Action required: Complete implementation first with /agentd:impl <change-id>
-```
-
-**Resolution**: Ensure all implementation tasks are complete and tests pass using `/agentd:impl`.
+Change is now archived and specs are updated.

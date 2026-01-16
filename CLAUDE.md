@@ -7,11 +7,15 @@
 
 | Skill | Purpose |
 |-------|---------|
-| `/agentd:plan` | Planning workflow (proposal → challenge) |
-| `/agentd:impl` | Implementation workflow |
+| `/agentd:proposal` | Generate proposal with Gemini |
+| `/agentd:challenge` | Review proposal with Codex |
+| `/agentd:reproposal` | Refine based on feedback |
+| `/agentd:implement` | Implement the change |
+| `/agentd:review` | Run tests and code review |
+| `/agentd:fix` | Fix issues from review |
 | `/agentd:archive` | Archive completed change |
 
-Start with: `/agentd:plan <id> "<description>"`
+Start with: `/agentd:proposal <id> "<description>"`
 <!-- agentd:end -->
 
 # Project Context

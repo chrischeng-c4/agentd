@@ -2,13 +2,9 @@
 name: agentd:proposal
 description: Generate proposal using Gemini (2M context)
 user-invocable: true
-deprecated: true
-deprecation_message: "Use /agentd:plan instead"
 ---
 
 # /agentd:proposal
-
-⚠️ **DEPRECATED**: Use `/agentd:plan` instead
 
 Generate spec-driven proposal with PRD, Technical Design, and Tickets.
 

@@ -2,13 +2,9 @@
 name: agentd:challenge
 description: Challenge proposal with Codex analysis
 user-invocable: true
-deprecated: true
-deprecation_message: "Use /agentd:plan instead"
 ---
 
 # /agentd:challenge
-
-⚠️ **DEPRECATED**: Use `/agentd:plan` instead
 
 Analyze proposal against existing codebase.
 
