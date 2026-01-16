@@ -12,7 +12,7 @@
 | `/agentd:reproposal` | Refine based on feedback |
 | `/agentd:implement` | Implement the change |
 | `/agentd:review` | Run tests and code review |
-| `/agentd:fix` | Fix issues from review |
+| `/agentd:resolve-reviews` | Fix issues from review |
 | `/agentd:archive` | Archive completed change |
 
 Start with: `/agentd:proposal <id> "<description>"`

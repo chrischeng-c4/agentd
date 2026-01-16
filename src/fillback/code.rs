@@ -1,7 +1,5 @@
-use crate::context::{generate_gemini_context, ContextPhase};
 use crate::fillback::strategy::ImportStrategy;
 use crate::models::{SourceFile, SpecGenerationRequest};
-use crate::orchestrator::ScriptRunner;
 use crate::Result;
 use async_trait::async_trait;
 use colored::Colorize;
@@ -98,7 +96,7 @@ impl CodeStrategy {
     async fn generate_specs(
         &self,
         request: &SpecGenerationRequest,
-        change_id: &str,
+        _change_id: &str,
     ) -> Result<()> {
         println!(
             "{}",
@@ -110,29 +108,14 @@ impl CodeStrategy {
             .cyan()
         );
 
-        // Use ScriptRunner to call the fillback script
-        let current_dir = std::env::current_dir()?;
-        let scripts_dir = current_dir.join("agentd/scripts");
-        let change_dir = current_dir.join("agentd/changes").join(change_id);
+        // TODO: Migrate to use GeminiOrchestrator::run_fillback
+        // The fillback script has been removed as part of shell-to-rust migration.
+        // This needs to be refactored to use the orchestrator-based approach.
 
-        // Generate GEMINI.md context file before running the script
-        generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
-
-        let runner = ScriptRunner::new(scripts_dir);
-
-        // Prepare args: change_id and JSON request
-        let request_json = serde_json::to_string(request)?;
-        let args = vec![change_id.to_string(), request_json];
-
-        // Run the gemini-fillback.sh script
-        let output = runner
-            .run_script("gemini-fillback.sh", &args, true)
-            .await?;
-
-        println!("{}", "✅ Spec generation completed".green());
-        println!("{}", output);
-
-        Ok(())
+        anyhow::bail!(
+            "Fillback is not yet supported after shell-to-rust migration. \
+             Please use manual spec generation for now."
+        )
     }
 }
 

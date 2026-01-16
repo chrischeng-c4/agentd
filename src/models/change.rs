@@ -598,7 +598,10 @@ pub struct AgentdConfig {
     #[serde(default)]
     pub claude: ClaudeConfig,
 
-    /// Scripts directory
+    /// Scripts directory (DEPRECATED: no longer used by orchestrators)
+    ///
+    /// Shell scripts are no longer generated or required. Orchestrators now call
+    /// CLI tools directly. This field is kept for backward compatibility only.
     pub scripts_dir: PathBuf,
 
     /// Validation rules for spec files

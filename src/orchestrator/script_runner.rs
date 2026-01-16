@@ -1,77 +1,93 @@
+use super::cli_mapper::LlmProvider;
 use super::SelectedModel;
 use anyhow::{Context, Result};
 use indicatif::{ProgressBar as IndicatifProgressBar, ProgressStyle};
-use std::path::PathBuf;
+use std::collections::HashMap;
 use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 
-/// Environment variables for model selection
-/// Scripts can read these to use the appropriate model
-const ENV_AGENTD_MODEL: &str = "AGENTD_MODEL";
-const ENV_AGENTD_MODEL_COMMAND: &str = "AGENTD_MODEL_COMMAND";
-const ENV_AGENTD_MODEL_REASONING: &str = "AGENTD_MODEL_REASONING";
-
-/// Runner for executing AI integration scripts
-pub struct ScriptRunner {
-    scripts_dir: PathBuf,
-}
+/// Runner for executing CLI commands directly
+#[derive(Default)]
+pub struct ScriptRunner {}
 
 impl ScriptRunner {
-    pub fn new(scripts_dir: impl Into<PathBuf>) -> Self {
-        Self {
-            scripts_dir: scripts_dir.into(),
-        }
+    pub fn new() -> Self {
+        Self {}
     }
 
-    /// Run a script and stream output with progress bar
-    pub async fn run_script(
+    // =========================================================================
+    // Direct CLI Execution (Rust-based, no shell scripts)
+    // =========================================================================
+
+    /// Run an LLM CLI command with provider-agnostic interface
+    ///
+    /// # Arguments
+    /// * `provider` - The LLM provider (Gemini, Codex, Claude)
+    /// * `args` - CLI arguments (already mapped via LlmProvider::build_args)
+    /// * `env` - Environment variables
+    /// * `prompt` - The prompt to pipe to stdin
+    /// * `show_progress` - Whether to show a progress spinner
+    pub async fn run_llm(
         &self,
-        script_name: &str,
-        args: &[String],
+        provider: LlmProvider,
+        args: Vec<String>,
+        env: HashMap<String, String>,
+        prompt: &str,
         show_progress: bool,
     ) -> Result<String> {
-        self.run_script_with_model(script_name, args, show_progress, None)
-            .await
+        self.run_command(provider.command(), &args, env, prompt, show_progress).await
     }
 
-    /// Run a script with model selection via environment variables
-    pub async fn run_script_with_model(
+    /// Run a CLI command directly with stdin prompt and environment variables
+    ///
+    /// This is the generic runner used by orchestrators to invoke LLM CLI tools
+    /// (gemini, claude, codex) without intermediate shell scripts.
+    ///
+    /// # Arguments
+    /// * `model` - The selected model (contains command name and model ID)
+    /// * `args` - Additional CLI arguments
+    /// * `env` - Environment variables to set (e.g., GEMINI_SYSTEM_MD, CODEX_INSTRUCTIONS_FILE)
+    /// * `prompt` - The prompt to pipe to stdin
+    /// * `show_progress` - Whether to show a progress spinner
+    ///
+    /// # Returns
+    /// The stdout output from the command
+    ///
+    /// # Errors
+    /// - Command not found
+    /// - Non-zero exit code
+    /// - Pipe failure
+    #[deprecated(note = "Use run_llm with LlmProvider instead")]
+    pub async fn run_cli(
         &self,
-        script_name: &str,
+        model: &SelectedModel,
         args: &[String],
+        env: HashMap<String, String>,
+        prompt: &str,
         show_progress: bool,
-        model: Option<&SelectedModel>,
     ) -> Result<String> {
-        let script_path = self.scripts_dir.join(script_name);
+        self.run_command(model.command(), args, env, prompt, show_progress).await
+    }
 
-        if !script_path.exists() {
-            anyhow::bail!("Script not found: {:?}", script_path);
-        }
+    /// Internal: Run a CLI command
+    async fn run_command(
+        &self,
+        command_name: &str,
+        args: &[String],
+        env: HashMap<String, String>,
+        prompt: &str,
+        show_progress: bool,
+    ) -> Result<String> {
+        let mut cmd = Command::new(command_name);
+        cmd.args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
 
-        // Make script executable
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&script_path)?.permissions();
-            perms.set_mode(0o755);
-            std::fs::set_permissions(&script_path, perms)?;
-        }
-
-        let mut cmd = Command::new(&script_path);
-        cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
-
-        // Set model environment variables if provided
-        if let Some(selected) = model {
-            cmd.env(ENV_AGENTD_MODEL, selected.to_cli_arg());
-            cmd.env(ENV_AGENTD_MODEL_COMMAND, selected.command());
-
-            // For Codex, also set the reasoning level separately
-            if let SelectedModel::Codex { reasoning, .. } = selected {
-                if let Some(level) = reasoning {
-                    cmd.env(ENV_AGENTD_MODEL_REASONING, level);
-                }
-            }
+        // Set environment variables
+        for (key, value) in env {
+            cmd.env(key, value);
         }
 
         let progress = if show_progress {
@@ -82,7 +98,7 @@ impl ScriptRunner {
                     .unwrap()
                     .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ "),
             );
-            pb.set_message(format!("Running {}...", script_name));
+            pb.set_message(format!("Running {}...", command_name));
             pb.enable_steady_tick(std::time::Duration::from_millis(100));
             Some(pb)
         } else {
@@ -91,26 +107,78 @@ impl ScriptRunner {
 
         let mut child = cmd
             .spawn()
-            .with_context(|| format!("Failed to spawn script: {:?}", script_path))?;
+            .with_context(|| {
+                format!(
+                    "Command '{}' not found. Please ensure it is installed and in your PATH.",
+                    command_name
+                )
+            })?;
 
+        // Write prompt to stdin
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(prompt.as_bytes())
+                .await
+                .context("Failed to write to stdin")?;
+            stdin.flush().await.context("Failed to flush stdin")?;
+            drop(stdin);
+        }
+
+        // Stream stdout and stderr concurrently to avoid backpressure deadlock
         let stdout = child.stdout.take().context("Failed to capture stdout")?;
-        let mut reader = BufReader::new(stdout).lines();
+        let stderr = child.stderr.take().context("Failed to capture stderr")?;
+
+        let mut stdout_reader = BufReader::new(stdout).lines();
+        let mut stderr_reader = BufReader::new(stderr).lines();
 
         let mut output = String::new();
-        while let Ok(Some(line)) = reader.next_line().await {
-            output.push_str(&line);
-            output.push('\n');
+        let mut stderr_output = String::new();
+        let mut stdout_done = false;
+        let mut stderr_done = false;
 
-            if let Some(ref pb) = progress {
-                // Update progress message with recent output
-                // Use char boundary to avoid panic with UTF-8
-                let short_line = if line.chars().count() > 60 {
-                    let truncated: String = line.chars().take(60).collect();
-                    format!("{}...", truncated)
-                } else {
-                    line.clone()
-                };
-                pb.set_message(short_line);
+        // Read stdout and stderr concurrently
+        // When progress spinner is disabled, stream output to terminal in real-time
+        while !stdout_done || !stderr_done {
+            tokio::select! {
+                line = stdout_reader.next_line(), if !stdout_done => {
+                    match line {
+                        Ok(Some(line)) => {
+                            output.push_str(&line);
+                            output.push('\n');
+
+                            if let Some(ref pb) = progress {
+                                // Update progress message with recent output
+                                let short_line = if line.chars().count() > 60 {
+                                    let truncated: String = line.chars().take(60).collect();
+                                    format!("{}...", truncated)
+                                } else {
+                                    line.clone()
+                                };
+                                pb.set_message(short_line);
+                            } else {
+                                // Stream to stdout in real-time when no progress spinner
+                                println!("{}", line);
+                            }
+                        }
+                        Ok(None) => stdout_done = true,
+                        Err(e) => return Err(anyhow::anyhow!("Failed to read stdout: {}", e)),
+                    }
+                }
+                line = stderr_reader.next_line(), if !stderr_done => {
+                    match line {
+                        Ok(Some(line)) => {
+                            stderr_output.push_str(&line);
+                            stderr_output.push('\n');
+
+                            // Stream stderr to stderr in real-time (always, even with progress)
+                            if progress.is_none() {
+                                eprintln!("{}", line);
+                            }
+                        }
+                        Ok(None) => stderr_done = true,
+                        Err(e) => return Err(anyhow::anyhow!("Failed to read stderr: {}", e)),
+                    }
+                }
             }
         }
 
@@ -121,281 +189,99 @@ impl ScriptRunner {
         }
 
         if !status.success() {
-            anyhow::bail!("Script failed with exit code: {:?}", status.code());
+            anyhow::bail!(
+                "Command '{}' failed with exit code {:?}\nStderr: {}",
+                command_name,
+                status.code(),
+                stderr_output
+            );
         }
 
         Ok(output)
     }
+}
 
-    // =========================================================================
-    // Gemini Methods
-    // =========================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
 
-    /// Run Gemini proposal generation
-    pub async fn run_gemini_proposal(&self, change_id: &str, description: &str) -> Result<String> {
-        self.run_gemini_proposal_with_model(change_id, description, None)
-            .await
+    #[test]
+    fn test_script_runner_creation() {
+        let runner = ScriptRunner::new();
+        // Just verify it can be created
+        drop(runner);
     }
 
-    /// Run Gemini proposal generation with model selection
-    pub async fn run_gemini_proposal_with_model(
-        &self,
-        change_id: &str,
-        description: &str,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model(
-            "gemini-proposal.sh",
-            &[change_id.to_string(), description.to_string()],
-            true,
-            model,
-        )
-        .await
-    }
-
-    /// Run Gemini reproposal (resumes previous session for cached context)
-    pub async fn run_gemini_reproposal(&self, change_id: &str) -> Result<String> {
-        self.run_gemini_reproposal_with_model(change_id, None).await
-    }
-
-    /// Run Gemini reproposal with model selection
-    pub async fn run_gemini_reproposal_with_model(
-        &self,
-        change_id: &str,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model(
-            "gemini-reproposal.sh",
-            &[change_id.to_string()],
-            true,
-            model,
-        )
-        .await
-    }
-
-    /// Run Gemini spec merging (merge delta specs back to main specs)
-    pub async fn run_gemini_merge_specs(
-        &self,
-        change_id: &str,
-        strategy: &str,
-        spec_file: &str,
-    ) -> Result<String> {
-        self.run_gemini_merge_specs_with_model(change_id, strategy, spec_file, None)
-            .await
-    }
-
-    /// Run Gemini spec merging with model selection
-    pub async fn run_gemini_merge_specs_with_model(
-        &self,
-        change_id: &str,
-        strategy: &str,
-        spec_file: &str,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model(
-            "gemini-merge-specs.sh",
-            &[
-                change_id.to_string(),
-                strategy.to_string(),
-                spec_file.to_string(),
-            ],
-            true,
-            model,
-        )
-        .await
-    }
-
-    /// Run Gemini CHANGELOG generation
-    pub async fn run_gemini_changelog(&self, change_id: &str) -> Result<String> {
-        self.run_gemini_changelog_with_model(change_id, None).await
-    }
-
-    /// Run Gemini CHANGELOG generation with model selection
-    pub async fn run_gemini_changelog_with_model(
-        &self,
-        change_id: &str,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model(
-            "gemini-changelog.sh",
-            &[change_id.to_string()],
-            true,
-            model,
-        )
-        .await
-    }
-
-    // =========================================================================
-    // Codex Methods
-    // =========================================================================
-
-    /// Run Codex challenge (creates new session)
-    pub async fn run_codex_challenge(&self, change_id: &str) -> Result<String> {
-        self.run_codex_challenge_with_model(change_id, None).await
-    }
-
-    /// Run Codex challenge with model selection
-    pub async fn run_codex_challenge_with_model(
-        &self,
-        change_id: &str,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model(
-            "codex-challenge.sh",
-            &[change_id.to_string()],
-            true,
-            model,
-        )
-        .await
-    }
-
-    /// Run Codex re-challenge (resumes previous session for cached context)
-    pub async fn run_codex_rechallenge(&self, change_id: &str) -> Result<String> {
-        self.run_codex_rechallenge_with_model(change_id, None).await
-    }
-
-    /// Run Codex re-challenge with model selection
-    pub async fn run_codex_rechallenge_with_model(
-        &self,
-        change_id: &str,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model(
-            "codex-rechallenge.sh",
-            &[change_id.to_string()],
-            true,
-            model,
-        )
-        .await
-    }
-
-    /// Run Codex code review with iteration tracking
-    pub async fn run_codex_review(&self, change_id: &str, iteration: u32) -> Result<String> {
-        self.run_codex_review_with_model(change_id, iteration, None)
-            .await
-    }
-
-    /// Run Codex code review with model selection
-    pub async fn run_codex_review_with_model(
-        &self,
-        change_id: &str,
-        iteration: u32,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model(
-            "codex-review.sh",
-            &[change_id.to_string(), iteration.to_string()],
-            true,
-            model,
-        )
-        .await
-    }
-
-    /// Run Codex verification
-    pub async fn run_codex_verify(&self, change_id: &str) -> Result<String> {
-        self.run_codex_verify_with_model(change_id, None).await
-    }
-
-    /// Run Codex verification with model selection
-    pub async fn run_codex_verify_with_model(
-        &self,
-        change_id: &str,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model("codex-verify.sh", &[change_id.to_string()], true, model)
-            .await
-    }
-
-    /// Run Codex archive quality review
-    pub async fn run_codex_archive_review(
-        &self,
-        change_id: &str,
-        strategy: &str,
-    ) -> Result<String> {
-        self.run_codex_archive_review_with_model(change_id, strategy, None)
-            .await
-    }
-
-    /// Run Codex archive quality review with model selection
-    pub async fn run_codex_archive_review_with_model(
-        &self,
-        change_id: &str,
-        strategy: &str,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model(
-            "codex-archive-review.sh",
-            &[change_id.to_string(), strategy.to_string()],
-            true,
-            model,
-        )
-        .await
-    }
-
-    // =========================================================================
-    // Claude Methods
-    // =========================================================================
-
-    /// Run Claude implementation
-    pub async fn run_claude_implement(
-        &self,
-        change_id: &str,
-        tasks: Option<&str>,
-    ) -> Result<String> {
-        self.run_claude_implement_with_model(change_id, tasks, None)
-            .await
-    }
-
-    /// Run Claude implementation with model selection
-    pub async fn run_claude_implement_with_model(
-        &self,
-        change_id: &str,
-        tasks: Option<&str>,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        let args = if let Some(t) = tasks {
-            vec![change_id.to_string(), "--tasks".to_string(), t.to_string()]
-        } else {
-            vec![change_id.to_string()]
+    #[tokio::test]
+    async fn test_run_cli_with_nonexistent_command() {
+        let runner = ScriptRunner::new();
+        // Use a command that definitely doesn't exist
+        let model = SelectedModel::Gemini {
+            model: "test-model".to_string(),
+            command: "nonexistent-cli-command-xyz123".to_string(),
         };
 
-        self.run_script_with_model("claude-implement.sh", &args, true, model)
-            .await
+        let args = vec![];
+        let env = HashMap::new();
+        let prompt = "test prompt";
+
+        // This should fail because the command doesn't exist
+        let result = runner.run_cli(&model, &args, env, prompt, false).await;
+
+        // We expect this to fail with "not found" error
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("not found") || err.to_string().contains("Please ensure it is installed"),
+            "Error should mention command not found: {}",
+            err
+        );
     }
 
-    /// Run Claude resolve (fix issues from review)
-    pub async fn run_claude_resolve(&self, change_id: &str) -> Result<String> {
-        self.run_claude_resolve_with_model(change_id, None).await
+    #[tokio::test]
+    async fn test_run_cli_environment_variables() {
+        let runner = ScriptRunner::new();
+        let model = SelectedModel::Codex {
+            model: "o3-mini".to_string(),
+            reasoning: Some("low".to_string()),
+            command: "codex".to_string(),
+        };
+
+        let args = vec![];
+        let mut env = HashMap::new();
+        env.insert("TEST_VAR".to_string(), "test_value".to_string());
+        let prompt = "test";
+
+        // This will fail because 'codex' doesn't exist, but tests env handling
+        let result = runner.run_cli(&model, &args, env, prompt, false).await;
+        assert!(result.is_err());
     }
 
-    /// Run Claude resolve with model selection
-    pub async fn run_claude_resolve_with_model(
-        &self,
-        change_id: &str,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model("claude-resolve.sh", &[change_id.to_string()], true, model)
-            .await
-    }
+    #[tokio::test]
+    async fn test_run_cli_stderr_capture() {
+        let runner = ScriptRunner::new();
+        let model = SelectedModel::Claude {
+            model: "claude-sonnet-4-5".to_string(),
+            command: "claude".to_string(),
+        };
 
-    /// Run Gemini archive fix (fix issues from archive review)
-    pub async fn run_gemini_archive_fix(&self, change_id: &str) -> Result<String> {
-        self.run_gemini_archive_fix_with_model(change_id, None)
-            .await
-    }
+        let args = vec!["--version".to_string()];
+        let env = HashMap::new();
+        let prompt = "";
 
-    /// Run Gemini archive fix with model selection
-    pub async fn run_gemini_archive_fix_with_model(
-        &self,
-        change_id: &str,
-        model: Option<&SelectedModel>,
-    ) -> Result<String> {
-        self.run_script_with_model(
-            "gemini-archive-fix.sh",
-            &[change_id.to_string()],
-            true,
-            model,
-        )
-        .await
+        // Test that stderr is captured when command fails
+        let result = runner.run_cli(&model, &args, env, prompt, false).await;
+
+        // Should fail with stderr in error message
+        if let Err(e) = result {
+            let error_msg = e.to_string();
+            // Error should mention either "not found" or include stderr
+            assert!(
+                error_msg.contains("not found") || error_msg.contains("Stderr"),
+                "Error message should mention command not found or include stderr: {}",
+                error_msg
+            );
+        }
     }
 }

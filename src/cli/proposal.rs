@@ -2,7 +2,7 @@ use crate::cli::validate_challenge::validate_challenge;
 use crate::cli::validate_proposal::validate_proposal;
 use crate::context::ContextPhase;
 use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, ValidationOptions};
-use crate::orchestrator::ScriptRunner;
+use crate::orchestrator::{GeminiOrchestrator, CodexOrchestrator};
 use crate::parser::parse_challenge_verdict;
 use crate::Result;
 use colored::Colorize;
@@ -168,8 +168,8 @@ async fn run_proposal_step(
     // Create proposal skeleton
     crate::context::create_proposal_skeleton(&change_dir, &resolved_change_id)?;
 
-    // Run Gemini script with retry
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
+    // Run Gemini orchestrator with retry
+    let orchestrator = GeminiOrchestrator::new(config, project_root);
     let max_retries = config.workflow.script_retries;
     let retry_delay = std::time::Duration::from_secs(config.workflow.retry_delay_secs);
 
@@ -183,7 +183,11 @@ async fn run_proposal_step(
             tokio::time::sleep(retry_delay).await;
         }
 
-        match script_runner.run_gemini_proposal(&resolved_change_id, description).await {
+        // Assess complexity dynamically based on change structure
+        let change = Change::new(&resolved_change_id, description);
+        let complexity = change.assess_complexity(&project_root);
+
+        match orchestrator.run_proposal(&resolved_change_id, description, complexity).await {
             Ok(_output) => {
                 last_error = None;
                 break;
@@ -273,8 +277,12 @@ async fn run_challenge_step(
     // Create CHALLENGE.md skeleton
     crate::context::create_challenge_skeleton(&change_dir, change_id)?;
 
-    // Run Codex script with retry
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
+    // Assess complexity dynamically based on change structure
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(project_root);
+
+    // Run Codex orchestrator with retry
+    let orchestrator = CodexOrchestrator::new(config, project_root);
     let max_retries = config.workflow.script_retries;
     let retry_delay = std::time::Duration::from_secs(config.workflow.retry_delay_secs);
 
@@ -288,7 +296,7 @@ async fn run_challenge_step(
             tokio::time::sleep(retry_delay).await;
         }
 
-        match script_runner.run_codex_challenge(change_id).await {
+        match orchestrator.run_challenge(change_id, complexity).await {
             Ok(_output) => {
                 last_error = None;
                 break;
@@ -368,15 +376,18 @@ async fn run_rechallenge_step(
     let change = Change::new(change_id, "");
     change.validate_structure(project_root)?;
 
+    // Assess complexity dynamically based on change structure
+    let complexity = change.assess_complexity(project_root);
+
     // Regenerate AGENTS.md context
     crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
 
     // Recreate CHALLENGE.md skeleton for re-challenge
     crate::context::create_challenge_skeleton(&change_dir, change_id)?;
 
-    // Run Codex rechallenge script (resumes session)
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    let _output = script_runner.run_codex_rechallenge(change_id).await?;
+    // Run Codex rechallenge orchestrator (resumes session)
+    let orchestrator = CodexOrchestrator::new(config, project_root);
+    let _output = orchestrator.run_rechallenge(change_id, complexity).await?;
 
     // Parse verdict
     let challenge_path = change.challenge_path(project_root);
@@ -405,11 +416,15 @@ async fn run_reproposal_step(
 
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
+    // Assess complexity dynamically based on change structure
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(project_root);
+
     // Regenerate GEMINI.md context
     crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
 
-    // Run Gemini reproposal with retry
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
+    // Run Gemini reproposal orchestrator with retry
+    let orchestrator = GeminiOrchestrator::new(config, project_root);
     let max_retries = config.workflow.script_retries;
     let retry_delay = std::time::Duration::from_secs(config.workflow.retry_delay_secs);
 
@@ -423,7 +438,7 @@ async fn run_reproposal_step(
             tokio::time::sleep(retry_delay).await;
         }
 
-        match script_runner.run_gemini_reproposal(change_id).await {
+        match orchestrator.run_reproposal(change_id, complexity).await {
             Ok(_output) => {
                 last_error = None;
                 break;

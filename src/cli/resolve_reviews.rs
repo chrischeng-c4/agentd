@@ -1,4 +1,4 @@
-use crate::orchestrator::ScriptRunner;
+use crate::orchestrator::ClaudeOrchestrator;
 use crate::{
     models::{Change, AgentdConfig},
     Result,
@@ -24,13 +24,16 @@ pub async fn run(change_id: &str) -> Result<()> {
         );
     }
 
+    // Assess complexity dynamically based on change structure
+    let complexity = change.assess_complexity(&project_root);
+
     println!(
         "{}",
         "🔧 Resolving review issues with Claude...".cyan()
     );
 
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    let _output = script_runner.run_claude_resolve(change_id).await?;
+    let orchestrator = ClaudeOrchestrator::new(&config, &project_root);
+    let _output = orchestrator.run_resolve(change_id, complexity).await?;
 
     println!("\n{}", "✅ Issues resolved!".green().bold());
     println!("\n{}", "⏭️  Next steps:".yellow());

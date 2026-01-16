@@ -1,6 +1,8 @@
 use crate::context::ContextPhase;
-use crate::orchestrator::ScriptRunner;
+use crate::models::frontmatter::StatePhase;
+use crate::orchestrator::{ClaudeOrchestrator, CodexOrchestrator};
 use crate::parser::parse_review_verdict;
+use crate::state::StateManager;
 use crate::{
     models::{Change, ReviewVerdict, AgentdConfig},
     Result,
@@ -14,6 +16,12 @@ pub struct ImplementCommand;
 pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
     let project_root = env::current_dir()?;
     let config = AgentdConfig::load(&project_root)?;
+    let change_dir = project_root.join("agentd/changes").join(change_id);
+
+    // Update STATE to Implementing phase
+    let mut state_manager = StateManager::load(&change_dir)?;
+    state_manager.set_phase(StatePhase::Implementing);
+    state_manager.save()?;
 
     println!("{}", "🎨 Agentd Implementation Workflow".cyan().bold());
     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
@@ -36,6 +44,11 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
     loop {
         match current_verdict {
             ReviewVerdict::Approved => {
+                // Update STATE to Complete phase
+                let mut state_manager = StateManager::load(&change_dir)?;
+                state_manager.set_phase(StatePhase::Complete);
+                state_manager.save()?;
+
                 println!();
                 println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
                 if iteration == 0 {
@@ -101,9 +114,12 @@ async fn run_implement_step(
     let change = Change::new(change_id, "");
     change.validate_structure(project_root)?;
 
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    let _output = script_runner
-        .run_claude_implement(change_id, tasks)
+    // Assess complexity dynamically based on change structure
+    let complexity = change.assess_complexity(project_root);
+
+    let orchestrator = ClaudeOrchestrator::new(config, project_root);
+    let _output = orchestrator
+        .run_implement(change_id, tasks, complexity)
         .await?;
 
     println!("{}", "✅ Implementation complete (code + tests written)".green());
@@ -119,20 +135,23 @@ async fn run_review_step(
 ) -> Result<ReviewVerdict> {
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
+    // Assess complexity dynamically based on change structure
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(project_root);
+
     // Regenerate AGENTS.md context
     crate::context::generate_agents_context(&change_dir, ContextPhase::Review)?;
 
     // Create/update REVIEW.md skeleton
     crate::context::create_review_skeleton(&change_dir, change_id, iteration)?;
 
-    // Run Codex review script with iteration number
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    let _output = script_runner
-        .run_codex_review(change_id, iteration)
+    // Run Codex review orchestrator with iteration number
+    let orchestrator = CodexOrchestrator::new(config, project_root);
+    let _output = orchestrator
+        .run_review(change_id, iteration, complexity)
         .await?;
 
     // Parse verdict
-    let change = Change::new(change_id, "");
     let review_path = change.review_path(project_root);
     let verdict = parse_review_verdict(&review_path)?;
 
@@ -155,8 +174,11 @@ async fn run_resolve_step(
         anyhow::bail!("REVIEW.md not found for resolving issues");
     }
 
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    let _output = script_runner.run_claude_resolve(change_id).await?;
+    // Assess complexity dynamically based on change structure
+    let complexity = change.assess_complexity(project_root);
+
+    let orchestrator = ClaudeOrchestrator::new(config, project_root);
+    let _output = orchestrator.run_resolve(change_id, complexity).await?;
 
     println!("{}", "✅ Issues resolved".green());
     Ok(())

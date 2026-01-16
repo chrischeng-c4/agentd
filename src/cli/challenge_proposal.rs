@@ -1,5 +1,5 @@
 use crate::context::ContextPhase;
-use crate::orchestrator::ScriptRunner;
+use crate::orchestrator::CodexOrchestrator;
 use crate::{
     models::{Change, AgentdConfig},
     Result,
@@ -29,6 +29,9 @@ pub async fn run(change_id: &str) -> Result<()> {
     let change = Change::new(change_id, "");
     change.validate_structure(&project_root)?;
 
+    // Assess complexity dynamically based on change structure
+    let complexity = change.assess_complexity(&project_root);
+
     // Generate AGENTS.md context for this change
     crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
 
@@ -40,9 +43,9 @@ pub async fn run(change_id: &str) -> Result<()> {
         "🔍 Analyzing proposal with Codex...".cyan()
     );
 
-    // Run Codex script
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    let output = script_runner.run_codex_challenge(change_id).await?;
+    // Run Codex orchestrator
+    let orchestrator = CodexOrchestrator::new(&config, &project_root);
+    let output = orchestrator.run_challenge(change_id, complexity).await?;
 
     println!("\n{}", "📊 Challenge Report Generated".green().bold());
 
@@ -65,7 +68,7 @@ pub async fn run(change_id: &str) -> Result<()> {
         println!("      agentd challenge {}", change_id);
     } else {
         println!("\n{}", "⚠️  Warning: CHALLENGE.md not found".yellow());
-        println!("   The Codex script may need adjustment.");
+        println!("   The Codex orchestrator may need adjustment.");
         println!("\n   Codex output:");
         println!("{}", output);
     }

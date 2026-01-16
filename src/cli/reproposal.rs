@@ -1,5 +1,5 @@
 use crate::context::ContextPhase;
-use crate::orchestrator::ScriptRunner;
+use crate::orchestrator::GeminiOrchestrator;
 use crate::{
     models::{Change, AgentdConfig},
     Result,
@@ -25,6 +25,10 @@ pub async fn run(change_id: &str) -> Result<()> {
         );
     }
 
+    // Assess complexity dynamically based on change structure
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(&project_root);
+
     // Generate GEMINI.md context for this change
     let change_dir = project_root.join("agentd/changes").join(change_id);
     crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
@@ -34,8 +38,8 @@ pub async fn run(change_id: &str) -> Result<()> {
         "🤖 Regenerating proposal with Gemini based on challenge feedback...".cyan()
     );
 
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
-    let _output = script_runner.run_gemini_reproposal(change_id).await?;
+    let orchestrator = GeminiOrchestrator::new(&config, &project_root);
+    let _output = orchestrator.run_reproposal(change_id, complexity).await?;
 
     println!("\n{}", "✅ Proposal updated!".green().bold());
     println!("\n{}", "⏭️  Next steps:".yellow());

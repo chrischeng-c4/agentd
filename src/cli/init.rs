@@ -34,18 +34,21 @@ const PROJECT_TEMPLATE: &str = include_str!("../../templates/project.md");
 const CLAUDE_TEMPLATE: &str = include_str!("../../templates/CLAUDE.md");
 
 // Helper Scripts - Single source of truth from agentd/scripts/
-const SCRIPT_GEMINI_PROPOSAL: &str = include_str!("../../agentd/scripts/gemini-proposal.sh");
-const SCRIPT_GEMINI_REPROPOSAL: &str = include_str!("../../agentd/scripts/gemini-reproposal.sh");
-const SCRIPT_GEMINI_FILLBACK: &str = include_str!("../../agentd/scripts/gemini-fillback.sh");
-const SCRIPT_GEMINI_MERGE_SPECS: &str = include_str!("../../agentd/scripts/gemini-merge-specs.sh");
-const SCRIPT_GEMINI_CHANGELOG: &str = include_str!("../../agentd/scripts/gemini-changelog.sh");
-const SCRIPT_GEMINI_ARCHIVE_FIX: &str = include_str!("../../agentd/scripts/gemini-archive-fix.sh");
-const SCRIPT_CODEX_CHALLENGE: &str = include_str!("../../agentd/scripts/codex-challenge.sh");
-const SCRIPT_CODEX_RECHALLENGE: &str = include_str!("../../agentd/scripts/codex-rechallenge.sh");
-const SCRIPT_CODEX_REVIEW: &str = include_str!("../../agentd/scripts/codex-review.sh");
-const SCRIPT_CODEX_ARCHIVE_REVIEW: &str = include_str!("../../agentd/scripts/codex-archive-review.sh");
-const SCRIPT_CLAUDE_IMPLEMENT: &str = include_str!("../../agentd/scripts/claude-implement.sh");
-const SCRIPT_CLAUDE_RESOLVE: &str = include_str!("../../agentd/scripts/claude-resolve.sh");
+// Shell scripts are no longer generated during init.
+// Orchestrators now call CLI tools directly instead of using shell scripts.
+// These constants are kept for reference but are no longer used.
+// const SCRIPT_GEMINI_PROPOSAL: &str = include_str!("../../agentd/scripts/gemini-proposal.sh");
+// const SCRIPT_GEMINI_REPROPOSAL: &str = include_str!("../../agentd/scripts/gemini-reproposal.sh");
+// const SCRIPT_GEMINI_FILLBACK: &str = include_str!("../../agentd/scripts/gemini-fillback.sh");
+// const SCRIPT_GEMINI_MERGE_SPECS: &str = include_str!("../../agentd/scripts/gemini-merge-specs.sh");
+// const SCRIPT_GEMINI_CHANGELOG: &str = include_str!("../../agentd/scripts/gemini-changelog.sh");
+// const SCRIPT_GEMINI_ARCHIVE_FIX: &str = include_str!("../../agentd/scripts/gemini-archive-fix.sh");
+// const SCRIPT_CODEX_CHALLENGE: &str = include_str!("../../agentd/scripts/codex-challenge.sh");
+// const SCRIPT_CODEX_RECHALLENGE: &str = include_str!("../../agentd/scripts/codex-rechallenge.sh");
+// const SCRIPT_CODEX_REVIEW: &str = include_str!("../../agentd/scripts/codex-review.sh");
+// const SCRIPT_CODEX_ARCHIVE_REVIEW: &str = include_str!("../../agentd/scripts/codex-archive-review.sh");
+// const SCRIPT_CLAUDE_IMPLEMENT: &str = include_str!("../../agentd/scripts/claude-implement.sh");
+// const SCRIPT_CLAUDE_RESOLVE: &str = include_str!("../../agentd/scripts/claude-resolve.sh");
 
 // Prompt for generating project.md
 const PROJECT_INIT_PROMPT: &str = r#"Analyze this codebase and generate a project.md file.
@@ -220,10 +223,10 @@ fn run_upgrade(
     Ok(())
 }
 
-/// Install/update all system files (scripts, skills, commands, prompts)
+/// Install/update all system files (skills, commands, prompts)
 fn install_system_files(
     project_root: &Path,
-    agentd_dir: &Path,
+    _agentd_dir: &Path,  // Kept for backward compatibility
     claude_dir: &Path,
 ) -> Result<()> {
     let skills_dir = claude_dir.join("skills");
@@ -249,10 +252,8 @@ fn install_system_files(
     let codex_prompts_dir = PathBuf::from(home_dir).join(".codex/prompts");
     install_codex_prompts(&codex_prompts_dir)?;
 
-    // Create/update helper scripts
-    println!();
-    println!("{}", "📜 Updating helper scripts...".cyan());
-    create_helper_scripts(&agentd_dir.join("scripts"))?;
+    // Note: Shell scripts are no longer generated. Orchestrators now call CLI tools directly.
+    // The agentd/scripts/ directory is kept for backward compatibility and custom user scripts.
 
     // Install shell completions
     println!();
@@ -634,41 +635,10 @@ fn install_claude_skills(skills_dir: &Path) -> Result<()> {
 }
 
 
-fn create_helper_scripts(scripts_dir: &Path) -> Result<()> {
-    // Write scripts from constants (single source of truth: agentd/scripts/)
-    let scripts: &[(&str, &str)] = &[
-        ("gemini-proposal.sh", SCRIPT_GEMINI_PROPOSAL),
-        ("gemini-reproposal.sh", SCRIPT_GEMINI_REPROPOSAL),
-        ("gemini-fillback.sh", SCRIPT_GEMINI_FILLBACK),
-        ("gemini-merge-specs.sh", SCRIPT_GEMINI_MERGE_SPECS),
-        ("gemini-changelog.sh", SCRIPT_GEMINI_CHANGELOG),
-        ("gemini-archive-fix.sh", SCRIPT_GEMINI_ARCHIVE_FIX),
-        ("codex-challenge.sh", SCRIPT_CODEX_CHALLENGE),
-        ("codex-rechallenge.sh", SCRIPT_CODEX_RECHALLENGE),
-        ("codex-review.sh", SCRIPT_CODEX_REVIEW),
-        ("codex-archive-review.sh", SCRIPT_CODEX_ARCHIVE_REVIEW),
-        ("claude-implement.sh", SCRIPT_CLAUDE_IMPLEMENT),
-        ("claude-resolve.sh", SCRIPT_CLAUDE_RESOLVE),
-    ];
-
-    for (name, content) in scripts {
-        std::fs::write(scripts_dir.join(name), content)?;
-    }
-
-    // Make scripts executable on Unix
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        for (name, _) in scripts {
-            let path = scripts_dir.join(name);
-            let mut perms = std::fs::metadata(&path)?.permissions();
-            perms.set_mode(0o755);
-            std::fs::set_permissions(&path, perms)?;
-        }
-    }
-
-    Ok(())
-}
+// No longer used - shell scripts are no longer generated during init.
+// Orchestrators now call CLI tools directly instead of using shell scripts.
+// The function has been removed. The agentd/scripts/ directory is kept for
+// backward compatibility and custom user scripts only.
 
 fn install_gemini_commands(gemini_dir: &Path) -> Result<()> {
     let commands_dir = gemini_dir.join("commands/agentd");

@@ -1,8 +1,8 @@
 use crate::models::{
     decide_merging_strategy, ArchiveReviewVerdict, DeltaMetrics, MergingStrategy, AgentdConfig,
-    ValidationRules,
+    ValidationRules, Change,
 };
-use crate::orchestrator::ScriptRunner;
+use crate::orchestrator::{GeminiOrchestrator, CodexOrchestrator};
 use crate::parser::parse_archive_review_verdict;
 use crate::validator::{SemanticValidator, SpecFormatValidator};
 use crate::Result;
@@ -369,10 +369,14 @@ async fn merge_spec_with_gemini(
     project_root: &PathBuf,
     config: &AgentdConfig,
 ) -> Result<()> {
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(project_root));
+    // Assess complexity dynamically based on change structure
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(project_root);
 
-    script_runner
-        .run_gemini_merge_specs(change_id, strategy.name(), spec_file)
+    let orchestrator = GeminiOrchestrator::new(config, project_root);
+
+    orchestrator
+        .run_merge_specs(change_id, strategy.name(), spec_file, complexity)
         .await?;
 
     Ok(())
@@ -384,9 +388,13 @@ async fn generate_changelog_entry(
     project_root: &Path,
     config: &AgentdConfig,
 ) -> Result<()> {
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(&project_root));
+    // Assess complexity dynamically based on change structure
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(project_root);
 
-    script_runner.run_gemini_changelog(change_id).await?;
+    let orchestrator = GeminiOrchestrator::new(config, project_root);
+
+    orchestrator.run_changelog(change_id, complexity).await?;
 
     // Verify CHANGELOG was updated
     let changelog_path = project_root.join("agentd/specs/CHANGELOG.md");
@@ -518,13 +526,17 @@ async fn run_archive_review_step(
 ) -> Result<ArchiveReviewVerdict> {
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
+    // Assess complexity dynamically based on change structure
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(project_root);
+
     // Create/update ARCHIVE_REVIEW.md skeleton
     crate::context::create_archive_review_skeleton(&change_dir, change_id, iteration)?;
 
-    // Run Codex archive review
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(project_root));
-    script_runner
-        .run_codex_archive_review(change_id, strategy)
+    // Run Codex archive review orchestrator
+    let orchestrator = CodexOrchestrator::new(config, project_root);
+    orchestrator
+        .run_archive_review(change_id, strategy, complexity)
         .await?;
 
     // Parse verdict
@@ -550,8 +562,12 @@ async fn run_archive_fix_step(
         anyhow::bail!("ARCHIVE_REVIEW.md not found for fixing issues");
     }
 
-    let script_runner = ScriptRunner::new(config.resolve_scripts_dir(project_root));
-    script_runner.run_gemini_archive_fix(change_id).await?;
+    // Assess complexity dynamically based on change structure
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(project_root);
+
+    let orchestrator = GeminiOrchestrator::new(config, project_root);
+    orchestrator.run_archive_fix(change_id, complexity).await?;
 
     println!("{}", "✅ Archive issues fixed".green());
     Ok(())

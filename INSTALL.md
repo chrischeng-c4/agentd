@@ -106,23 +106,17 @@ agentd init --name "Test Project"
 
 ## 配置 AI 工具整合
 
-Agentd 需要配置 AI 工具腳本才能正常工作：
+Agentd 直接調用 AI CLI 工具，無需配置腳本：
 
 ```bash
 # 1. 初始化專案
 cd your-project
 agentd init
 
-# 2. 複製示例腳本
-cp /path/to/agentd/examples/scripts/* .agentd/scripts/
-
-# 3. 使腳本可執行（Unix 系統）
-chmod +x .agentd/scripts/*.sh
-
-# 4. 編輯腳本以整合你的 AI 工具
-nano .agentd/scripts/gemini-proposal.sh
-nano .agentd/scripts/codex-challenge.sh
-# ... 其他腳本
+# 2. 確保 AI CLI 工具已安裝並在 PATH 中
+which gemini  # Gemini CLI
+which claude  # Claude Code
+which codex   # Codex CLI (如果可用)
 ```
 
 ### 配置環境變量
@@ -130,24 +124,21 @@ nano .agentd/scripts/codex-challenge.sh
 創建 `.env` 文件：
 
 ```bash
-# API Keys
+# API Keys (如果需要)
 ANTHROPIC_API_KEY=sk-ant-...
 GEMINI_API_KEY=...
 OPENAI_API_KEY=sk-...
-
-# CLI 路徑（可選）
-GEMINI_CLI=/usr/local/bin/gemini
-CODEX_CLI=/usr/local/bin/codex
-CLAUDE_CLI=/usr/local/bin/claude
 ```
 
-## 安裝 AI CLI 工具（可選）
+## 安裝 AI CLI 工具（必需）
+
+Agentd 需要以下 CLI 工具才能正常工作：
 
 ### Gemini CLI
 
 ```bash
-npm install -g gemini-cli
-# 或訪問: https://geminicli.com
+npm install -g @google/generative-ai-cli
+# 或訪問: https://ai.google.dev/gemini-api/docs/cli
 ```
 
 ### Claude Code
@@ -157,10 +148,11 @@ npm install -g gemini-cli
 # 訪問: https://claude.ai/code
 ```
 
-### Codex（如果可用）
+### Codex CLI（如果可用）
 
 ```bash
 # 根據你的 Codex 提供商安裝
+# 確保 'codex' 命令在 PATH 中可用
 ```
 
 ## 更新 Agentd
@@ -214,19 +206,17 @@ source ~/.bashrc
 rustup update stable
 ```
 
-### 問題: 腳本執行失敗
-
-**解決方案**: 檢查腳本權限
-```bash
-chmod +x .agentd/scripts/*.sh
-```
-
 ### 問題: AI 工具未找到
 
 **解決方案**:
-1. 檢查 AI CLI 是否已安裝
+1. 確保 AI CLI 工具已安裝並在 PATH 中
+   ```bash
+   which gemini
+   which claude
+   which codex
+   ```
 2. 檢查環境變量是否正確設置
-3. 編輯 `.agentd/config.toml` 設置正確的命令路徑
+3. 編輯 `agentd/config.toml` 配置模型選擇
 
 ## 性能優化
 
@@ -288,7 +278,6 @@ docker run -v $(pwd):/workspace -w /workspace agentd init
 
 安裝完成後，請閱讀：
 - [README.md](README.md) - 使用指南
-- [examples/scripts/README.md](examples/scripts/README.md) - AI 整合範例
 
 或直接開始：
 ```bash
