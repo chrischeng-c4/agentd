@@ -1,0 +1,86 @@
+change_id: simplify-skills
+schema_version: '2.0'
+created_at: 2026-01-16T06:19:04.599494Z
+updated_at: 2026-01-16T09:22:54.075258Z
+phase: archived
+iteration: 1
+last_action: archive
+checksums:
+  specs/workflows.md:
+    hash: sha256:8306e21b01d155db6587178b0785990e19757e09a716c7f0c48da7b3313da703
+    validated_at: 2026-01-16T06:21:54.580922Z
+  proposal.md:
+    hash: sha256:34638f9607b3649cdb493e5cd512fd380c7ede58fbad47db7204cbed33a52a98
+    validated_at: 2026-01-16T06:21:54.580830Z
+  tasks.md:
+    hash: sha256:c34e76ffc09b0cb576e5d637b7d2f7a73031ead97dd2dda27f9c29d032d3f6dc
+    validated_at: 2026-01-16T06:21:54.580857Z
+  CHALLENGE.md:
+    hash: sha256:efd2cc5375469de75f25545a5944b705c9c3b8f9c9fb8fe2aa6778cf988e110e
+    validated_at: 2026-01-16T06:25:25.860369Z
+  specs/_skeleton.md:
+    hash: sha256:b36a8641f8c91dcdda73cbb4ba9918e7ed1881a0d5c5de3fad5d6002b7429478
+    validated_at: 2026-01-16T06:21:54.581073Z
+validations:
+- step: validate-proposal
+  timestamp: 2026-01-16T06:19:04.599537Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 2
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/workflows.md] Missing required heading: Overview'
+  - '[specs/workflows.md] Missing required heading: Requirements'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-16T06:20:28.027831Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 3
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/workflows.md] Requirement heading '' Workflow Orchestration'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/workflows.md] Requirement heading '' Workflow Orchestration'' doesn''t match pattern ''^R\d+:'''
+  - '[specs/workflows.md] Requirement heading '' Workflow Orchestration'' doesn''t match pattern ''^R\d+:'''
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-16T06:21:54.580801Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 0
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-16T06:25:25.860299Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 5
+    medium: 4
+    low: 4
+    verdict: NEEDS_REVISION
+    issues_parsed: 13
+  errors: []
+  warnings: []
+telemetry: null

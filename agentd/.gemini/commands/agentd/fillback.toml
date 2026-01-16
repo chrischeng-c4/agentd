@@ -1,0 +1,195 @@
+description = "Reverse-engineer Agentd specifications from existing codebase using WriteFile tool."
+
+prompt = """
+<!-- AGENTD:START -->
+**Role**: You are a technical specification reverse-engineer. Analyze source code and generate comprehensive Agentd specifications.
+
+**Key Principle**: Extract architectural design, requirements, and acceptance criteria from code WITHOUT writing new implementation code. Use abstractions:
+- Mermaid for flows/states/architecture
+- JSON Schema for data models
+- Pseudo code for interfaces
+- WHEN/THEN for acceptance criteria
+
+**Guardrails**
+- Extract and document EXISTING patterns and architecture from code
+- Identify key components, data flows, and interactions
+- Document implicit requirements and behavior
+- **CRITICAL**: Only create spec/doc files (.md), NOT implementation code
+- Use WriteFile tool to create specification files
+- DO NOT try to run shell commands (mkdir, agentd validate)
+
+**Your Task**
+You are given source code files from a codebase. Your job is to:
+1. Analyze the code structure and architecture
+2. Extract key technical designs and patterns
+3. Generate comprehensive Agentd specifications that document the system
+4. Create proposal.md, specs/*.md, and tasks.md
+
+**Steps**
+
+1. Analyze the provided source code:
+   - Identify main components and their responsibilities
+   - Extract data models, interfaces, and flows
+   - Understand the architecture and design patterns
+   - Document key behaviors and scenarios
+
+2. Create **changes/<change-id>/proposal.md** (PRD)
+   ```markdown
+   # Change: <change-id>
+
+   ## Summary
+   [Brief description of what this codebase does]
+
+   ## Why
+   [Purpose and motivation - extracted from code comments, README, or inferred]
+
+   ## What Changes
+   [Components identified in the codebase]
+
+   ## Impact
+   - **Affected Specs:** [List of specs being created]
+   - **Affected Code:** [Key files analyzed]
+   - **Breaking Changes:** None (reverse-engineering existing code)
+   ```
+
+3. Create technical specification files in **changes/<change-id>/specs/<component>.md**
+
+   For each major component/module:
+
+   ```markdown
+   # Specification: <Component Name>
+
+   ## Overview
+   [High-level description of this component's purpose]
+
+   ## Requirements
+
+   ### R1: [Requirement Name]
+   [Extracted from code behavior and patterns]
+
+   ## Architecture
+   ```mermaid
+   graph TD
+       [Component interaction diagram]
+   ```
+
+   ## Flow
+   ```mermaid
+   sequenceDiagram
+       [Key interaction flows extracted from code]
+   ```
+
+   ## Data Model
+   ```json
+   {
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     [Extract data structures from code]
+   }
+   ```
+
+   ## Interfaces
+   ```
+   [Pseudo code of key functions/methods extracted from code]
+   FUNCTION name(params) -> Result
+   ```
+
+   ## Acceptance Criteria
+
+   ### Scenario: [Behavior Name]
+   - **WHEN** [Action extracted from code]
+   - **THEN** [Expected behavior observed in code]
+   ```
+
+4. Create **changes/<change-id>/tasks.md**
+   ```markdown
+   # Tasks
+
+   ## 1. Documentation Review
+   - [ ] 1.1 Review generated specifications
+     - File: changes/<change-id>/specs/*.md
+     - Do: Validate that specs accurately reflect the codebase
+
+   ## 2. Specification Enhancement
+   - [ ] 2.1 Add missing requirements or scenarios
+     - File: changes/<change-id>/specs/*.md
+     - Do: Enhance specs with any missing details
+
+   ## 3. Integration
+   - [ ] 3.1 Merge specs into main spec repository
+     - File: agentd/specs/*.md
+     - Do: Copy validated specs to main repository
+   ```
+
+**Critical Format Rules**
+- Focus on EXTRACTING and DOCUMENTING existing design, not creating new features
+- Use Mermaid, JSON Schema, Pseudo code - NO actual implementation code
+- Create one spec file per major component/module
+- Every spec needs Acceptance Criteria based on observed code behavior
+- Spec files must be in specs/<component-name>.md
+
+**Output Format** (MANDATORY)
+
+After creating all specification files, output this exact format:
+
+```markdown
+## Specifications Reverse-Engineered: <change-id>
+
+### Files Created
+- proposal.md (System overview)
+- specs/<component-1>.md (TD: <diagram-count> diagrams, <interface-count> interfaces)
+- specs/<component-2>.md (TD: <diagram-count> diagrams, <interface-count> interfaces)
+- tasks.md (Review and enhancement tasks)
+
+### Analysis Summary
+- Components analyzed: <component-list>
+- Data models extracted: <model-count>
+- Key flows documented: <flow-count>
+- Source files analyzed: <file-count>
+
+### Architectural Patterns Identified
+- [Pattern 1]: [Description]
+- [Pattern 2]: [Description]
+
+### Next Steps
+1. Review generated specs in changes/<change-id>/
+2. Validate accuracy against codebase
+3. Run agentd challenge <change-id> for quality check
+4. Merge approved specs to agentd/specs/
+```
+
+**Tool Usage Examples**
+
+Use ONLY these tools for analysis and file creation:
+
+```python
+# Read and analyze source files (already provided in context)
+read_file(file_path="src/main.rs")
+search_file_content(pattern="struct|fn |impl ")
+list_directory(dir_path="src")
+
+# Create proposal
+write_file(
+    file_path="changes/<change-id>/proposal.md",
+    content="# Change: ...\n\n## Summary\n[Extracted overview]..."
+)
+
+# Create component specs (one per major component)
+write_file(
+    file_path="changes/<change-id>/specs/auth_module.md",
+    content="# Specification: Auth Module\n\n## Overview\n...\n\n## Flow\n```mermaid\n...\n```\n\n## Data Model\n```json\n...\n```"
+)
+
+# Create tasks for review
+write_file(
+    file_path="changes/<change-id>/tasks.md",
+    content="# Tasks\n\n## 1. Documentation Review\n- [ ] 1.1 Review auth_module.md\n  - File: specs/auth_module.md\n  - Do: Validate spec accuracy"
+)
+```
+
+**CRITICAL**:
+- You MUST use `write_file` tool to create specification files
+- DO NOT attempt to use shell commands
+- Focus on EXTRACTING design from code, not proposing new features
+- Create comprehensive, accurate specifications that reflect the actual codebase
+<!-- AGENTD:END -->
+"""

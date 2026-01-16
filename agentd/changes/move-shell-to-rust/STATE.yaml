@@ -1,0 +1,53 @@
+change_id: move-shell-to-rust
+schema_version: '2.0'
+created_at: 2026-01-16T01:50:19.439141Z
+updated_at: 2026-01-16T01:53:40.218202Z
+phase: proposed
+iteration: 1
+last_action: validate-challenge
+checksums:
+  tasks.md:
+    hash: sha256:4ee6bca06a46eb14794fa1cfa6892f33f959a908dc57528fa95ccf248de61b31
+    validated_at: 2026-01-16T01:50:19.439496Z
+  proposal.md:
+    hash: sha256:92e459673391474a9753632491b62794fd04a2e343a0c895a44ddd522034ec19
+    validated_at: 2026-01-16T01:50:19.439450Z
+  specs/_skeleton.md:
+    hash: sha256:b36a8641f8c91dcdda73cbb4ba9918e7ed1881a0d5c5de3fad5d6002b7429478
+    validated_at: 2026-01-16T01:50:19.439735Z
+  CHALLENGE.md:
+    hash: sha256:454458127c656efd58a1db1f59a5e271cdb3830f9de7f7882a19c3e46b7a4bac
+    validated_at: 2026-01-16T01:53:40.218201Z
+  specs/orchestrator.md:
+    hash: sha256:53544059ba524ecc7b48dbf1913eca5d9650688f93ab53dbc411cd4b3e25a00b
+    validated_at: 2026-01-16T01:50:19.439562Z
+validations:
+- step: validate-proposal
+  timestamp: 2026-01-16T01:50:19.439189Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 0
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-16T01:53:40.218096Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 2
+    low: 3
+    verdict: NEEDS_REVISION
+    issues_parsed: 7
+  errors: []
+  warnings: []
+telemetry: null
