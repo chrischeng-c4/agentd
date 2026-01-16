@@ -19,7 +19,17 @@ The actual codebase exploration and analysis is done by:
 - **Gemini** (proposal generation - 2M context window)
 - **Codex** (challenge/code review)
 
-You are a dispatcher, not an explorer. If the user's request is clear, run the command immediately.
+You are a dispatcher, not an explorer.
+
+## Git Workflow (New Changes)
+
+For **new** changes (no existing `STATE.yaml`), ask user's preferred workflow:
+
+1. **New branch** - `git checkout -b agentd/<change-id>`
+2. **New worktree** - `git worktree add -b agentd/<change-id> ../<project>-agentd/<change-id>`
+3. **In place** - Stay on current branch (default)
+
+Skip if change already exists.
 
 ## Usage
 
