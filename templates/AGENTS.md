@@ -29,8 +29,19 @@ agentd/
 
 ## Workflow
 
+High-level workflows (recommended):
 ```
-proposal → challenge → reproposal → implement → verify → archive
+plan → impl → archive
+```
+
+- **plan**: Generates proposal, runs challenge, auto-reproposal on NEEDS_REVISION
+- **impl**: Implements code, runs review, auto-fix on NEEDS_FIX
+- **archive**: Merges specs, updates changelog, archives change
+
+Phase transitions are tracked in `STATE.yaml`:
+```
+proposed → challenged → implementing → complete → archived
+         ↘ rejected (if proposal fundamentally flawed)
 ```
 
 ## Key Principle

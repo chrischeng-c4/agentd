@@ -2,8 +2,10 @@ use crate::models::{
     decide_merging_strategy, ArchiveReviewVerdict, DeltaMetrics, MergingStrategy, AgentdConfig,
     ValidationRules, Change,
 };
+use crate::models::frontmatter::StatePhase;
 use crate::orchestrator::{GeminiOrchestrator, CodexOrchestrator};
 use crate::parser::parse_archive_review_verdict;
+use crate::state::StateManager;
 use crate::validator::{SemanticValidator, SpecFormatValidator};
 use crate::Result;
 use colored::Colorize;
@@ -213,7 +215,7 @@ pub async fn run(change_id: &str) -> Result<()> {
         }
     }
 
-    // Step 7: Move to archive
+    // Step 7: Move to archive and update STATE.yaml
     println!();
     println!("{}", "📦 [7/7] Moving to archive...".cyan());
 
@@ -221,6 +223,13 @@ pub async fn run(change_id: &str) -> Result<()> {
     let archive_path = move_to_archive(change_id, &timestamp.to_string(), &project_root)?;
 
     println!("   {} Archived to: {}", "✅".green(), archive_path.display());
+
+    // Update phase to archived in the archived location
+    let archived_change_dir = archive_path.join(change_id);
+    let mut state_manager = StateManager::load(&archived_change_dir)?;
+    state_manager.set_phase(StatePhase::Archived);
+    state_manager.set_last_action("archive");
+    state_manager.save()?;
 
     // Clean up backup after successful archive
     cleanup_backup(&project_root)?;
@@ -602,5 +611,62 @@ fn format_archive_verdict(verdict: &ArchiveReviewVerdict) -> colored::ColoredStr
         ArchiveReviewVerdict::NeedsFix => "NEEDS_FIX".yellow().bold(),
         ArchiveReviewVerdict::Rejected => "REJECTED".red().bold(),
         ArchiveReviewVerdict::Unknown => "UNKNOWN".bright_black(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::StateManager;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    fn setup_test_change() -> (TempDir, PathBuf) {
+        let temp_dir = TempDir::new().unwrap();
+        let change_dir = temp_dir.path().join("test-change");
+        std::fs::create_dir_all(&change_dir).unwrap();
+
+        // Create minimal proposal.md for StateManager
+        let mut proposal = std::fs::File::create(change_dir.join("proposal.md")).unwrap();
+        writeln!(proposal, "# Test Proposal\n\nContent").unwrap();
+
+        (temp_dir, change_dir)
+    }
+
+    #[test]
+    fn test_archive_sets_phase_to_archived() {
+        let (_temp, change_dir) = setup_test_change();
+
+        // Create state in Complete phase
+        let mut state_manager = StateManager::load(&change_dir).unwrap();
+        state_manager.set_phase(StatePhase::Complete);
+        state_manager.save().unwrap();
+
+        // Simulate archive operation: update phase to Archived
+        let mut state_manager = StateManager::load(&change_dir).unwrap();
+        state_manager.set_phase(StatePhase::Archived);
+        state_manager.set_last_action("archive");
+        state_manager.save().unwrap();
+
+        // Verify phase was updated to Archived
+        let state_manager = StateManager::load(&change_dir).unwrap();
+        assert_eq!(*state_manager.phase(), StatePhase::Archived);
+        assert_eq!(state_manager.state().last_action.as_deref(), Some("archive"));
+    }
+
+    #[test]
+    fn test_format_archive_verdict() {
+        // Test that all verdicts have appropriate formatting
+        let approved = format_archive_verdict(&ArchiveReviewVerdict::Approved);
+        assert!(approved.to_string().contains("APPROVED"));
+
+        let needs_fix = format_archive_verdict(&ArchiveReviewVerdict::NeedsFix);
+        assert!(needs_fix.to_string().contains("NEEDS_FIX"));
+
+        let rejected = format_archive_verdict(&ArchiveReviewVerdict::Rejected);
+        assert!(rejected.to_string().contains("REJECTED"));
+
+        let unknown = format_archive_verdict(&ArchiveReviewVerdict::Unknown);
+        assert!(unknown.to_string().contains("UNKNOWN"));
     }
 }

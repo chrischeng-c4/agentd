@@ -7,13 +7,9 @@ use std::process::Command;
 // Current version for tracking upgrades
 const AGENTD_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// Claude Code Skills
-const SKILL_PROPOSAL: &str = include_str!("../../templates/skills/agentd-proposal/SKILL.md");
-const SKILL_CHALLENGE: &str = include_str!("../../templates/skills/agentd-challenge/SKILL.md");
-const SKILL_REPROPOSAL: &str = include_str!("../../templates/skills/agentd-reproposal/SKILL.md");
-const SKILL_IMPLEMENT: &str = include_str!("../../templates/skills/agentd-implement/SKILL.md");
-const SKILL_REVIEW: &str = include_str!("../../templates/skills/agentd-review/SKILL.md");
-const SKILL_FIX: &str = include_str!("../../templates/skills/agentd-fix/SKILL.md");
+// Claude Code Skills (high-level workflows only)
+const SKILL_PLAN: &str = include_str!("../../templates/skills/agentd-plan/SKILL.md");
+const SKILL_IMPL: &str = include_str!("../../templates/skills/agentd-impl/SKILL.md");
 const SKILL_ARCHIVE: &str = include_str!("../../templates/skills/agentd-archive/SKILL.md");
 
 // Gemini Commands
@@ -277,8 +273,8 @@ fn print_init_success() {
     println!("   agentd/specs/             - Main specifications");
     println!("   agentd/changes/           - Active changes");
     println!("   agentd/archive/           - Completed changes");
-    println!("   .claude/skills/           - 7 Skills installed");
-    println!("   .gemini/commands/agentd/  - 2 Gemini commands");
+    println!("   .claude/skills/           - 3 Skills installed");
+    println!("   .gemini/commands/agentd/  - 3 Gemini commands");
     println!("   ~/.codex/prompts/         - 2 Codex prompts");
     println!();
 
@@ -297,29 +293,19 @@ fn print_init_success() {
 
     println!(
         "{}",
-        "🎯 Available Skills (use in Claude Code):".cyan().bold()
+        "🎯 Primary Workflows (use in Claude Code):".cyan().bold()
     );
     println!(
-        "   {} - Generate proposal with Gemini",
-        "/agentd:proposal".green()
+        "   {} - Plan and validate proposal",
+        "/agentd:plan".green().bold()
     );
     println!(
-        "   {} - Challenge proposal with Codex",
-        "/agentd:challenge".green()
+        "   {} - Implement and iterate",
+        "/agentd:impl".green().bold()
     );
-    println!(
-        "   {} - Refine based on feedback",
-        "/agentd:reproposal".green()
-    );
-    println!(
-        "   {} - Implement with Claude",
-        "/agentd:implement".green()
-    );
-    println!("   {} - Verify with tests", "/agentd:review".green());
-    println!("   {} - Fix verification failures", "/agentd:fix".green());
     println!(
         "   {} - Archive completed change",
-        "/agentd:archive".green()
+        "/agentd:archive".green().bold()
     );
     println!();
 
@@ -333,10 +319,10 @@ fn print_init_success() {
         "\"Read agentd/project.md and help me fill it out\"".cyan()
     );
     println!();
-    println!("   2. Start your first proposal:");
+    println!("   2. Start your first change:");
     println!(
         "      {}",
-        "/agentd:proposal my-feature \"Add awesome feature\"".cyan()
+        "/agentd:plan my-feature \"Add awesome feature\"".cyan()
     );
 }
 
@@ -614,13 +600,30 @@ pub fn get_current_version() -> &'static str {
 }
 
 fn install_claude_skills(skills_dir: &Path) -> Result<()> {
+    // Remove deprecated skills
+    let deprecated_skills = vec![
+        "agentd-proposal",
+        "agentd-challenge",
+        "agentd-reproposal",
+        "agentd-implement",
+        "agentd-review",
+        "agentd-resolve-reviews",
+        "agentd-fix",
+        "agentd-verify",
+    ];
+
+    for deprecated in &deprecated_skills {
+        let deprecated_dir = skills_dir.join(deprecated);
+        if deprecated_dir.exists() {
+            std::fs::remove_dir_all(&deprecated_dir)?;
+            println!("   {} {} (removed)", "✗".red(), deprecated);
+        }
+    }
+
+    // Install current skills
     let skills = vec![
-        ("proposal", SKILL_PROPOSAL),
-        ("challenge", SKILL_CHALLENGE),
-        ("reproposal", SKILL_REPROPOSAL),
-        ("implement", SKILL_IMPLEMENT),
-        ("review", SKILL_REVIEW),
-        ("fix", SKILL_FIX),
+        ("plan", SKILL_PLAN),
+        ("impl", SKILL_IMPL),
         ("archive", SKILL_ARCHIVE),
     ];
 

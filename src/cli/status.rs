@@ -34,8 +34,8 @@ pub async fn run(change_id: &str, json: bool) -> Result<()> {
         let phase_icon = match state.phase {
             StatePhase::Proposed => "📝",
             StatePhase::Challenged => "🔍",
+            StatePhase::Rejected => "⛔",
             StatePhase::Implementing => "🔨",
-            StatePhase::Testing => "🧪",
             StatePhase::Complete => "✅",
             StatePhase::Archived => "📦",
         };
@@ -43,8 +43,8 @@ pub async fn run(change_id: &str, json: bool) -> Result<()> {
         let phase_color = match state.phase {
             StatePhase::Proposed => format!("{:?}", state.phase).yellow(),
             StatePhase::Challenged => format!("{:?}", state.phase).cyan(),
+            StatePhase::Rejected => format!("{:?}", state.phase).red(),
             StatePhase::Implementing => format!("{:?}", state.phase).blue(),
-            StatePhase::Testing => format!("{:?}", state.phase).magenta(),
             StatePhase::Complete => format!("{:?}", state.phase).green(),
             StatePhase::Archived => format!("{:?}", state.phase).bright_black(),
         };
@@ -62,4 +62,83 @@ pub async fn run(change_id: &str, json: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::StateManager;
+    use std::io::Write;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    fn setup_test_change() -> (TempDir, PathBuf) {
+        let temp_dir = TempDir::new().unwrap();
+        let change_dir = temp_dir.path().join("test-change");
+        std::fs::create_dir_all(&change_dir).unwrap();
+
+        // Create minimal proposal.md for StateManager
+        let mut proposal = std::fs::File::create(change_dir.join("proposal.md")).unwrap();
+        writeln!(proposal, "# Test Proposal\n\nContent").unwrap();
+
+        (temp_dir, change_dir)
+    }
+
+    #[test]
+    fn test_rejected_phase_icon_and_color() {
+        let (_temp, change_dir) = setup_test_change();
+
+        // Create state in Rejected phase
+        let mut state_manager = StateManager::load(&change_dir).unwrap();
+        state_manager.set_phase(StatePhase::Rejected);
+        state_manager.save().unwrap();
+
+        // Verify phase is Rejected
+        let state_manager = StateManager::load(&change_dir).unwrap();
+        let state = state_manager.state();
+        assert_eq!(state.phase, StatePhase::Rejected);
+
+        // Verify icon and color mapping
+        let phase_icon = match state.phase {
+            StatePhase::Proposed => "📝",
+            StatePhase::Challenged => "🔍",
+            StatePhase::Rejected => "⛔",
+            StatePhase::Implementing => "🔨",
+            StatePhase::Complete => "✅",
+            StatePhase::Archived => "📦",
+        };
+        assert_eq!(phase_icon, "⛔");
+
+        // Verify color is red for rejected
+        let phase_color = match state.phase {
+            StatePhase::Rejected => "red",
+            _ => "other",
+        };
+        assert_eq!(phase_color, "red");
+    }
+
+    #[test]
+    fn test_all_phase_icons() {
+        // Verify all phases have appropriate icons
+        let phases = [
+            (StatePhase::Proposed, "📝"),
+            (StatePhase::Challenged, "🔍"),
+            (StatePhase::Rejected, "⛔"),
+            (StatePhase::Implementing, "🔨"),
+            (StatePhase::Complete, "✅"),
+            (StatePhase::Archived, "📦"),
+        ];
+
+        for (phase, expected_icon) in phases.iter() {
+            let icon = match phase {
+                StatePhase::Proposed => "📝",
+                StatePhase::Challenged => "🔍",
+                StatePhase::Rejected => "⛔",
+                StatePhase::Implementing => "🔨",
+                StatePhase::Complete => "✅",
+                StatePhase::Archived => "📦",
+            };
+            assert_eq!(icon, *expected_icon, "Icon mismatch for phase {:?}", phase);
+        }
+    }
 }

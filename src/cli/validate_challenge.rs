@@ -355,6 +355,9 @@ pub fn validate_challenge(
         low_count as u32,
     );
 
+    // Update phase based on verdict
+    state_manager.update_phase_from_verdict(verdict_str);
+
     // Update CHALLENGE.md checksum
     state_manager.update_checksum("CHALLENGE.md")?;
     state_manager.set_last_action("validate-challenge");

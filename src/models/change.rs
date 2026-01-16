@@ -9,10 +9,10 @@ pub enum ChangePhase {
     Proposed,
     /// Challenge generated, awaiting review
     Challenged,
+    /// Challenge rejected, requires manual intervention
+    Rejected,
     /// Implementation in progress
     Implementing,
-    /// Verification/testing in progress
-    Testing,
     /// All tasks complete, ready to archive
     Complete,
     /// Archived
@@ -24,8 +24,8 @@ impl ChangePhase {
         match self {
             ChangePhase::Proposed => "Proposed",
             ChangePhase::Challenged => "Challenged",
+            ChangePhase::Rejected => "Rejected",
             ChangePhase::Implementing => "Implementing",
-            ChangePhase::Testing => "Testing",
             ChangePhase::Complete => "Complete",
             ChangePhase::Archived => "Archived",
         }
@@ -35,8 +35,8 @@ impl ChangePhase {
         match self {
             ChangePhase::Proposed => "📝",
             ChangePhase::Challenged => "🔍",
+            ChangePhase::Rejected => "⛔",
             ChangePhase::Implementing => "🔨",
-            ChangePhase::Testing => "🧪",
             ChangePhase::Complete => "✅",
             ChangePhase::Archived => "📦",
         }

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- New high-level workflow skills: `/agentd:plan`, `/agentd:impl`, `/agentd:archive`
+- Phase-only state machine: workflows determine actions based on `STATE.yaml` phase
+- New `rejected` phase for fundamentally flawed proposals
+- Challenge command now automatically updates phase based on verdict (APPROVED → challenged, REJECTED → rejected)
+
+### Changed
+- Simplified workflow: `plan → impl → archive` replaces granular skill invocations
+- Updated CLAUDE.md template with new workflow table
+
+### Removed
+- `testing` phase (use `implementing` instead)
+- Granular skills removed: `/agentd:proposal`, `/agentd:challenge`, `/agentd:reproposal`, `/agentd:implement`, `/agentd:review`, `/agentd:resolve-reviews`, `/agentd:fix`
+- Now only 3 high-level workflow skills are installed: `/agentd:plan`, `/agentd:impl`, `/agentd:archive`
+
 ## [0.1.0] - 2026-01-12
 
 ### Added

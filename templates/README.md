@@ -10,36 +10,48 @@ agentd init
 
 # This creates:
 .claude/skills/
-  ├── agentd-proposal/SKILL.md
-  ├── agentd-challenge/SKILL.md
-  ├── agentd-reproposal/SKILL.md
-  ├── agentd-implement/SKILL.md
-  ├── agentd-verify/SKILL.md
-  └── agentd-archive/SKILL.md
+  ├── agentd-plan/SKILL.md      # Primary workflow entry
+  ├── agentd-impl/SKILL.md      # Primary workflow entry
+  ├── agentd-archive/SKILL.md   # Primary workflow entry
+  ├── agentd-proposal/SKILL.md  # (deprecated)
+  ├── agentd-challenge/SKILL.md # (deprecated)
+  └── ...
 ```
 
 ## Usage in Claude Code
 
-After running `agentd init`, you can use these skills directly in Claude Code:
+After running `agentd init`, use the high-level workflow skills:
 
 ```
-/agentd:proposal add-oauth "Add OAuth authentication"
-/agentd:challenge add-oauth
-/agentd:reproposal add-oauth
-/agentd:implement add-oauth
-/agentd:verify add-oauth
+# Planning phase (proposal + challenge + auto-reproposal)
+/agentd:plan add-oauth "Add OAuth authentication"
+
+# Implementation phase (implement + review + auto-fix)
+/agentd:impl add-oauth
+
+# Archive completed change
 /agentd:archive add-oauth
 ```
+
+### Deprecated Skills
+
+The following granular skills are deprecated but still available:
+
+- `/agentd:proposal` - Use `/agentd:plan` instead
+- `/agentd:challenge` - Use `/agentd:plan` instead
+- `/agentd:reproposal` - Use `/agentd:plan` instead
+- `/agentd:implement` - Use `/agentd:impl` instead
+- `/agentd:review` - Use `/agentd:impl` instead
+- `/agentd:resolve-reviews` - Use `/agentd:impl` instead
 
 ## Skill Architecture
 
 Each skill follows this pattern:
 
-1. **Validate inputs** - Check required parameters
-2. **Check state** - Ensure prerequisites are met
-3. **Execute task** - Call AI tools or perform operations
-4. **Verify results** - Ensure output is correct
-5. **Display feedback** - Show results to user
+1. **Check state** - Read `STATE.yaml` phase
+2. **Determine action** - Based on phase, decide next step
+3. **Execute task** - Call appropriate `agentd` CLI command
+4. **Display feedback** - Show results to user
 
 ## Customization
 
@@ -48,22 +60,3 @@ To customize a skill:
 1. Find it in `.claude/skills/agentd-*/SKILL.md`
 2. Edit the SKILL.md file
 3. Reload Claude Code
-4. Use the skill with `/agentd:*`
-
-## Development
-
-To add new skills:
-
-1. Create `templates/skills/agentd-newskill/SKILL.md`
-2. Update `src/cli/init.rs` to include the new skill
-3. Rebuild agentd: `cargo build --release`
-4. Run `agentd init` in a test project
-
-## Skill List
-
-- **agentd-proposal** - Generate proposal with Gemini (2M context)
-- **agentd-challenge** - Challenge proposal with Codex analysis
-- **agentd-reproposal** - Refine proposal based on feedback
-- **agentd-implement** - Implement tasks with Claude
-- **agentd-verify** - Generate tests and verify with Codex
-- **agentd-archive** - Archive completed change

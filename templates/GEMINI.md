@@ -29,14 +29,25 @@ agentd/
 
 ## Workflow
 
-The Agentd workflow follows this lifecycle:
+The Agentd workflow is streamlined into three high-level stages, accessed via specific skills:
 
-1. **Proposal** - Generate PRD (proposal.md), TD (specs/), and Tickets (tasks.md)
-2. **Challenge** - Review proposal for conflicts, issues, edge cases
-3. **Reproposal** - Refine based on challenge feedback
-4. **Implement** - Execute tasks from tasks.md
-5. **Verify** - Run tests and validate implementation
-6. **Archive** - Move completed change to archive
+1. **Plan** (`/agentd:plan`)
+   - Generates PRD (proposal.md), TD (specs/), and Tickets (tasks.md)
+   - Runs Challenge (automated review)
+   - Handles Reproposal loop until approved
+   - *Note: Handles legacy Proposal/Challenge/Reproposal steps internally*
+
+2. **Implement** (`/agentd:impl`)
+   - Executes tasks from tasks.md
+   - Runs verification and iterative fixes
+   - *Note: Handles legacy Implement/Verify/Fix steps internally*
+
+3. **Archive** (`/agentd:archive`)
+   - Finalizes the change and moves it to the archive
+
+**Phase Transitions:**
+`proposed` → `challenged` → `implementing` → `complete` → `archived`
+(Or `proposed` → `rejected` if fundamentally flawed)
 
 ## Your Role (Gemini)
 

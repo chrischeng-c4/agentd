@@ -434,8 +434,8 @@ fn default_schema_version() -> String {
 pub enum StatePhase {
     Proposed,
     Challenged,
+    Rejected,
     Implementing,
-    Testing,
     Complete,
     Archived,
 }

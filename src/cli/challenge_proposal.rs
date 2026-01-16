@@ -1,7 +1,7 @@
 use crate::context::ContextPhase;
 use crate::orchestrator::CodexOrchestrator;
 use crate::{
-    models::{Change, AgentdConfig},
+    models::{Change, AgentdConfig, ValidationOptions},
     Result,
 };
 use colored::Colorize;
@@ -59,13 +59,53 @@ pub async fn run(change_id: &str) -> Result<()> {
             display_challenge_summary(&content);
         }
 
+        // Validate and update phase based on verdict
+        println!();
+        println!("{}", "📝 Updating STATE.yaml from verdict...".cyan());
+        let validation_options = ValidationOptions::new().with_json(true);
+        let verdict = match crate::cli::validate_challenge::validate_challenge(
+            change_id,
+            &project_root,
+            &validation_options,
+        ) {
+            Ok(result) => {
+                println!("   {} Phase updated based on verdict: {:?}", "✓".green(), result.verdict);
+                result.verdict
+            }
+            Err(e) => {
+                println!("   {} Failed to update phase: {}", "⚠".yellow(), e);
+                crate::models::ChallengeVerdict::Unknown
+            }
+        };
+
+        // Provide next steps based on verdict
         println!("\n{}", "⏭️  Next steps:".yellow());
         println!("   1. Review full report:");
         println!("      cat {}", challenge_path.display());
-        println!("\n   2. Address issues automatically:");
-        println!("      agentd reproposal {}", change_id);
-        println!("\n   3. Or edit manually and re-challenge:");
-        println!("      agentd challenge {}", change_id);
+
+        match verdict {
+            crate::models::ChallengeVerdict::Approved => {
+                println!("\n   2. Proceed to implementation:");
+                println!("      agentd implement {}", change_id);
+            }
+            crate::models::ChallengeVerdict::NeedsRevision => {
+                println!("\n   2. Address issues automatically:");
+                println!("      agentd reproposal {}", change_id);
+                println!("\n   3. Or edit manually and re-challenge:");
+                println!("      agentd challenge {}", change_id);
+            }
+            crate::models::ChallengeVerdict::Rejected => {
+                println!("\n   2. Review rejection reasons in CHALLENGE.md");
+                println!("      This proposal has fundamental issues requiring manual intervention.");
+                println!("\n   3. Consider creating a new proposal with a different approach.");
+            }
+            crate::models::ChallengeVerdict::Unknown => {
+                println!("\n   2. Address issues automatically:");
+                println!("      agentd reproposal {}", change_id);
+                println!("\n   3. Or edit manually and re-challenge:");
+                println!("      agentd challenge {}", change_id);
+            }
+        }
     } else {
         println!("\n{}", "⚠️  Warning: CHALLENGE.md not found".yellow());
         println!("   The Codex orchestrator may need adjustment.");
