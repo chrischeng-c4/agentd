@@ -1,11 +1,43 @@
 use crate::context::ContextPhase;
-use crate::orchestrator::CodexOrchestrator;
+use crate::orchestrator::{CodexOrchestrator, UsageMetrics};
+use crate::state::StateManager;
 use crate::{
-    models::{Change, AgentdConfig, ValidationOptions},
+    models::{Change, AgentdConfig, Complexity, ValidationOptions},
     Result,
 };
 use colored::Colorize;
 use std::env;
+use std::path::PathBuf;
+
+/// Record LLM usage to StateManager
+fn record_usage(
+    change_id: &str,
+    project_root: &PathBuf,
+    step: &str,
+    model: &str,
+    usage: &UsageMetrics,
+    config: &AgentdConfig,
+    complexity: Complexity,
+) {
+    let state_path = project_root
+        .join("agentd/changes")
+        .join(change_id)
+        .join("STATE.yaml");
+
+    if let Ok(mut manager) = StateManager::load(&state_path) {
+        let m = config.codex.select_model(complexity);
+        manager.record_llm_call(
+            step,
+            Some(model.to_string()),
+            usage.tokens_in,
+            usage.tokens_out,
+            usage.duration_ms,
+            m.cost_per_1m_input,
+            m.cost_per_1m_output,
+        );
+        let _ = manager.save();
+    }
+}
 
 pub struct ChallengeCommand;
 
@@ -45,7 +77,9 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     // Run Codex orchestrator
     let orchestrator = CodexOrchestrator::new(&config, &project_root);
-    let (output, _usage) = orchestrator.run_challenge(change_id, complexity).await?;
+    let (output, usage) = orchestrator.run_challenge(change_id, complexity).await?;
+    let model = config.codex.select_model(complexity).model.clone();
+    record_usage(change_id, &project_root, "challenge", &model, &usage, &config, complexity);
 
     println!("\n{}", "📊 Challenge Report Generated".green().bold());
 

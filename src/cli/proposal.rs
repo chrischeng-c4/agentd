@@ -1,26 +1,70 @@
 use crate::cli::validate_challenge::validate_challenge;
 use crate::cli::validate_proposal::validate_proposal;
 use crate::context::ContextPhase;
-use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, ValidationOptions};
-use crate::orchestrator::{GeminiOrchestrator, CodexOrchestrator};
+use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, Complexity, ValidationOptions};
+use crate::orchestrator::{GeminiOrchestrator, CodexOrchestrator, UsageMetrics};
 use crate::parser::parse_challenge_verdict;
+use crate::state::StateManager;
 use crate::Result;
 use colored::Colorize;
 use std::env;
 use std::path::PathBuf;
+
+/// Record LLM usage to StateManager
+fn record_usage(
+    change_id: &str,
+    project_root: &PathBuf,
+    step: &str,
+    model: &str,
+    usage: &UsageMetrics,
+    config: &AgentdConfig,
+    complexity: Complexity,
+) {
+    let state_path = project_root
+        .join("agentd/changes")
+        .join(change_id)
+        .join("STATE.yaml");
+
+    if let Ok(mut manager) = StateManager::load(&state_path) {
+        // Get pricing from config based on model type
+        let (cost_in, cost_out) = if model.contains("gemini") {
+            let m = config.gemini.select_model(complexity);
+            (m.cost_per_1m_input, m.cost_per_1m_output)
+        } else if model.contains("codex") || model.contains("o1") || model.contains("o3") || model.contains("o4-mini") {
+            let m = config.codex.select_model(complexity);
+            (m.cost_per_1m_input, m.cost_per_1m_output)
+        } else {
+            let m = config.claude.select_model(complexity);
+            (m.cost_per_1m_input, m.cost_per_1m_output)
+        };
+
+        manager.record_llm_call(
+            step,
+            Some(model.to_string()),
+            usage.tokens_in,
+            usage.tokens_out,
+            usage.duration_ms,
+            cost_in,
+            cost_out,
+        );
+
+        let _ = manager.save();
+    }
+}
 
 pub struct ProposalCommand;
 
 /// Main entry point for the proposal workflow with automatic challenge-reproposal loop
 ///
 /// Workflow (6 steps):
+/// 0. Check clarifications.md (unless skip_clarify)
 /// 1. Generate proposal (Gemini)
 /// 2. Validate proposal format (local)
 /// 3. Challenge proposal (Codex)
 /// 4. Validate challenge (local)
 /// 5. Reproposal (Gemini) - if NEEDS_REVISION
 /// 6. Re-challenge (Codex) - one loop only
-pub async fn run(change_id: &str, description: &str) -> Result<()> {
+pub async fn run(change_id: &str, description: &str, skip_clarify: bool) -> Result<()> {
     let project_root = env::current_dir()?;
     let config = AgentdConfig::load(&project_root)?;
 
@@ -30,6 +74,27 @@ pub async fn run(change_id: &str, description: &str) -> Result<()> {
     );
     println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
     println!();
+
+    // Step 0: Check for clarifications.md (unless skipped)
+    if !skip_clarify {
+        let clarifications_path = project_root
+            .join("agentd/changes")
+            .join(change_id)
+            .join("clarifications.md");
+
+        if !clarifications_path.exists() {
+            println!("{}", "❌ Error: clarifications.md not found".red().bold());
+            println!();
+            println!("   Run clarification first via /agentd:plan, or use --skip-clarify to bypass.");
+            println!();
+            println!("   Example:");
+            println!("     agentd proposal {} \"{}\" --skip-clarify", change_id, description);
+            return Ok(());
+        }
+        println!("{}", "✅ clarifications.md found".green());
+    } else {
+        println!("{}", "⏭️  Skipping clarification check (--skip-clarify)".yellow());
+    }
 
     // Step 1: Generate proposal (resolves change-id conflicts)
     let resolved_change_id = run_proposal_step(change_id, description, &project_root, &config).await?;
@@ -188,7 +253,9 @@ async fn run_proposal_step(
         let complexity = change.assess_complexity(&project_root);
 
         match orchestrator.run_proposal(&resolved_change_id, description, complexity).await {
-            Ok((_output, _usage)) => {
+            Ok((_output, usage)) => {
+                let model = config.gemini.select_model(complexity).model.clone();
+                record_usage(&resolved_change_id, project_root, "proposal", &model, &usage, config, complexity);
                 last_error = None;
                 break;
             }
@@ -297,7 +364,9 @@ async fn run_challenge_step(
         }
 
         match orchestrator.run_challenge(change_id, complexity).await {
-            Ok((_output, _usage)) => {
+            Ok((_output, usage)) => {
+                let model = config.codex.select_model(complexity).model.clone();
+                record_usage(change_id, project_root, "challenge", &model, &usage, config, complexity);
                 last_error = None;
                 break;
             }
@@ -387,7 +456,9 @@ async fn run_rechallenge_step(
 
     // Run Codex rechallenge orchestrator (resumes session)
     let orchestrator = CodexOrchestrator::new(config, project_root);
-    let (_output, _usage) = orchestrator.run_rechallenge(change_id, complexity).await?;
+    let (_output, usage) = orchestrator.run_rechallenge(change_id, complexity).await?;
+    let model = config.codex.select_model(complexity).model.clone();
+    record_usage(change_id, project_root, "rechallenge", &model, &usage, config, complexity);
 
     // Parse verdict
     let challenge_path = change.challenge_path(project_root);
@@ -439,7 +510,9 @@ async fn run_reproposal_step(
         }
 
         match orchestrator.run_reproposal(change_id, complexity).await {
-            Ok((_output, _usage)) => {
+            Ok((_output, usage)) => {
+                let model = config.gemini.select_model(complexity).model.clone();
+                record_usage(change_id, project_root, "reproposal", &model, &usage, config, complexity);
                 last_error = None;
                 break;
             }

@@ -1,15 +1,56 @@
 use crate::context::ContextPhase;
 use crate::models::frontmatter::StatePhase;
-use crate::orchestrator::{ClaudeOrchestrator, CodexOrchestrator};
+use crate::orchestrator::{ClaudeOrchestrator, CodexOrchestrator, UsageMetrics};
 use crate::parser::parse_review_verdict;
 use crate::state::StateManager;
 use crate::{
-    models::{Change, ReviewVerdict, AgentdConfig},
+    models::{Change, Complexity, ReviewVerdict, AgentdConfig},
     Result,
 };
 use colored::Colorize;
 use std::env;
 use std::path::PathBuf;
+
+/// Record LLM usage to StateManager
+fn record_usage(
+    change_id: &str,
+    project_root: &PathBuf,
+    step: &str,
+    model: &str,
+    usage: &UsageMetrics,
+    config: &AgentdConfig,
+    complexity: Complexity,
+    provider: &str,
+) {
+    let state_path = project_root
+        .join("agentd/changes")
+        .join(change_id)
+        .join("STATE.yaml");
+
+    if let Ok(mut manager) = StateManager::load(&state_path) {
+        let (cost_in, cost_out) = match provider {
+            "claude" => {
+                let m = config.claude.select_model(complexity);
+                (m.cost_per_1m_input, m.cost_per_1m_output)
+            }
+            "codex" => {
+                let m = config.codex.select_model(complexity);
+                (m.cost_per_1m_input, m.cost_per_1m_output)
+            }
+            _ => (None, None),
+        };
+        manager.record_llm_call(
+            step,
+            Some(model.to_string()),
+            usage.tokens_in,
+            usage.tokens_out,
+            usage.duration_ms,
+            cost_in,
+            cost_out,
+        );
+        let _ = manager.save();
+    }
+}
 
 pub struct ImplementCommand;
 
@@ -118,9 +159,11 @@ async fn run_implement_step(
     let complexity = change.assess_complexity(project_root);
 
     let orchestrator = ClaudeOrchestrator::new(config, project_root);
-    let (_output, _usage) = orchestrator
+    let (_output, usage) = orchestrator
         .run_implement(change_id, tasks, complexity)
         .await?;
+    let model = config.claude.select_model(complexity).model.clone();
+    record_usage(change_id, project_root, "implement", &model, &usage, config, complexity, "claude");
 
     println!("{}", "✅ Implementation complete (code + tests written)".green());
     Ok(())
@@ -147,9 +190,11 @@ async fn run_review_step(
 
     // Run Codex review orchestrator with iteration number
     let orchestrator = CodexOrchestrator::new(config, project_root);
-    let (_output, _usage) = orchestrator
+    let (_output, usage) = orchestrator
         .run_review(change_id, iteration, complexity)
         .await?;
+    let model = config.codex.select_model(complexity).model.clone();
+    record_usage(change_id, project_root, "review", &model, &usage, config, complexity, "codex");
 
     // Parse verdict
     let review_path = change.review_path(project_root);
@@ -178,7 +223,9 @@ async fn run_resolve_step(
     let complexity = change.assess_complexity(project_root);
 
     let orchestrator = ClaudeOrchestrator::new(config, project_root);
-    let (_output, _usage) = orchestrator.run_resolve(change_id, complexity).await?;
+    let (_output, usage) = orchestrator.run_resolve(change_id, complexity).await?;
+    let model = config.claude.select_model(complexity).model.clone();
+    record_usage(change_id, project_root, "resolve", &model, &usage, config, complexity, "claude");
 
     println!("{}", "✅ Issues resolved".green());
     Ok(())

@@ -1,12 +1,44 @@
 use crate::context::ContextPhase;
-use crate::orchestrator::CodexOrchestrator;
+use crate::orchestrator::{CodexOrchestrator, UsageMetrics};
 use crate::parser::parse_review_verdict;
+use crate::state::StateManager;
 use crate::{
-    models::{Change, ReviewVerdict, AgentdConfig},
+    models::{Change, Complexity, ReviewVerdict, AgentdConfig},
     Result,
 };
 use colored::Colorize;
 use std::env;
+use std::path::PathBuf;
+
+/// Record LLM usage to StateManager
+fn record_usage(
+    change_id: &str,
+    project_root: &PathBuf,
+    step: &str,
+    model: &str,
+    usage: &UsageMetrics,
+    config: &AgentdConfig,
+    complexity: Complexity,
+) {
+    let state_path = project_root
+        .join("agentd/changes")
+        .join(change_id)
+        .join("STATE.yaml");
+
+    if let Ok(mut manager) = StateManager::load(&state_path) {
+        let m = config.codex.select_model(complexity);
+        manager.record_llm_call(
+            step,
+            Some(model.to_string()),
+            usage.tokens_in,
+            usage.tokens_out,
+            usage.duration_ms,
+            m.cost_per_1m_input,
+            m.cost_per_1m_output,
+        );
+        let _ = manager.save();
+    }
+}
 
 pub struct ReviewCommand;
 
@@ -44,7 +76,9 @@ pub async fn run(change_id: &str) -> Result<()> {
 
     // Run Codex review orchestrator
     let orchestrator = CodexOrchestrator::new(&config, &project_root);
-    let (output, _usage) = orchestrator.run_review(change_id, 0, complexity).await?;
+    let (output, usage) = orchestrator.run_review(change_id, 0, complexity).await?;
+    let model = config.codex.select_model(complexity).model.clone();
+    record_usage(change_id, &project_root, "review", &model, &usage, &config, complexity);
 
     println!("\n{}", "📊 Code Review Complete".green().bold());
 

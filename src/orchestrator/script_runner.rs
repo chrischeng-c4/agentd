@@ -17,48 +17,62 @@ pub struct UsageMetrics {
     pub tokens_out: Option<u64>,
     /// Duration in milliseconds
     pub duration_ms: Option<u64>,
+    /// Cost in USD (if provided directly by CLI)
+    pub cost_usd: Option<f64>,
 }
 
 /// Gemini stream-json usage response format
+/// Actual format: {"type":"result","stats":{"input_tokens":N,"output_tokens":N,...}}
 #[derive(Debug, Deserialize)]
 struct GeminiUsageResponse {
-    #[serde(rename = "usageMetadata")]
-    usage_metadata: Option<GeminiUsageMetadata>,
+    #[serde(rename = "type")]
+    response_type: Option<String>,
+    stats: Option<GeminiStats>,
 }
 
 #[derive(Debug, Deserialize)]
-struct GeminiUsageMetadata {
-    #[serde(rename = "promptTokenCount")]
-    prompt_token_count: Option<u64>,
-    #[serde(rename = "candidatesTokenCount")]
-    candidates_token_count: Option<u64>,
+struct GeminiStats {
+    input_tokens: Option<u64>,
+    output_tokens: Option<u64>,
     #[allow(dead_code)]
-    #[serde(rename = "totalTokenCount")]
-    total_token_count: Option<u64>,
+    total_tokens: Option<u64>,
+    #[allow(dead_code)]
+    duration_ms: Option<u64>,
 }
 
 /// Claude stream-json usage response format
+/// Actual format: {"type":"result","total_cost_usd":N,"usage":{"input_tokens":N,"output_tokens":N,...},"duration_ms":N}
 #[derive(Debug, Deserialize)]
 struct ClaudeUsageResponse {
+    #[serde(rename = "type")]
+    response_type: Option<String>,
     usage: Option<ClaudeUsage>,
+    total_cost_usd: Option<f64>,
+    duration_ms: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ClaudeUsage {
     input_tokens: Option<u64>,
     output_tokens: Option<u64>,
+    cache_read_input_tokens: Option<u64>,
+    cache_creation_input_tokens: Option<u64>,
 }
 
 /// Codex JSON usage response format
+/// Actual format: {"type":"turn.completed","usage":{"input_tokens":N,"cached_input_tokens":N,"output_tokens":N}}
 #[derive(Debug, Deserialize)]
 struct CodexUsageResponse {
+    #[serde(rename = "type")]
+    response_type: Option<String>,
     usage: Option<CodexUsage>,
 }
 
 #[derive(Debug, Deserialize)]
 struct CodexUsage {
-    prompt_tokens: Option<u64>,
-    completion_tokens: Option<u64>,
+    input_tokens: Option<u64>,
+    output_tokens: Option<u64>,
+    cached_input_tokens: Option<u64>,
 }
 
 /// Runner for executing CLI commands directly
@@ -118,13 +132,16 @@ impl ScriptRunner {
         let mut metrics = UsageMetrics::default();
 
         // Gemini stream-json outputs JSON objects one per line
-        // Look for the last line with usageMetadata
+        // Look for the "result" type message with stats
         for line in output.lines().rev() {
             if let Ok(response) = serde_json::from_str::<GeminiUsageResponse>(line) {
-                if let Some(usage) = response.usage_metadata {
-                    metrics.tokens_in = usage.prompt_token_count;
-                    metrics.tokens_out = usage.candidates_token_count;
-                    return metrics;
+                if response.response_type.as_deref() == Some("result") {
+                    if let Some(stats) = response.stats {
+                        metrics.tokens_in = stats.input_tokens;
+                        metrics.tokens_out = stats.output_tokens;
+                        metrics.duration_ms = stats.duration_ms;
+                        return metrics;
+                    }
                 }
             }
         }
@@ -136,12 +153,19 @@ impl ScriptRunner {
     fn parse_claude_usage(output: &str) -> UsageMetrics {
         let mut metrics = UsageMetrics::default();
 
-        // Claude outputs JSON objects with usage in the final message
+        // Claude outputs JSON objects, look for "result" type with usage
         for line in output.lines().rev() {
             if let Ok(response) = serde_json::from_str::<ClaudeUsageResponse>(line) {
-                if let Some(usage) = response.usage {
-                    metrics.tokens_in = usage.input_tokens;
-                    metrics.tokens_out = usage.output_tokens;
+                if response.response_type.as_deref() == Some("result") {
+                    if let Some(usage) = response.usage {
+                        // Include cache tokens in input count
+                        let cache_tokens = usage.cache_read_input_tokens.unwrap_or(0)
+                            + usage.cache_creation_input_tokens.unwrap_or(0);
+                        metrics.tokens_in = Some(usage.input_tokens.unwrap_or(0) + cache_tokens);
+                        metrics.tokens_out = usage.output_tokens;
+                    }
+                    metrics.duration_ms = response.duration_ms;
+                    metrics.cost_usd = response.total_cost_usd;
                     return metrics;
                 }
             }
@@ -154,13 +178,17 @@ impl ScriptRunner {
     fn parse_codex_usage(output: &str) -> UsageMetrics {
         let mut metrics = UsageMetrics::default();
 
-        // Codex --json outputs JSON with usage
+        // Codex --json outputs JSON with turn.completed containing usage
         for line in output.lines().rev() {
             if let Ok(response) = serde_json::from_str::<CodexUsageResponse>(line) {
-                if let Some(usage) = response.usage {
-                    metrics.tokens_in = usage.prompt_tokens;
-                    metrics.tokens_out = usage.completion_tokens;
-                    return metrics;
+                if response.response_type.as_deref() == Some("turn.completed") {
+                    if let Some(usage) = response.usage {
+                        // Include cached tokens in input count
+                        let cached = usage.cached_input_tokens.unwrap_or(0);
+                        metrics.tokens_in = Some(usage.input_tokens.unwrap_or(0) + cached);
+                        metrics.tokens_out = usage.output_tokens;
+                        return metrics;
+                    }
                 }
             }
         }
@@ -375,18 +403,20 @@ mod tests {
 
     #[test]
     fn test_parse_gemini_usage() {
-        let output = r#"{"text":"Hello"}
-{"text":" world"}
-{"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":50,"totalTokenCount":150}}"#;
+        let output = r#"{"type":"init","session_id":"abc"}
+{"type":"message","role":"user","content":"Hello"}
+{"type":"message","role":"assistant","content":"Hi there"}
+{"type":"result","status":"success","stats":{"total_tokens":150,"input_tokens":100,"output_tokens":50,"duration_ms":1234}}"#;
 
         let metrics = ScriptRunner::parse_gemini_usage(output);
         assert_eq!(metrics.tokens_in, Some(100));
         assert_eq!(metrics.tokens_out, Some(50));
+        assert_eq!(metrics.duration_ms, Some(1234));
     }
 
     #[test]
     fn test_parse_gemini_usage_no_metadata() {
-        let output = r#"{"text":"Hello world"}"#;
+        let output = r#"{"type":"message","content":"Hello world"}"#;
 
         let metrics = ScriptRunner::parse_gemini_usage(output);
         assert_eq!(metrics.tokens_in, None);
@@ -395,18 +425,21 @@ mod tests {
 
     #[test]
     fn test_parse_claude_usage() {
-        let output = r#"{"type":"message_start"}
-{"type":"content_block_delta"}
-{"type":"message_delta","usage":{"input_tokens":200,"output_tokens":75}}"#;
+        let output = r#"{"type":"system","subtype":"init"}
+{"type":"assistant","message":{"content":"Hello"}}
+{"type":"result","subtype":"success","duration_ms":2940,"total_cost_usd":0.051,"usage":{"input_tokens":2,"cache_creation_input_tokens":6745,"cache_read_input_tokens":14269,"output_tokens":72}}"#;
 
         let metrics = ScriptRunner::parse_claude_usage(output);
-        assert_eq!(metrics.tokens_in, Some(200));
-        assert_eq!(metrics.tokens_out, Some(75));
+        // input_tokens = 2 + 6745 + 14269 = 21016
+        assert_eq!(metrics.tokens_in, Some(21016));
+        assert_eq!(metrics.tokens_out, Some(72));
+        assert_eq!(metrics.duration_ms, Some(2940));
+        assert_eq!(metrics.cost_usd, Some(0.051));
     }
 
     #[test]
     fn test_parse_claude_usage_no_usage() {
-        let output = r#"{"type":"message_start"}"#;
+        let output = r#"{"type":"assistant","message":{"content":"Hello"}}"#;
 
         let metrics = ScriptRunner::parse_claude_usage(output);
         assert_eq!(metrics.tokens_in, None);
@@ -415,16 +448,20 @@ mod tests {
 
     #[test]
     fn test_parse_codex_usage() {
-        let output = r#"{"message":"Done","usage":{"prompt_tokens":500,"completion_tokens":150}}"#;
+        let output = r#"{"type":"thread.started","thread_id":"abc"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"type":"agent_message","text":"Hello!"}}
+{"type":"turn.completed","usage":{"input_tokens":3448,"cached_input_tokens":1664,"output_tokens":8}}"#;
 
         let metrics = ScriptRunner::parse_codex_usage(output);
-        assert_eq!(metrics.tokens_in, Some(500));
-        assert_eq!(metrics.tokens_out, Some(150));
+        // input_tokens = 3448 + 1664 = 5112
+        assert_eq!(metrics.tokens_in, Some(5112));
+        assert_eq!(metrics.tokens_out, Some(8));
     }
 
     #[test]
     fn test_parse_codex_usage_no_usage() {
-        let output = r#"{"message":"Done"}"#;
+        let output = r#"{"type":"thread.started","thread_id":"abc"}"#;
 
         let metrics = ScriptRunner::parse_codex_usage(output);
         assert_eq!(metrics.tokens_in, None);
@@ -461,5 +498,6 @@ mod tests {
         assert_eq!(metrics.tokens_in, None);
         assert_eq!(metrics.tokens_out, None);
         assert_eq!(metrics.duration_ms, None);
+        assert_eq!(metrics.cost_usd, None);
     }
 }

@@ -1,9 +1,9 @@
 use crate::models::{
-    decide_merging_strategy, ArchiveReviewVerdict, DeltaMetrics, MergingStrategy, AgentdConfig,
+    decide_merging_strategy, ArchiveReviewVerdict, Complexity, DeltaMetrics, MergingStrategy, AgentdConfig,
     ValidationRules, Change,
 };
 use crate::models::frontmatter::StatePhase;
-use crate::orchestrator::{GeminiOrchestrator, CodexOrchestrator};
+use crate::orchestrator::{GeminiOrchestrator, CodexOrchestrator, UsageMetrics};
 use crate::parser::parse_archive_review_verdict;
 use crate::state::StateManager;
 use crate::validator::{SemanticValidator, SpecFormatValidator};
@@ -12,6 +12,36 @@ use colored::Colorize;
 use std::env;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+
+/// Record LLM usage to StateManager
+fn record_usage(
+    change_id: &str,
+    project_root: &PathBuf,
+    step: &str,
+    model: &str,
+    usage: &UsageMetrics,
+    config: &AgentdConfig,
+    complexity: Complexity,
+) {
+    let state_path = project_root
+        .join("agentd/changes")
+        .join(change_id)
+        .join("STATE.yaml");
+
+    if let Ok(mut manager) = StateManager::load(&state_path) {
+        let m = config.gemini.select_model(complexity);
+        manager.record_llm_call(
+            step,
+            Some(model.to_string()),
+            usage.tokens_in,
+            usage.tokens_out,
+            usage.duration_ms,
+            m.cost_per_1m_input,
+            m.cost_per_1m_output,
+        );
+        let _ = manager.save();
+    }
+}
 
 pub struct ArchiveCommand;
 
@@ -403,7 +433,9 @@ async fn generate_changelog_entry(
 
     let orchestrator = GeminiOrchestrator::new(config, project_root);
 
-    let (_output, _usage) = orchestrator.run_changelog(change_id, complexity).await?;
+    let (_output, usage) = orchestrator.run_changelog(change_id, complexity).await?;
+    let model = config.gemini.select_model(complexity).model.clone();
+    record_usage(change_id, &project_root.to_path_buf(), "changelog", &model, &usage, config, complexity);
 
     // Verify CHANGELOG was updated
     let changelog_path = project_root.join("agentd/specs/CHANGELOG.md");
@@ -576,7 +608,9 @@ async fn run_archive_fix_step(
     let complexity = change.assess_complexity(project_root);
 
     let orchestrator = GeminiOrchestrator::new(config, project_root);
-    let (_output, _usage) = orchestrator.run_archive_fix(change_id, complexity).await?;
+    let (_output, usage) = orchestrator.run_archive_fix(change_id, complexity).await?;
+    let model = config.gemini.select_model(complexity).model.clone();
+    record_usage(change_id, project_root, "archive_fix", &model, &usage, config, complexity);
 
     println!("{}", "✅ Archive issues fixed".green());
     Ok(())
