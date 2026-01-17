@@ -1,26 +1,26 @@
 change_id: plan-viewer-ui
 schema_version: '2.0'
 created_at: 2026-01-17T08:29:21.525730Z
-updated_at: 2026-01-17T10:28:55.776745Z
-phase: complete
+updated_at: 2026-01-17T14:49:49.102729Z
+phase: archived
 iteration: 1
-last_action: validate-challenge
+last_action: archive
 checksums:
-  tasks.md:
-    hash: sha256:40cc2eeaa0db5dfe26d0ab91f04f41c231fb409b26e47112bcb0e2b76be5114c
-    validated_at: 2026-01-17T08:32:45.065247Z
-  specs/plan-viewer.md:
-    hash: sha256:2d424d7298dd41578d1c77887e23c90133d23028d0afcffe7df7031935501dea
-    validated_at: 2026-01-17T08:32:45.065415Z
   specs/_skeleton.md:
     hash: sha256:b36a8641f8c91dcdda73cbb4ba9918e7ed1881a0d5c5de3fad5d6002b7429478
     validated_at: 2026-01-17T08:32:45.065376Z
-  specs/annotations.md:
-    hash: sha256:5fc972e8337731ddb5c0cb70336a0b6702c3ad6b3a896e968aadddc5c86ce071
-    validated_at: 2026-01-17T08:32:45.065313Z
   proposal.md:
     hash: sha256:54d51687f3cae38a7892a951df91064f1e06feae3c287f7599f7e97586c0c39f
     validated_at: 2026-01-17T08:32:45.065204Z
+  specs/plan-viewer.md:
+    hash: sha256:2d424d7298dd41578d1c77887e23c90133d23028d0afcffe7df7031935501dea
+    validated_at: 2026-01-17T08:32:45.065415Z
+  tasks.md:
+    hash: sha256:40cc2eeaa0db5dfe26d0ab91f04f41c231fb409b26e47112bcb0e2b76be5114c
+    validated_at: 2026-01-17T08:32:45.065247Z
+  specs/annotations.md:
+    hash: sha256:5fc972e8337731ddb5c0cb70336a0b6702c3ad6b3a896e968aadddc5c86ce071
+    validated_at: 2026-01-17T08:32:45.065313Z
   CHALLENGE.md:
     hash: sha256:71a3793fccbbe702953f9473393502f4225ea0dd4c75fb2b71ba466c37447ef8
     validated_at: 2026-01-17T09:43:15.991220Z

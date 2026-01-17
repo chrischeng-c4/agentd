@@ -100,34 +100,34 @@ FUNCTION handle_ipc_message(message: JsonValue) -> JsonValue
 
 ## Acceptance Criteria
 
-### Scenario: Open viewer for valid change
+### Scenario: WHEN user opens valid change THEN viewer displays files
 - **WHEN** user runs `agentd view my-change`
 - **THEN** a native window opens with a sidebar listing `proposal.md`, `CHALLENGE.md`, and `STATE.yaml`
 
-### Scenario: Open viewer for invalid change
+### Scenario: WHEN user opens invalid change THEN error is shown
 - **WHEN** user runs `agentd view non-existent-change`
 - **THEN** the command exits with message "Change 'non-existent-change' not found" and status code 1, and does not open a window
 
-### Scenario: Auto-open during planning (UI disabled)
+### Scenario: WHEN UI feature disabled THEN fallback message is logged
 - **WHEN** `agentd proposal` completes and updates phase to `CHALLENGED` (with `ui` feature disabled)
 - **THEN** a message "UI feature disabled. View plan manually at: [path]" is logged, and no process is spawned
 
-### Scenario: Render missing file
+### Scenario: WHEN file is missing THEN placeholder is shown
 - **WHEN** user clicks `CHALLENGE.md` but the file does not exist
 - **THEN** the viewer displays a "File not found" placeholder instead of crashing
 
-### Scenario: Save annotation failure
+### Scenario: WHEN annotation save fails THEN error notification appears
 - **WHEN** user attempts to save an annotation but the file system is read-only
 - **THEN** the UI displays an error notification
 
-### Scenario: Approve review
+### Scenario: WHEN user approves review THEN phase is updated
 - **WHEN** user clicks the "Approve" button after reviewing the plan
 - **THEN** `STATE.yaml` phase is updated to `complete`, a success message is shown, and the viewer closes
 
-### Scenario: Request changes
+### Scenario: WHEN user requests changes THEN annotations are saved
 - **WHEN** user clicks the "Request Changes" button with annotations added
 - **THEN** annotations are saved, `STATE.yaml` phase remains unchanged (or set to needs-revision), and the viewer closes with a summary
 
-### Scenario: Submit comments only
+### Scenario: WHEN user submits comments THEN viewer stays open
 - **WHEN** user clicks "Submit Comments" button
 - **THEN** annotations are saved but the viewer remains open for continued review

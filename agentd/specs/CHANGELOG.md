@@ -10,6 +10,10 @@ All notable changes to specifications will be documented here.
   - Challenge updates phase based on verdict (APPROVED → challenged, REJECTED → rejected)
   - New `rejected` phase for fundamentally flawed proposals
 
+## 2026-01-17: Add Plan Viewer UI (plan-viewer-ui)
+Added a standalone UI window viewer for `agentd` plans using `wry`. This viewer provides a rich, interactive interface for reviewing proposals and challenges, featuring native Mermaid diagram rendering, STATE.yaml rendering, and support for human annotations.
+- Related specs: plan-viewer.md, annotations.md
+
 ## 2026-01-17: Enhance Fillback Process (improve-fillback-2)
 Added `fillback-enhancement.md` to specify the enhanced fillback process, transitioning from simple file-scanning to AST-based analysis and interactive clarification.
 - Related specs: fillback-enhancement.md
