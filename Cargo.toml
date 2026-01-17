@@ -1,6 +1,6 @@
 [package]
 name = "agentd"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 authors = ["Chris Cheng <chris.cheng@shopee.com>"]
 description = "AI agent orchestrator for spec-driven development with iterative proposal refinement"
@@ -43,6 +43,14 @@ thiserror = "2"
 walkdir = "2"
 glob = "0.3"
 ignore = "0.4"
+
+# AST parsing (tree-sitter)
+tree-sitter = "0.24"
+tree-sitter-rust = "0.23"
+tree-sitter-python = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-go = "0.23"
 
 # Git (vendored-openssl for cross-platform builds)
 git2 = { version = "0.20", features = ["vendored-openssl"] }
