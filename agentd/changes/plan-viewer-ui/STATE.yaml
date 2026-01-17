@@ -1,0 +1,281 @@
+change_id: plan-viewer-ui
+schema_version: '2.0'
+created_at: 2026-01-17T08:29:21.525730Z
+updated_at: 2026-01-17T10:28:55.776745Z
+phase: complete
+iteration: 1
+last_action: validate-challenge
+checksums:
+  tasks.md:
+    hash: sha256:40cc2eeaa0db5dfe26d0ab91f04f41c231fb409b26e47112bcb0e2b76be5114c
+    validated_at: 2026-01-17T08:32:45.065247Z
+  specs/plan-viewer.md:
+    hash: sha256:2d424d7298dd41578d1c77887e23c90133d23028d0afcffe7df7031935501dea
+    validated_at: 2026-01-17T08:32:45.065415Z
+  specs/_skeleton.md:
+    hash: sha256:b36a8641f8c91dcdda73cbb4ba9918e7ed1881a0d5c5de3fad5d6002b7429478
+    validated_at: 2026-01-17T08:32:45.065376Z
+  specs/annotations.md:
+    hash: sha256:5fc972e8337731ddb5c0cb70336a0b6702c3ad6b3a896e968aadddc5c86ce071
+    validated_at: 2026-01-17T08:32:45.065313Z
+  proposal.md:
+    hash: sha256:54d51687f3cae38a7892a951df91064f1e06feae3c287f7599f7e97586c0c39f
+    validated_at: 2026-01-17T08:32:45.065204Z
+  CHALLENGE.md:
+    hash: sha256:71a3793fccbbe702953f9473393502f4225ea0dd4c75fb2b71ba466c37447ef8
+    validated_at: 2026-01-17T09:43:15.991220Z
+validations:
+- step: validate-proposal
+  timestamp: 2026-01-17T08:29:21.525785Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 13
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/annotations.md] Scenario heading ''Scenario: Add an annotation to a requirement'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/annotations.md] Scenario heading ''Scenario: Load existing annotations'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/annotations.md] Scenario heading ''Scenario: Resolve an annotation'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/annotations.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/annotations.md] Missing **WHEN** clause in scenarios'
+  - '[specs/annotations.md] Missing **THEN** clause in scenarios'
+  - '[specs/plan-viewer.md] Scenario heading ''Scenario: Open viewer for valid change'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/plan-viewer.md] Scenario heading ''Scenario: Render Mermaid diagram'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/plan-viewer.md] Scenario heading ''Scenario: Auto-open during planning'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/plan-viewer.md] Scenario heading ''Scenario: Switch between files'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/plan-viewer.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/plan-viewer.md] Missing **WHEN** clause in scenarios'
+  - '[specs/plan-viewer.md] Missing **THEN** clause in scenarios'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-17T08:31:38.904630Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 2
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/annotations.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/plan-viewer.md] Found 0 scenarios, but minimum 1 required'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-17T08:32:45.065167Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 0
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T08:35:58.254290Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 4
+    medium: 2
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 7
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T08:40:34.919042Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 4
+    medium: 2
+    low: 2
+    verdict: UNKNOWN
+    issues_parsed: 8
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T08:44:24.267241Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 2
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T08:49:40.715353Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 2
+    low: 3
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T08:54:37.021331Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 1
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T08:58:46.947615Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 4
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T09:03:34.083035Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 0
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 4
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T09:08:29.980066Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 3
+    medium: 1
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T09:13:43.393133Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 1
+    low: 3
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T09:27:19.491812Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 3
+    medium: 2
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T09:31:45.877373Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 4
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T09:35:34.576804Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 3
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T09:38:59.787528Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 4
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-17T09:43:15.991163Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 1
+    low: 3
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+telemetry: null

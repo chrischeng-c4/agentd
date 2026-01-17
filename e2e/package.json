@@ -1,0 +1,15 @@
+{
+  "name": "agentd-e2e",
+  "version": "0.1.10",
+  "description": "E2E tests for agentd plan viewer",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.10.0"
+  }
+}

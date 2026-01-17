@@ -1,3 +1,4 @@
+pub mod annotation;
 pub mod archive_review;
 pub mod challenge;
 pub mod change;
@@ -39,3 +40,5 @@ pub use validation::{
     ValidationError, ValidationJsonOutput, ValidationOptions, ValidationResult, ValidationRules,
 };
 pub use verification::{TestResult, TestStatus, Verification};
+
+pub use annotation::{get_author_name, Annotation, AnnotationError, AnnotationResult, AnnotationStore};

@@ -156,6 +156,10 @@ pub async fn run(change_id: &str, description: &str, skip_clarify: bool) -> Resu
                 }
                 println!("   Location: agentd/changes/{}", resolved_change_id);
                 println!();
+
+                // Auto-open viewer (if ui feature is enabled)
+                open_viewer_if_available(&resolved_change_id, &project_root);
+
                 println!("{}", "⏭️  Next steps:".yellow());
                 println!("   agentd implement {}", resolved_change_id);
                 return Ok(());
@@ -627,4 +631,29 @@ fn display_remaining_issues(change_id: &str, project_root: &PathBuf) -> Result<(
     println!("     agentd reproposal {}  (if needed)", change_id);
 
     Ok(())
+}
+
+/// Open the plan viewer if the ui feature is enabled
+/// Spawns a detached process so the CLI can exit independently
+#[cfg(feature = "ui")]
+fn open_viewer_if_available(change_id: &str, _project_root: &PathBuf) {
+    println!("{}", "🖼️  Opening plan viewer...".cyan());
+    match crate::cli::view::spawn_detached(change_id) {
+        Ok(_) => {
+            println!("   Plan viewer opened in a new window.");
+        }
+        Err(e) => {
+            println!("{}", format!("   Warning: Could not open viewer: {}", e).yellow());
+            println!("   You can manually open it with: agentd view {}", change_id);
+        }
+    }
+    println!();
+}
+
+#[cfg(not(feature = "ui"))]
+fn open_viewer_if_available(change_id: &str, project_root: &PathBuf) {
+    let change_path = project_root.join("agentd/changes").join(change_id);
+    // Print exact message without ANSI formatting to match spec requirement
+    println!("UI feature disabled. View plan manually at: {}", change_path.display());
+    println!();
 }

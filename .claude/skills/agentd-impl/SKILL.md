@@ -8,6 +8,16 @@ user-invocable: true
 
 Orchestrates the implementation phase, handling code generation, review, and iterative fixes based on the current state.
 
+## IMPORTANT: Your role is orchestration only
+
+**DO NOT implement code yourself.** Your job is to:
+1. Check the current phase in `STATE.yaml`
+2. Run the `agentd implement` command
+
+The actual implementation is done by a **separate Claude session** spawned by the command. This session has access to the proposal specs and implements according to `tasks.md`.
+
+You are a dispatcher, not an implementer. Run the command and let the subprocess handle the work.
+
 ## Usage
 
 ```bash
