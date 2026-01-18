@@ -37,6 +37,8 @@ pub enum LlmArg {
     AllowedTools(String),
     /// Verbose output
     Verbose,
+    /// MCP config file path (Claude --mcp-config)
+    McpConfig(String),
 }
 
 /// LLM provider type
@@ -227,6 +229,14 @@ impl LlmProvider {
                     if *self == LlmProvider::Claude {
                         cli_args.push("--verbose".to_string());
                     }
+                }
+                LlmArg::McpConfig(path) => {
+                    // Claude --mcp-config (load MCP servers from config file)
+                    if *self == LlmProvider::Claude {
+                        cli_args.push("--mcp-config".to_string());
+                        cli_args.push(path.clone());
+                    }
+                    // TODO: Add Gemini/Codex MCP config support when available
                 }
             }
         }

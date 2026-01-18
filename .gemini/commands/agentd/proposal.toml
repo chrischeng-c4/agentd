@@ -133,7 +133,81 @@ After completing all phases, output:
 
 # Tool Usage
 
-Use ONLY these tools:
+## Option A: MCP Tools (Recommended)
+
+If MCP server is configured, use these structured tools for guaranteed-valid output:
+
+```python
+# Create proposal.md with enforced structure
+create_proposal(
+    change_id="my-change",
+    summary="Brief description of what changes",
+    why="Explanation of why this change is needed...",
+    what_changes=["Change 1", "Change 2"],
+    impact={
+        "scope": "minor",  # patch|minor|major
+        "affected_files": 5,
+        "new_files": 2,
+        "affected_specs": ["spec-id"],
+        "affected_code": ["src/path/"]
+    }
+)
+
+# Create specs with requirements and scenarios
+create_spec(
+    change_id="my-change",
+    spec_id="feature-spec",
+    title="Feature Specification",
+    overview="Detailed overview of what this spec covers...",
+    requirements=[
+        {"id": "R1", "title": "Requirement 1", "description": "...", "priority": "high"}
+    ],
+    scenarios=[
+        {"name": "Scenario Name", "given": "...", "when": "...", "then": "..."}
+    ],
+    flow_diagram="graph LR\n    A --> B"  # Optional Mermaid
+)
+
+# Create tasks.md with layered structure
+create_tasks(
+    change_id="my-change",
+    tasks=[
+        {
+            "layer": "data",  # data|logic|integration|testing
+            "number": 1,
+            "title": "Task title",
+            "file": {"path": "src/module.rs", "action": "CREATE"},
+            "spec_ref": "feature-spec:R1",
+            "description": "What to do...",
+            "depends": []
+        }
+    ]
+)
+
+# Validate all files
+validate_change(change_id="my-change")
+
+# Read existing files (for progressive workflow)
+read_file(change_id="my-change", file="proposal")  # Read proposal.md
+read_file(change_id="my-change", file="my-spec")   # Read specs/my-spec.md
+read_file(change_id="my-change", file="tasks")     # Read tasks.md
+
+# List existing specs
+list_specs(change_id="my-change")
+```
+
+**Progressive Workflow:**
+1. `create_proposal` → Create PRD first
+2. `read_file(file="proposal")` → Review proposal for context
+3. `create_spec` → Create each technical spec
+4. `list_specs` → See what specs exist
+5. `read_file(file="<spec>")` → Review specs before creating tasks
+6. `create_tasks` → Create implementation tasks
+7. `validate_change` → Validate all files
+
+## Option B: Direct File Writing (Fallback)
+
+If MCP is not configured, use write_file:
 
 ```python
 # Read files
@@ -152,7 +226,8 @@ write_file(file_path="changes/<change-id>/tasks.md", content="...")
 ```
 
 **CRITICAL**:
-- You MUST use `write_file` to create outputs
+- Prefer MCP tools (create_proposal, create_spec, create_tasks) when available
+- MCP tools enforce correct structure and validate automatically
 - Do NOT use shell commands
 - Do NOT write actual implementation code
 - Follow the skeleton format from GEMINI.md exactly
