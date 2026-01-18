@@ -1,10 +1,153 @@
-use super::cli_mapper::{LlmArg, LlmProvider};
+use super::cli_mapper::{LlmArg, LlmProvider, ResumeMode};
 use super::prompts;
 use super::{ModelSelector, ScriptRunner, UsageMetrics};
 use crate::models::{AgentdConfig, Complexity};
-use anyhow::Result;
+use anyhow::{Context, Result};
+use regex::Regex;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::process::Stdio;
+use tokio::process::Command;
+
+/// Self-review outcome from Gemini
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelfReviewResult {
+    /// No issues found
+    Pass,
+    /// Issues found and files were edited
+    NeedsRevision,
+}
+
+/// Gemini stream-json message response format for text content
+#[derive(Debug, Deserialize)]
+struct GeminiMessageResponse {
+    #[serde(rename = "type")]
+    response_type: Option<String>,
+    content: Option<serde_json::Value>,
+}
+
+/// Detect self-review markers from Gemini stream-json output
+///
+/// Parses the output looking for `<review>PASS</review>` or `<review>NEEDS_REVISION</review>`.
+/// If no marker is found, logs a warning and returns Pass (non-blocking, proceed to validation).
+pub fn detect_self_review_marker(output: &str) -> SelfReviewResult {
+    // Assemble all text content from the output
+    let mut assembled_text = String::new();
+
+    for line in output.lines() {
+        // Try to parse as a message with content
+        if let Ok(msg) = serde_json::from_str::<GeminiMessageResponse>(line) {
+            if msg.response_type.as_deref() == Some("message") {
+                if let Some(content) = msg.content {
+                    // Content can be a string or an array of parts
+                    match content {
+                        serde_json::Value::String(s) => {
+                            assembled_text.push_str(&s);
+                        }
+                        serde_json::Value::Array(parts) => {
+                            for part in parts {
+                                // Each part may have a "text" field
+                                if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
+                                    assembled_text.push_str(text);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    // Also check raw output for escaped markers
+    let full_text = format!("{}\n{}", assembled_text, output);
+
+    // Check for markers
+    if full_text.contains("<review>NEEDS_REVISION</review>") {
+        return SelfReviewResult::NeedsRevision;
+    }
+    if full_text.contains("<review>PASS</review>") {
+        return SelfReviewResult::Pass;
+    }
+
+    // No marker found - log warning and treat as PASS
+    eprintln!("Warning: Self-review marker not found in output, treating as PASS");
+    SelfReviewResult::Pass
+}
+
+/// Find the session index for a given UUID by calling `gemini --list-sessions`
+///
+/// # Arguments
+/// * `uuid` - The session UUID to find
+/// * `project_root` - The project root directory (used as cwd for gemini command)
+///
+/// # Returns
+/// The 1-indexed session index for use with `--resume <index>`
+///
+/// # Errors
+/// - If the command fails (non-zero exit code)
+/// - If the output format is unexpected
+/// - If the UUID is not found in the session list
+pub async fn find_session_index(uuid: &str, project_root: &PathBuf) -> Result<u32> {
+    // Run gemini --list-sessions with project_root as cwd
+    let output = Command::new("gemini")
+        .arg("--list-sessions")
+        .current_dir(project_root)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await
+        .context("Failed to execute gemini --list-sessions")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        anyhow::bail!(
+            "gemini --list-sessions failed with exit code {:?}\nstdout: {}\nstderr: {}",
+            output.status.code(),
+            stdout,
+            stderr
+        );
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Parse the output format:
+    // Available sessions for this project (N):
+    //   1. <prompt preview> (time ago) [UUID]
+    //   2. <prompt preview> (time ago) [UUID]
+
+    // Check for expected header
+    if !stdout.contains("Available sessions") {
+        anyhow::bail!(
+            "Failed to parse session list: unexpected format (no header)\nRaw output: {}",
+            stdout
+        );
+    }
+
+    // Parse lines looking for the UUID in brackets
+    // Format: "  1. <text> [UUID]"
+    let re = Regex::new(r"^\s*(\d+)\.\s+.*\[([a-f0-9-]+)\]").unwrap();
+
+    for line in stdout.lines() {
+        if let Some(captures) = re.captures(line) {
+            let index: u32 = captures
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse()
+                .context("Failed to parse session index")?;
+            let found_uuid = captures.get(2).unwrap().as_str();
+
+            if found_uuid == uuid {
+                return Ok(index);
+            }
+        }
+    }
+
+    anyhow::bail!("Session not found, please re-run proposal")
+}
 
 /// Gemini orchestrator for proposal and documentation tasks
 pub struct GeminiOrchestrator<'a> {
@@ -43,15 +186,25 @@ impl<'a> GeminiOrchestrator<'a> {
         env
     }
 
-    /// Build common Gemini args
-    fn build_args(&self, task: &str, complexity: Complexity, resume: bool) -> Vec<String> {
+    /// Build common Gemini args with resume mode
+    fn build_args_with_resume(&self, task: &str, complexity: Complexity, resume_mode: ResumeMode) -> Vec<String> {
         let model = self.model_selector.select_gemini(complexity);
         let args = vec![
             LlmArg::Task(task.to_string()),
             LlmArg::Model(model.to_cli_arg()),
             LlmArg::OutputFormat("stream-json".to_string()),
         ];
-        LlmProvider::Gemini.build_args(&args, resume)
+        LlmProvider::Gemini.build_args_with_resume(&args, resume_mode)
+    }
+
+    /// Build common Gemini args (convenience wrapper for bool resume)
+    fn build_args(&self, task: &str, complexity: Complexity, resume: bool) -> Vec<String> {
+        let resume_mode = if resume {
+            ResumeMode::Latest
+        } else {
+            ResumeMode::None
+        };
+        self.build_args_with_resume(task, complexity, resume_mode)
     }
 
     /// Run proposal generation
@@ -65,7 +218,29 @@ impl<'a> GeminiOrchestrator<'a> {
         let env = self.build_env(change_id);
         let args = self.build_args("agentd:proposal", complexity, false);
 
-        self.runner.run_llm(LlmProvider::Gemini, args, env, &prompt, true).await
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
+    }
+
+    /// Run self-review to check proposal files (resumes session by index)
+    ///
+    /// # Arguments
+    /// * `change_id` - The change ID
+    /// * `session_index` - The session index to resume (from find_session_index)
+    /// * `complexity` - Complexity level for model selection
+    ///
+    /// # Returns
+    /// Tuple of (output text, usage metrics). Use detect_self_review_marker() to parse the result.
+    pub async fn run_self_review(
+        &self,
+        change_id: &str,
+        session_index: u32,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        let prompt = prompts::proposal_self_review_prompt(change_id);
+        let env = self.build_env(change_id);
+        let args = self.build_args_with_resume("agentd:self-review", complexity, ResumeMode::ByIndex(session_index));
+
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
     }
 
     /// Run reproposal (resume previous session for cached context)
@@ -79,7 +254,21 @@ impl<'a> GeminiOrchestrator<'a> {
         // Resume previous session (Plan stage)
         let args = self.build_args("agentd:reproposal", complexity, true);
 
-        self.runner.run_llm(LlmProvider::Gemini, args, env, &prompt, true).await
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
+    }
+
+    /// Run reproposal with session index (resume by specific session)
+    pub async fn run_reproposal_with_session(
+        &self,
+        change_id: &str,
+        session_index: u32,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        let prompt = prompts::gemini_reproposal_prompt(change_id);
+        let env = self.build_env(change_id);
+        let args = self.build_args_with_resume("agentd:reproposal", complexity, ResumeMode::ByIndex(session_index));
+
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
     }
 
     /// Run spec merging (merge delta specs back to main specs)
@@ -94,7 +283,7 @@ impl<'a> GeminiOrchestrator<'a> {
         let env = self.build_env(change_id);
         let args = self.build_args("agentd:merge-specs", complexity, false);
 
-        self.runner.run_llm(LlmProvider::Gemini, args, env, &prompt, true).await
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
     }
 
     /// Run changelog generation
@@ -104,7 +293,7 @@ impl<'a> GeminiOrchestrator<'a> {
         // First call in Archive stage, no resume
         let args = self.build_args("agentd:changelog", complexity, false);
 
-        self.runner.run_llm(LlmProvider::Gemini, args, env, &prompt, true).await
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
     }
 
     /// Run fillback (fill placeholders in files)
@@ -119,7 +308,7 @@ impl<'a> GeminiOrchestrator<'a> {
         let env = self.build_env(change_id);
         let args = self.build_args("agentd:fillback", complexity, false);
 
-        self.runner.run_llm(LlmProvider::Gemini, args, env, &prompt, true).await
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
     }
 
     /// Run archive fix (fix issues from archive review)
@@ -133,7 +322,7 @@ impl<'a> GeminiOrchestrator<'a> {
         // Resume previous session (Archive stage)
         let args = self.build_args("agentd:archive-fix", complexity, true);
 
-        self.runner.run_llm(LlmProvider::Gemini, args, env, &prompt, true).await
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
     }
 }
 
@@ -146,5 +335,227 @@ mod tests {
         let config = AgentdConfig::default();
         let orchestrator = GeminiOrchestrator::new(&config, "/tmp/test");
         assert_eq!(orchestrator.project_root, PathBuf::from("/tmp/test"));
+    }
+
+    // =========================================================================
+    // Self-Review Marker Detection Tests
+    // =========================================================================
+
+    #[test]
+    fn test_detect_self_review_marker_pass() {
+        let output = r#"{"type":"message","content":"Reviewing files..."}
+{"type":"message","content":"All looks good!\n<review>PASS</review>"}
+{"type":"result","status":"success"}"#;
+
+        assert_eq!(detect_self_review_marker(output), SelfReviewResult::Pass);
+    }
+
+    #[test]
+    fn test_detect_self_review_marker_needs_revision() {
+        let output = r#"{"type":"message","content":"Found issues, fixing..."}
+{"type":"message","content":"<review>NEEDS_REVISION</review>"}
+{"type":"result","status":"success"}"#;
+
+        assert_eq!(
+            detect_self_review_marker(output),
+            SelfReviewResult::NeedsRevision
+        );
+    }
+
+    #[test]
+    fn test_detect_self_review_marker_in_raw_output() {
+        // Test when marker appears in raw text (not parsed JSON content)
+        let output = "Some raw text <review>PASS</review> more text";
+
+        assert_eq!(detect_self_review_marker(output), SelfReviewResult::Pass);
+    }
+
+    #[test]
+    fn test_detect_self_review_marker_multiline() {
+        // Test marker spread across content with other text
+        let output = r#"{"type":"message","content":"Reviewing proposal.md..."}
+{"type":"message","content":"Reviewing tasks.md..."}
+{"type":"message","content":"Reviewing specs/workflow.md..."}
+{"type":"message","content":"No issues found.\n\n<review>PASS</review>"}
+{"type":"result","status":"success"}"#;
+
+        assert_eq!(detect_self_review_marker(output), SelfReviewResult::Pass);
+    }
+
+    #[test]
+    fn test_detect_self_review_marker_array_content() {
+        // Test content as array of parts (Gemini can emit nested text fields)
+        let output = r#"{"type":"message","content":[{"text":"Found issues"},{"text":"\n<review>NEEDS_REVISION</review>"}]}"#;
+
+        assert_eq!(
+            detect_self_review_marker(output),
+            SelfReviewResult::NeedsRevision
+        );
+    }
+
+    #[test]
+    fn test_detect_self_review_marker_no_marker_returns_pass() {
+        // No marker found should return PASS with warning
+        let output = r#"{"type":"message","content":"Done reviewing, everything looks fine."}
+{"type":"result","status":"success"}"#;
+
+        assert_eq!(detect_self_review_marker(output), SelfReviewResult::Pass);
+    }
+
+    #[test]
+    fn test_detect_self_review_marker_empty_output() {
+        assert_eq!(detect_self_review_marker(""), SelfReviewResult::Pass);
+    }
+
+    #[test]
+    fn test_detect_self_review_marker_escaped_characters() {
+        // Test with escaped characters in stream-json
+        let output = r#"{"type":"message","content":"Files reviewed.\n\n\u003creview\u003ePASS\u003c/review\u003e"}"#;
+        // \u003c = <, \u003e = >
+
+        // The JSON parser will unescape these, so it should find the marker
+        assert_eq!(detect_self_review_marker(output), SelfReviewResult::Pass);
+    }
+
+    #[test]
+    fn test_detect_self_review_prefers_needs_revision() {
+        // If both markers somehow appear, NEEDS_REVISION takes precedence
+        let output = "<review>PASS</review>\n<review>NEEDS_REVISION</review>";
+
+        assert_eq!(
+            detect_self_review_marker(output),
+            SelfReviewResult::NeedsRevision
+        );
+    }
+
+    // =========================================================================
+    // Session Index Lookup Tests (unit tests for parsing logic)
+    // =========================================================================
+
+    #[test]
+    fn test_session_list_regex_parsing() {
+        // Test the regex pattern used in find_session_index
+        let re = Regex::new(r"^\s*(\d+)\.\s+.*\[([a-f0-9-]+)\]").unwrap();
+
+        let line = "  1. Create proposal files in... (2 hours ago) [abc123-def456-789]";
+        let captures = re.captures(line).expect("Should match");
+        assert_eq!(captures.get(1).unwrap().as_str(), "1");
+        assert_eq!(captures.get(2).unwrap().as_str(), "abc123-def456-789");
+
+        let line2 = "  15. Another session (3 days ago) [fedcba98-7654-3210-abcd-ef0123456789]";
+        let captures2 = re.captures(line2).expect("Should match");
+        assert_eq!(captures2.get(1).unwrap().as_str(), "15");
+        assert_eq!(
+            captures2.get(2).unwrap().as_str(),
+            "fedcba98-7654-3210-abcd-ef0123456789"
+        );
+    }
+
+    #[test]
+    fn test_session_list_no_match_for_invalid_lines() {
+        let re = Regex::new(r"^\s*(\d+)\.\s+.*\[([a-f0-9-]+)\]").unwrap();
+
+        // Header line shouldn't match
+        assert!(re.captures("Available sessions for this project (5):").is_none());
+
+        // Line without UUID shouldn't match
+        assert!(re.captures("  1. Some session without uuid").is_none());
+    }
+
+    // =========================================================================
+    // Session Lookup Failure Path Tests
+    // =========================================================================
+
+    /// Helper function to simulate parsing session list output
+    /// This extracts the parsing logic for unit testing
+    fn parse_session_list_for_uuid(stdout: &str, uuid: &str) -> Result<u32> {
+        // Check for expected header
+        if !stdout.contains("Available sessions") {
+            anyhow::bail!(
+                "Failed to parse session list: unexpected format (no header)\nRaw output: {}",
+                stdout
+            );
+        }
+
+        // Parse lines looking for the UUID in brackets
+        let re = Regex::new(r"^\s*(\d+)\.\s+.*\[([a-f0-9-]+)\]").unwrap();
+
+        for line in stdout.lines() {
+            if let Some(captures) = re.captures(line) {
+                let index: u32 = captures
+                    .get(1)
+                    .unwrap()
+                    .as_str()
+                    .parse()
+                    .context("Failed to parse session index")?;
+                let found_uuid = captures.get(2).unwrap().as_str();
+
+                if found_uuid == uuid {
+                    return Ok(index);
+                }
+            }
+        }
+
+        anyhow::bail!("Session not found, please re-run proposal")
+    }
+
+    #[test]
+    fn test_parse_session_list_uuid_found() {
+        // UUIDs must be lowercase hex with dashes to match the regex
+        let output = r#"Available sessions for this project (3):
+  1. Create proposal files in... (2 hours ago) [abc123-def456-789012]
+  2. Fix validation errors... (1 day ago) [abcd1234-5678-90ab-cdef-123456789abc]
+  3. Another session (3 days ago) [xyz789-123-456789]"#;
+
+        let result = parse_session_list_for_uuid(output, "abcd1234-5678-90ab-cdef-123456789abc");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 2);
+    }
+
+    #[test]
+    fn test_parse_session_list_uuid_not_found() {
+        let output = r#"Available sessions for this project (2):
+  1. Session one (1 hour ago) [abc123-def456-789012]
+  2. Session two (2 hours ago) [def456-abc789-012345]"#;
+
+        let result = parse_session_list_for_uuid(output, "nonexistent-uuid-1234");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Session not found"));
+    }
+
+    #[test]
+    fn test_parse_session_list_unexpected_format_no_header() {
+        let output = r#"Some random output
+  1. Session one [abc123-def456-789012]"#;
+
+        let result = parse_session_list_for_uuid(output, "abc123-def456-789012");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Failed to parse session list"));
+        assert!(err.contains("unexpected format"));
+    }
+
+    #[test]
+    fn test_parse_session_list_malformed_lines() {
+        // Valid header but malformed session lines (no brackets)
+        let output = r#"Available sessions for this project (2):
+  1. Session without uuid bracket
+  2. Another malformed line"#;
+
+        let result = parse_session_list_for_uuid(output, "any-uuid");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Session not found"));
+    }
+
+    #[test]
+    fn test_parse_session_list_empty_output() {
+        let output = "Available sessions for this project (0):";
+
+        let result = parse_session_list_for_uuid(output, "any-uuid");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Session not found"));
     }
 }

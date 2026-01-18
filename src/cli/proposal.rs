@@ -2,7 +2,7 @@ use crate::cli::validate_challenge::validate_challenge;
 use crate::cli::validate_proposal::validate_proposal;
 use crate::context::ContextPhase;
 use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, Complexity, ValidationOptions};
-use crate::orchestrator::{GeminiOrchestrator, CodexOrchestrator, UsageMetrics};
+use crate::orchestrator::{detect_self_review_marker, find_session_index, GeminiOrchestrator, CodexOrchestrator, SelfReviewResult, UsageMetrics};
 use crate::parser::parse_challenge_verdict;
 use crate::state::StateManager;
 use crate::Result;
@@ -130,7 +130,7 @@ pub async fn run(change_id: &str, description: &str, skip_clarify: bool) -> Resu
             format!("⚠️  Format validation still failing after {} iterations", max_format_iterations).yellow().bold()
         );
         println!("   Fix manually and re-run: agentd challenge {}", resolved_change_id);
-        return Ok(());
+        std::process::exit(1);
     }
 
     // Step 3: First challenge (use resolved ID)
@@ -175,7 +175,7 @@ pub async fn run(change_id: &str, description: &str, skip_clarify: bool) -> Resu
                     );
                     println!();
                     display_remaining_issues(&resolved_change_id, &project_root)?;
-                    return Ok(());
+                    std::process::exit(1);
                 }
 
                 println!();
@@ -196,7 +196,7 @@ pub async fn run(change_id: &str, description: &str, skip_clarify: bool) -> Resu
                 println!("{}", "❌ Proposal rejected".red().bold());
                 println!();
                 display_remaining_issues(&resolved_change_id, &project_root)?;
-                return Ok(());
+                std::process::exit(1);
             }
             ChallengeVerdict::Unknown => {
                 println!();
@@ -205,7 +205,7 @@ pub async fn run(change_id: &str, description: &str, skip_clarify: bool) -> Resu
                     "⚠️  Could not parse challenge verdict".yellow()
                 );
                 println!("   Please review: agentd/changes/{}/CHALLENGE.md", resolved_change_id);
-                return Ok(());
+                std::process::exit(1);
             }
         }
     }
@@ -243,6 +243,8 @@ async fn run_proposal_step(
     let retry_delay = std::time::Duration::from_secs(config.workflow.retry_delay_secs);
 
     let mut last_error = None;
+    let mut session_id: Option<String> = None;
+
     for attempt in 0..=max_retries {
         if attempt > 0 {
             println!(
@@ -254,10 +256,13 @@ async fn run_proposal_step(
 
         // Assess complexity dynamically based on change structure
         let change = Change::new(&resolved_change_id, description);
-        let complexity = change.assess_complexity(&project_root);
+        let complexity = change.assess_complexity(project_root);
 
         match orchestrator.run_proposal(&resolved_change_id, description, complexity).await {
             Ok((_output, usage)) => {
+                // Save session_id for later use in resume-by-index
+                session_id = usage.session_id.clone();
+
                 let model = config.gemini.select_model(complexity).model.clone();
                 record_usage(&resolved_change_id, project_root, "proposal", &model, &usage, config, complexity);
                 last_error = None;
@@ -280,6 +285,73 @@ async fn run_proposal_step(
 
     if let Some(e) = last_error {
         return Err(e);
+    }
+
+    // Save session_id to STATE.yaml for resume-by-index
+    // R2 requires session_id capture - exit with error if not available
+    match &session_id {
+        Some(sid) => {
+            let state_path = project_root
+                .join("agentd/changes")
+                .join(&resolved_change_id)
+                .join("STATE.yaml");
+
+            if let Ok(mut manager) = StateManager::load(&state_path) {
+                manager.set_session_id(sid.clone());
+                let _ = manager.save();
+            }
+        }
+        None => {
+            println!("{}", "❌ Failed to capture session ID".red().bold());
+            std::process::exit(1);
+        }
+    }
+
+    // Run self-review loop - session_id is guaranteed to exist at this point
+    let sid = session_id.as_ref().unwrap();
+    println!();
+    println!("{}", "🔍 Running self-review...".cyan());
+
+    // Look up session index by UUID - R2 requires exit on failure
+    let session_index = match find_session_index(sid, project_root).await {
+        Ok(index) => index,
+        Err(e) => {
+            println!("{}", format!("❌ Session not found, please re-run proposal: {}", e).red().bold());
+            std::process::exit(1);
+        }
+    };
+
+    let change = Change::new(&resolved_change_id, description);
+    let complexity = change.assess_complexity(project_root);
+
+    // Self-review loop (max 3 iterations to prevent infinite loops)
+    let max_self_review_iterations = 3;
+    for iteration in 0..max_self_review_iterations {
+        match orchestrator.run_self_review(&resolved_change_id, session_index, complexity).await {
+            Ok((output, usage)) => {
+                let model = config.gemini.select_model(complexity).model.clone();
+                record_usage(&resolved_change_id, project_root, "self-review", &model, &usage, config, complexity);
+
+                let result = detect_self_review_marker(&output);
+                match result {
+                    SelfReviewResult::Pass => {
+                        println!("{}", "Self-review: PASS (no changes)".green());
+                        break;
+                    }
+                    SelfReviewResult::NeedsRevision => {
+                        println!("{}", "Self-review: NEEDS_REVISION (files updated)".yellow());
+                        if iteration >= max_self_review_iterations - 1 {
+                            println!("{}", "⚠️  Self-review still finding issues after max iterations".yellow());
+                        }
+                        // Continue to next iteration - Gemini already made the fixes
+                    }
+                }
+            }
+            Err(e) => {
+                println!("{}", format!("⚠️  Self-review failed: {}", e).yellow());
+                break;
+            }
+        }
     }
 
     // Create Change object
@@ -503,6 +575,36 @@ async fn run_reproposal_step(
     let max_retries = config.workflow.script_retries;
     let retry_delay = std::time::Duration::from_secs(config.workflow.retry_delay_secs);
 
+    // Load session_id from STATE.yaml for resume-by-index - R2 requires strict enforcement
+    let state_path = project_root
+        .join("agentd/changes")
+        .join(change_id)
+        .join("STATE.yaml");
+
+    let session_index = match StateManager::load(&state_path) {
+        Ok(manager) => {
+            match manager.session_id() {
+                Some(sid) => {
+                    match find_session_index(sid, project_root).await {
+                        Ok(index) => index,
+                        Err(e) => {
+                            println!("{}", format!("❌ Session not found, please re-run proposal: {}", e).red().bold());
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                None => {
+                    println!("{}", "❌ Failed to capture session ID".red().bold());
+                    std::process::exit(1);
+                }
+            }
+        }
+        Err(_) => {
+            println!("{}", "❌ Failed to load STATE.yaml".red().bold());
+            std::process::exit(1);
+        }
+    };
+
     let mut last_error = None;
     for attempt in 0..=max_retries {
         if attempt > 0 {
@@ -513,7 +615,10 @@ async fn run_reproposal_step(
             tokio::time::sleep(retry_delay).await;
         }
 
-        match orchestrator.run_reproposal(change_id, complexity).await {
+        // Use resume-by-index (R2 requires strict enforcement - no fallback to --resume latest)
+        let result = orchestrator.run_reproposal_with_session(change_id, session_index, complexity).await;
+
+        match result {
             Ok((_output, usage)) => {
                 let model = config.gemini.select_model(complexity).model.clone();
                 record_usage(change_id, project_root, "reproposal", &model, &usage, config, complexity);

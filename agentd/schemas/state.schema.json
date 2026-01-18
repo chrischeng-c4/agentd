@@ -38,6 +38,10 @@
       "type": "string",
       "description": "Last action performed"
     },
+    "session_id": {
+      "type": ["string", "null"],
+      "description": "Gemini session ID for resume-by-index"
+    },
     "checksums": {
       "type": "object",
       "additionalProperties": {

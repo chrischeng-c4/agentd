@@ -1,0 +1,334 @@
+change_id: progressive-proposal
+schema_version: '2.0'
+created_at: 2026-01-18T12:31:30.401635Z
+updated_at: 2026-01-18T15:46:27.990440Z
+phase: archived
+iteration: 1
+last_action: validate-challenge
+checksums:
+  CHALLENGE.md:
+    hash: sha256:76da54197b8eb42d15a1ae40dc919787ee41133b403f009eafcf65953c383355
+    validated_at: 2026-01-18T15:40:20.009474Z
+validations:
+- step: validate-proposal
+  timestamp: 2026-01-18T12:31:30.401688Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 6
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/workflow.md] Scenario heading ''Scenario: Successful Progressive Generation'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/workflow.md] Scenario heading ''Scenario: Local Validation Failure'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/workflow.md] Scenario heading ''Scenario: Completion'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/workflow.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/workflow.md] Missing **WHEN** clause in scenarios'
+  - '[specs/workflow.md] Missing **THEN** clause in scenarios'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-18T12:35:56.843098Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 2
+    medium: 0
+    low: 1
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/workflow.md] Scenario heading ''Scenario: WHEN I run '' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/workflow.md] Scenario heading '' THEN it generates files in sequence'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-18T12:37:13.657232Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 5
+    medium: 0
+    low: 1
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/workflow.md] Scenario heading ''Scenario: Successful Progressive Generation'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/workflow.md] Scenario heading ''Scenario: Automatic PRD Fix'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/workflow.md] Scenario heading ''Scenario: Final Technical Challenge'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/workflow.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/workflow.md] Missing **WHEN** clause in scenarios'
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T13:10:10.481068Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 1
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T13:19:53.907574Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 3
+    medium: 1
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T13:54:15.208505Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 3
+    medium: 1
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T13:58:40.479172Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 1
+    low: 3
+    verdict: NEEDS_REVISION
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T14:03:31.342030Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 4
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T14:13:13.631354Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 1
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T14:19:20.442396Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 2
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T14:37:33.825234Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 3
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T14:42:20.399295Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 2
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T14:46:10.114804Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 3
+    medium: 2
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T14:51:13.228644Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 2
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T14:59:53.248662Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 3
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T15:05:13.118400Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 0
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 3
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T15:08:50.017296Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 1
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 4
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T15:13:49.586258Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 3
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T15:20:20.255592Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 3
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T15:26:28.959795Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 3
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T15:34:01.604828Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 3
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-18T15:40:20.009132Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 1
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 3
+  errors: []
+  warnings: []
+telemetry: null

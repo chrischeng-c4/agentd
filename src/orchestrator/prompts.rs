@@ -34,6 +34,39 @@ Update files in agentd/changes/{change_id}/ as needed.
     )
 }
 
+/// Generate Gemini self-review prompt for reviewing all proposal files
+pub fn proposal_self_review_prompt(change_id: &str) -> String {
+    format!(
+        r#"## Change ID
+{change_id}
+
+## Self-Review Task
+Review all generated proposal files in agentd/changes/{change_id}/:
+- proposal.md (PRD)
+- tasks.md
+- specs/*.md
+
+## Quality Criteria
+1. **Completeness**: All required frontmatter fields present and valid
+2. **Consistency**: IDs, references, and versions match across files
+3. **Clarity**: Requirements and tasks are specific and actionable
+4. **Structure**: Proper markdown formatting, valid YAML blocks
+5. **Traceability**: Tasks reference specs, specs have clear requirements
+
+## Instructions
+1. Read each file and check against the quality criteria
+2. If ANY issues are found:
+   - Edit the files directly to fix them
+   - Output: `<review>NEEDS_REVISION</review>`
+3. If NO issues are found:
+   - Output: `<review>PASS</review>`
+
+IMPORTANT: You MUST output exactly one of the two markers above at the end of your response.
+"#,
+        change_id = change_id
+    )
+}
+
 /// Generate Gemini spec merge prompt
 pub fn gemini_merge_specs_prompt(change_id: &str, strategy: &str, spec_file: &str) -> String {
     format!(
@@ -360,6 +393,7 @@ mod tests {
 
         assert!(gemini_proposal_prompt(change_id, "desc").contains(change_id));
         assert!(gemini_reproposal_prompt(change_id).contains(change_id));
+        assert!(proposal_self_review_prompt(change_id).contains(change_id));
         assert!(gemini_merge_specs_prompt(change_id, "strategy", "file").contains(change_id));
         assert!(gemini_changelog_prompt(change_id).contains(change_id));
         assert!(gemini_fillback_prompt(change_id, "path", "placeholder").contains(change_id));
@@ -371,6 +405,16 @@ mod tests {
         assert!(codex_archive_review_prompt(change_id, "strategy").contains(change_id));
         assert!(claude_implement_prompt(change_id, None).contains(change_id));
         assert!(claude_resolve_prompt(change_id).contains(change_id));
+    }
+
+    #[test]
+    fn test_proposal_self_review_prompt() {
+        let prompt = proposal_self_review_prompt("test-change");
+        assert!(prompt.contains("test-change"));
+        assert!(prompt.contains("Self-Review Task"));
+        assert!(prompt.contains("<review>PASS</review>"));
+        assert!(prompt.contains("<review>NEEDS_REVISION</review>"));
+        assert!(prompt.contains("Quality Criteria"));
     }
 
     #[test]
