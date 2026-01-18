@@ -66,6 +66,7 @@ agentd archive add-oauth
 | `agentd resolve-reviews <id>` | Fix issues found during review |
 | `agentd validate-proposal <id>` | Validate proposal format |
 | `agentd validate-challenge <id>` | Validate challenge format |
+| `agentd view <id>` | Open plan viewer UI (requires `ui` feature) |
 
 ## Workflow
 
@@ -129,6 +130,28 @@ After initialization, use these skills in Claude Code:
 
 ### Deprecated Skills
 Granular skills (e.g., `/agentd:proposal`, `/agentd:challenge`) are available but deprecated.
+
+## Plan Viewer UI (Optional)
+
+Agentd includes an optional native UI for viewing plans. Build with the `ui` feature to enable:
+
+```bash
+cargo build --features ui
+```
+
+Then open the viewer for any change:
+
+```bash
+agentd view <change-id>
+```
+
+The viewer provides:
+- Rendered Markdown with Mermaid diagrams
+- Syntax-highlighted YAML state files
+- Annotation support for human review comments
+- Navigation between proposal, challenge, and state files
+
+The viewer auto-opens when a proposal is approved (if built with `ui` feature).
 
 ## License
 

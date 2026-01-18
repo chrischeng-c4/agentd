@@ -11,8 +11,8 @@ Orchestrates the entire planning phase, automatically handling proposal generati
 ## IMPORTANT: Your role is orchestration only
 
 **DO NOT explore the codebase yourself.** Your job is to:
-1. Clarify the user's requirements if ambiguous
-2. Convert user intent into proper prompts/arguments
+1. Clarify the user's requirements (structured Q&A)
+2. Write clarifications to `clarifications.md`
 3. Run the `agentd proposal` command
 
 The actual codebase exploration and analysis is done by:
@@ -20,6 +20,55 @@ The actual codebase exploration and analysis is done by:
 - **Codex** (challenge/code review)
 
 You are a dispatcher, not an explorer.
+
+## Clarification Phase (Before Proposal)
+
+For **NEW changes** (no existing `STATE.yaml`), clarify requirements before running `agentd proposal`:
+
+### When to clarify
+- Always for new changes, unless user says "skip" or description is very detailed
+- Skip for existing changes (continuing from `proposed` phase)
+
+### How to clarify
+1. Analyze the description for ambiguities
+2. Use the **AskUserQuestion tool** to ask **3-5 questions max**:
+
+```
+AskUserQuestion with questions array:
+- question: "What is your preferred approach for X?"
+  header: "Short Label" (max 12 chars)
+  options:
+    - label: "Option A (Recommended)"
+      description: "Why this is the best choice"
+    - label: "Option B"
+      description: "Alternative approach"
+  multiSelect: false
+```
+
+**Important**: Always use the AskUserQuestion tool for interactive clarification, not text-based questions.
+
+3. After user answers, write to `agentd/changes/<change-id>/clarifications.md`:
+
+```markdown
+---
+change: <change-id>
+date: YYYY-MM-DD
+---
+
+# Clarifications
+
+## Q1: [Topic]
+- **Question**: [the question asked]
+- **Answer**: [user's answer]
+- **Rationale**: [why this choice]
+```
+
+4. Then run `agentd proposal` with the clarified context
+
+### Skip clarification if
+- User explicitly says "skip" or uses `--skip-clarify`
+- Description already covers all key decisions
+- Continuing an existing change (phase is `proposed`)
 
 ## Git Workflow (New Changes)
 
@@ -57,7 +106,7 @@ The skill determines the next action based on the `phase` field in `STATE.yaml`:
 
 | Phase | Action |
 |-------|--------|
-| No STATE.yaml | Run `agentd proposal` (description required) |
+| No STATE.yaml | **Clarify** → write `clarifications.md` → run `agentd proposal` |
 | `proposed` | Run `agentd proposal` to continue planning cycle |
 | `challenged` | ✅ Planning complete, suggest `/agentd:impl` |
 | `rejected` | ⛔ Rejected, suggest reviewing CHALLENGE.md |
@@ -68,9 +117,9 @@ The skill determines the next action based on the `phase` field in `STATE.yaml`:
 ## State transitions
 
 ```
-No STATE.yaml → proposed → challenged  (APPROVED)
-              ↓         ↗ (NEEDS_REVISION - auto-reproposal)
-              → rejected (REJECTED)
+No STATE.yaml → [Clarify] → proposed → challenged  (APPROVED)
+                          ↓         ↗ (NEEDS_REVISION - auto-reproposal)
+                          → rejected (REJECTED)
 ```
 
 ## Next steps

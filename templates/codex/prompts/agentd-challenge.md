@@ -24,13 +24,20 @@ Your job is to identify:
      - `tasks.md` - Tickets: Review file paths, actions, spec references, dependencies
      - `specs/*.md` - TD: Check Mermaid diagrams, JSON Schema, interfaces, acceptance criteria
 
-2. **Check Internal Consistency (HIGH Priority)**
+2. **Check Spec Quality (HIGH Priority)**
+   - Are all requirements testable and specific (no vague terms like "fast", "secure", "robust" without metrics)?
+   - Are there any unresolved TODO/TBD/FIXME markers?
+   - Are acceptance criteria clear with measurable outcomes?
+   - Do all specs have proper WHEN/THEN scenarios?
+
+3. **Check Internal Consistency (HIGH Priority)**
    - Does `proposal.md` "What Changes" match tasks in `tasks.md`?
    - Do Mermaid diagrams in `specs/` match descriptions in `proposal.md`?
    - Does each task in `tasks.md` reference a valid spec section?
-   - Are all acceptance criteria testable (clear WHEN/THEN)?
+   - Are all acceptance criteria covered by at least one task?
+   - Do task dependencies (`Depends:`) form a valid DAG (no cycles)?
 
-3. **Check Code Alignment (MEDIUM Priority)**
+4. **Check Code Alignment (MEDIUM Priority)**
    - Do file paths in `tasks.md` exist (for MODIFY/DELETE actions)?
    - Does JSON Schema align with existing data structures?
    - Do pseudo code interfaces match existing patterns?
@@ -51,12 +58,22 @@ Fill the existing `changes/<change-id>/CHALLENGE.md` skeleton:
 ## Summary
 [Overall assessment]
 
+## Spec Quality Issues
+[HIGH priority - requirements must be testable]
+
+### Issue: [Title]
+- **Severity**: High
+- **Category**: Vague Requirement | Unresolved TODO | Missing Scenario
+- **Description**: [What's wrong with the spec]
+- **Location**: [Which spec file/section]
+- **Recommendation**: [How to make it testable/specific]
+
 ## Internal Consistency Issues
 [HIGH priority - must fix]
 
 ### Issue: [Title]
 - **Severity**: High
-- **Category**: Completeness | Consistency
+- **Category**: Completeness | Consistency | Coverage Gap
 - **Description**: [What's inconsistent]
 - **Location**: [Which files/sections]
 - **Recommendation**: [How to fix]
@@ -91,9 +108,12 @@ Fill the existing `changes/<change-id>/CHALLENGE.md` skeleton:
 ## Severity Guidelines
 
 ### HIGH Severity (Blockers)
-- Internal inconsistencies between proposal files
-- Missing spec sections referenced by tasks
-- Acceptance criteria not testable
+- **Spec Quality**: Vague requirements without metrics (e.g., "fast", "secure" without numbers)
+- **Spec Quality**: Unresolved TODO/TBD/FIXME markers
+- **Spec Quality**: Acceptance criteria not testable (missing WHEN/THEN)
+- **Consistency**: Proposal scope doesn't match tasks
+- **Consistency**: Acceptance criteria without corresponding tasks
+- **Consistency**: Task dependencies form a cycle
 - Fundamentally flawed approach
 
 ### MEDIUM Severity (Important)

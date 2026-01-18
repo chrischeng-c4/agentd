@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentd Plan Viewer</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/highlight.min.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Plan Viewer</h1>
+                <div class="change-id" id="change-id"></div>
+            </div>
+            <nav class="file-nav" id="file-nav">
+                <!-- File list populated by JavaScript -->
+            </nav>
+            <!-- Global Review Actions -->
+            <div class="sidebar-footer" id="review-toolbar">
+                <div class="review-status" id="review-status">
+                    <span class="comment-count" id="comment-count">0 comments</span>
+                </div>
+                <button class="btn btn-success btn-block" id="btn-approve" title="Approve and complete review">
+                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Approve
+                </button>
+                <button class="btn btn-warning btn-block" id="btn-request-changes" title="Request changes with comments">
+                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    Request Changes
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="content-header">
+                <h2 id="current-file">Select a file</h2>
+            </header>
+            <article class="content-body" id="content-body">
+                <div class="placeholder">
+                    <p>Select a file from the sidebar to view its contents.</p>
+                </div>
+            </article>
+        </main>
+
+        <!-- Annotations Sidebar -->
+        <aside class="annotations-sidebar" id="annotations-sidebar">
+            <div class="annotations-header">
+                <h3>Annotations</h3>
+                <button class="btn-add-annotation" id="btn-add-annotation" title="Add annotation">
+                    + Add
+                </button>
+            </div>
+            <div class="annotations-list" id="annotations-list">
+                <!-- Annotations populated by JavaScript -->
+            </div>
+        </aside>
+
+        <!-- Annotation Modal -->
+        <div class="modal" id="annotation-modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Add Annotation</h3>
+                    <button class="modal-close" id="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <label for="annotation-section">Section:</label>
+                    <select id="annotation-section">
+                        <!-- Populated dynamically -->
+                    </select>
+                    <label for="annotation-content">Comment:</label>
+                    <textarea id="annotation-content" placeholder="Enter your comment..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="btn-cancel">Cancel</button>
+                    <button class="btn btn-primary" id="btn-save">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <script src="/highlight.min.js"></script>
+    <script src="/mermaid.min.js"></script>
+    <script src="/app.js"></script>
+</body>
+</html>

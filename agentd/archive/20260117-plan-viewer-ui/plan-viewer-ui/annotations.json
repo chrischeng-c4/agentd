@@ -1,0 +1,59 @@
+{
+  "change_id": "plan-viewer-ui",
+  "annotations": [
+    {
+      "id": "1b35f2c6-5c0c-4177-a453-85ed50b2fba3",
+      "file": "specs/annotations.md",
+      "section_id": "overview",
+      "content": "test comment please ignore",
+      "author": "chrischeng-c4",
+      "created_at": "2026-01-17T12:58:44.392663+00:00",
+      "resolved": false
+    },
+    {
+      "id": "0fd47e12-27ad-4a82-83e5-11636b6c371e",
+      "file": "proposal.md",
+      "section_id": "summary",
+      "content": "test comment",
+      "author": "chrischeng-c4",
+      "created_at": "2026-01-17T13:27:53.188093+00:00",
+      "resolved": false
+    },
+    {
+      "id": "4f79410c-6c8d-4771-86b5-888d40676cb8",
+      "file": "proposal.md",
+      "section_id": "change-plan-viewer-ui",
+      "content": "Test comment from Playwright",
+      "author": "chrischeng-c4",
+      "created_at": "2026-01-17T13:59:31.819809+00:00",
+      "resolved": false
+    },
+    {
+      "id": "de943b13-50e0-4a24-b66e-c5840e33dea4",
+      "file": "proposal.md",
+      "section_id": "change-plan-viewer-ui",
+      "content": "Test comment 1768658420535",
+      "author": "chrischeng-c4",
+      "created_at": "2026-01-17T14:00:20.608307+00:00",
+      "resolved": false
+    },
+    {
+      "id": "747576b4-450d-4781-8373-e66614e6ddc2",
+      "file": "CHALLENGE.md",
+      "section_id": "summary",
+      "content": "test comment",
+      "author": "chrischeng-c4",
+      "created_at": "2026-01-17T14:02:48.167350+00:00",
+      "resolved": false
+    },
+    {
+      "id": "7d7c0bef-16c6-4e60-a4ad-7813e658b259",
+      "file": "proposal.md",
+      "section_id": "change-plan-viewer-ui",
+      "content": "Test comment 1768659698397",
+      "author": "chrischeng-c4",
+      "created_at": "2026-01-17T14:21:38.462219+00:00",
+      "resolved": false
+    }
+  ]
+}

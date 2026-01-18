@@ -1,118 +1,104 @@
 project_name = "agentd"
 scripts_dir = "agentd/scripts"
 
-# =============================================================================
-# Workflow Iteration Settings
-# =============================================================================
 [workflow]
-format_iterations = 3          # proposal format validation iterations
-planning_iterations = 3        # proposal ↔ challenge iterations
-implementation_iterations = 3  # implement ↔ review iterations
-archive_iterations = 1         # archive review iterations
+format_iterations = 2
+planning_iterations = 2
+implementation_iterations = 2
+archive_iterations = 1
+script_retries = 3
+retry_delay_secs = 5
 
-# =============================================================================
-# Gemini Configuration
-# =============================================================================
 [gemini]
 command = "gemini"
-default = "flash"  # Default model ID
+default = "flash"
 
 [[gemini.models]]
 id = "flash"
 model = "gemini-3-flash-preview"
-complexity = "medium"  # Handles up to Medium complexity
-cost_per_1m_input = 0.10   # USD per 1M input tokens
-cost_per_1m_output = 0.40  # USD per 1M output tokens
+complexity = "medium"
+cost_per_1m_input = 0.1
+cost_per_1m_output = 0.4
 
 [[gemini.models]]
 id = "pro"
 model = "gemini-3-pro-preview"
-complexity = "critical"  # Handles up to Critical complexity
-cost_per_1m_input = 1.25   # USD per 1M input tokens
-cost_per_1m_output = 10.00 # USD per 1M output tokens
+complexity = "critical"
+cost_per_1m_input = 1.25
+cost_per_1m_output = 10.0
 
-# =============================================================================
-# Codex Configuration
-# =============================================================================
 [codex]
 command = "codex"
-default = "fast"  # Default model ID (gpt-5.2-codex low for testing)
+default = "balanced"
 
 [[codex.models]]
 id = "fast"
 model = "gpt-5.2-codex"
 reasoning = "low"
 complexity = "low"
-cost_per_1m_input = 2.00   # USD per 1M input tokens
-cost_per_1m_output = 8.00  # USD per 1M output tokens
+cost_per_1m_input = 2.0
+cost_per_1m_output = 8.0
 
 [[codex.models]]
 id = "balanced"
 model = "gpt-5.2-codex"
 reasoning = "medium"
 complexity = "medium"
-cost_per_1m_input = 2.00   # USD per 1M input tokens
-cost_per_1m_output = 8.00  # USD per 1M output tokens
+cost_per_1m_input = 2.0
+cost_per_1m_output = 8.0
 
 [[codex.models]]
 id = "deep"
 model = "gpt-5.2-codex"
 reasoning = "high"
 complexity = "high"
-cost_per_1m_input = 2.00   # USD per 1M input tokens
-cost_per_1m_output = 8.00  # USD per 1M output tokens
+cost_per_1m_input = 2.0
+cost_per_1m_output = 8.0
 
 [[codex.models]]
 id = "max"
 model = "gpt-5.2-codex"
 reasoning = "extra high"
 complexity = "critical"
-cost_per_1m_input = 2.00   # USD per 1M input tokens
-cost_per_1m_output = 8.00  # USD per 1M output tokens
+cost_per_1m_input = 2.0
+cost_per_1m_output = 8.0
 
-# =============================================================================
-# Claude Configuration
-# =============================================================================
 [claude]
 command = "claude"
-default = "fast"  # Default model ID (haiku for testing)
+default = "balanced"
 
 [[claude.models]]
 id = "fast"
 model = "haiku"
 complexity = "low"
-cost_per_1m_input = 0.80   # USD per 1M input tokens
-cost_per_1m_output = 4.00  # USD per 1M output tokens
+cost_per_1m_input = 0.8
+cost_per_1m_output = 4.0
 
 [[claude.models]]
 id = "balanced"
 model = "sonnet"
 complexity = "medium"
-cost_per_1m_input = 3.00   # USD per 1M input tokens
-cost_per_1m_output = 15.00 # USD per 1M output tokens
+cost_per_1m_input = 3.0
+cost_per_1m_output = 15.0
 
 [[claude.models]]
 id = "deep"
 model = "opus"
 complexity = "critical"
-cost_per_1m_input = 15.00  # USD per 1M input tokens
-cost_per_1m_output = 75.00 # USD per 1M output tokens
+cost_per_1m_input = 15.0
+cost_per_1m_output = 75.0
 
-# =============================================================================
-# Validation Rules
-# =============================================================================
 [validation]
 required_headings = [
-    "Specification:",
     "Overview",
-    "Requirements",
+    "Acceptance Criteria",
 ]
-requirement_pattern = '^R\d+:'
-scenario_pattern = "Scenario:"
+requirement_pattern = ""
+scenario_pattern = 'WHEN\s.*THEN\s'
 scenario_min_count = 1
 require_when_then = true
-when_pattern = '- \*\*WHEN\*\*'
-then_pattern = '- \*\*THEN\*\*'
+when_pattern = 'WHEN\s'
+then_pattern = 'THEN\s'
 
 [validation.severity_map]
 missing_heading = "High"

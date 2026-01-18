@@ -8,6 +8,29 @@ user-invocable: true
 
 Orchestrates the entire planning phase, automatically handling proposal generation, challenge analysis, and refinement based on the current state.
 
+## IMPORTANT: Your role is orchestration only
+
+**DO NOT explore the codebase yourself.** Your job is to:
+1. Clarify the user's requirements if ambiguous
+2. Convert user intent into proper prompts/arguments
+3. Run the `agentd proposal` command
+
+The actual codebase exploration and analysis is done by:
+- **Gemini** (proposal generation - 2M context window)
+- **Codex** (challenge/code review)
+
+You are a dispatcher, not an explorer.
+
+## Git Workflow (New Changes)
+
+For **new** changes (no existing `STATE.yaml`), ask user's preferred workflow:
+
+1. **New branch** - `git checkout -b agentd/<change-id>`
+2. **New worktree** - `git worktree add -b agentd/<change-id> ../<project>-agentd/<change-id>`
+3. **In place** - Stay on current branch (default)
+
+Skip if change already exists.
+
 ## Usage
 
 ```bash

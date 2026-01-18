@@ -24,6 +24,10 @@ enum Commands {
 
         /// Description of the change
         description: String,
+
+        /// Skip clarifications.md check (use when clarification is not needed)
+        #[arg(long)]
+        skip_clarify: bool,
     },
 
     /// Validate proposal format (local validation, no AI)
@@ -157,18 +161,19 @@ enum Commands {
         check: bool,
     },
 
-    /// Bootstrap Agentd specs from existing codebase or other spec formats
+    /// Bootstrap Agentd specs from existing codebase using AST analysis
     Fillback {
-        /// Change ID to create/populate
-        change_id: String,
-
-        /// Path to source directory or file
+        /// Path to source directory to analyze (default: current directory)
         #[arg(short, long)]
         path: Option<String>,
 
-        /// Import strategy (auto, openspec, speckit, code)
+        /// Only generate spec for a specific module name
         #[arg(short, long)]
-        strategy: Option<String>,
+        module: Option<String>,
+
+        /// Overwrite existing specs without confirmation
+        #[arg(short, long)]
+        force: bool,
     },
 
     /// Generate shell completions
@@ -177,14 +182,55 @@ enum Commands {
         #[arg(value_enum)]
         shell: Shell,
     },
+
+    /// Revise proposal based on review annotations
+    Revise {
+        /// Change ID to revise
+        change_id: String,
+    },
+
+    /// Open plan viewer UI for a change (requires ui feature)
+    #[cfg(feature = "ui")]
+    View {
+        /// Change ID to view
+        change_id: String,
+    },
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() {
     let cli = Cli::parse();
 
+    // Handle View command specially - it needs to run on the main thread
+    // without initializing the tokio runtime first (tao/wry requirement on macOS)
+    #[cfg(feature = "ui")]
+    if let Commands::View { change_id } = &cli.command {
+        agentd::cli::view::run(change_id);
+        return;
+    }
+
+    // For all other commands, run with tokio runtime
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to create tokio runtime");
+
+    if let Err(e) = runtime.block_on(run_async(cli)) {
+        eprintln!("{}", format!("Error: {}", e).red());
+        std::process::exit(1);
+    }
+}
+
+async fn run_async(cli: Cli) -> Result<()> {
     // Auto-upgrade check for all commands except init, completions, and archived
-    if !matches!(cli.command, Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived) {
+    let skip_upgrade = matches!(
+        cli.command,
+        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived
+    );
+
+    #[cfg(feature = "ui")]
+    let skip_upgrade = skip_upgrade || matches!(cli.command, Commands::View { .. });
+
+    if !skip_upgrade {
         // Check for updates and auto-upgrade if available
         agentd::cli::init::check_and_auto_upgrade(true);
     }
@@ -193,12 +239,13 @@ async fn main() -> Result<()> {
         Commands::Proposal {
             change_id,
             description,
+            skip_clarify,
         } => {
             println!(
                 "{}",
                 "🤖 Generating proposal with Gemini (2M context)...".cyan()
             );
-            agentd::cli::proposal::run(&change_id, &description).await?;
+            agentd::cli::proposal::run(&change_id, &description, skip_clarify).await?;
         }
 
         Commands::ValidateProposal { change_id, strict, verbose, json, fix } => {
@@ -286,15 +333,26 @@ async fn main() -> Result<()> {
         }
 
         Commands::Fillback {
-            change_id,
             path,
-            strategy,
+            module,
+            force,
         } => {
-            agentd::cli::fillback::run(&change_id, path.as_deref(), strategy.as_deref()).await?;
+            agentd::cli::fillback::run(path.as_deref(), module.as_deref(), force).await?;
         }
 
         Commands::Completions { shell } => {
             generate(shell, &mut Cli::command(), "agentd", &mut io::stdout());
+        }
+
+        Commands::Revise { change_id } => {
+            println!("{}", format!("📝 Reviewing annotations: {}", change_id).cyan());
+            agentd::cli::revise::run(&change_id).await?;
+        }
+
+        // View command is handled before the async runtime is created
+        #[cfg(feature = "ui")]
+        Commands::View { .. } => {
+            unreachable!("View command should be handled before runtime creation");
         }
     }
 
