@@ -14,5 +14,11 @@
       "write_file": true,
       "replace": true
     }
+  },
+  "mcpServers": {
+    "agentd": {
+      "command": "agentd",
+      "args": ["mcp-server"]
+    }
   }
 }

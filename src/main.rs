@@ -195,6 +195,9 @@ enum Commands {
         /// Change ID to view
         change_id: String,
     },
+
+    /// Start MCP server for structured proposal generation
+    McpServer,
 }
 
 fn main() {
@@ -221,10 +224,10 @@ fn main() {
 }
 
 async fn run_async(cli: Cli) -> Result<()> {
-    // Auto-upgrade check for all commands except init, completions, and archived
+    // Auto-upgrade check for all commands except init, completions, archived, and mcp-server
     let skip_upgrade = matches!(
         cli.command,
-        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived
+        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived | Commands::McpServer
     );
 
     #[cfg(feature = "ui")]
@@ -353,6 +356,10 @@ async fn run_async(cli: Cli) -> Result<()> {
         #[cfg(feature = "ui")]
         Commands::View { .. } => {
             unreachable!("View command should be handled before runtime creation");
+        }
+
+        Commands::McpServer => {
+            agentd::cli::mcp_server::run().await?;
         }
     }
 

@@ -4,6 +4,7 @@ pub mod fillback;
 pub mod implement;
 pub mod init;
 pub mod list;
+pub mod mcp_server;
 pub mod proposal;
 pub mod refine;
 pub mod reproposal;

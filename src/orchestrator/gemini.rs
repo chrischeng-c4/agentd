@@ -214,6 +214,9 @@ impl<'a> GeminiOrchestrator<'a> {
         description: &str,
         complexity: Complexity,
     ) -> Result<(String, UsageMetrics)> {
+        // Ensure Gemini MCP config exists before running
+        crate::mcp::ensure_gemini_mcp_config(&self.project_root)?;
+
         let prompt = prompts::gemini_proposal_prompt(change_id, description);
         let env = self.build_env(change_id);
         let args = self.build_args("agentd:proposal", complexity, false);
