@@ -5,6 +5,10 @@ All notable changes to specifications will be documented here.
 ## [Unreleased]
 
 ### Added
+- `workflow.md`: Progressive proposal workflow enhancements (progressive-proposal)
+  - Self-review prompts after proposal generation
+  - Resume-by-index for reliable Gemini session handling
+  - Non-zero exit on validation/challenge failures
 - `workflows.md`: High-level workflow specification for plan/impl/archive
   - Phase-only state machine design
   - Challenge updates phase based on verdict (APPROVED → challenged, REJECTED → rejected)

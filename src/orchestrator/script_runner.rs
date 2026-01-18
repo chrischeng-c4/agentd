@@ -19,6 +19,17 @@ pub struct UsageMetrics {
     pub duration_ms: Option<u64>,
     /// Cost in USD (if provided directly by CLI)
     pub cost_usd: Option<f64>,
+    /// Gemini session ID (from init message)
+    pub session_id: Option<String>,
+}
+
+/// Gemini stream-json init response format
+/// Actual format: {"type":"init","session_id":"..."}
+#[derive(Debug, Deserialize)]
+struct GeminiInitResponse {
+    #[serde(rename = "type")]
+    response_type: Option<String>,
+    session_id: Option<String>,
 }
 
 /// Gemini stream-json usage response format
@@ -107,8 +118,33 @@ impl ScriptRunner {
         prompt: &str,
         show_progress: bool,
     ) -> Result<(String, UsageMetrics)> {
+        self.run_llm_with_cwd(provider, args, env, prompt, show_progress, None).await
+    }
+
+    /// Run an LLM CLI command with optional working directory
+    ///
+    /// # Arguments
+    /// * `provider` - The LLM provider (Gemini, Codex, Claude)
+    /// * `args` - CLI arguments (already mapped via LlmProvider::build_args)
+    /// * `env` - Environment variables
+    /// * `prompt` - The prompt to pipe to stdin
+    /// * `show_progress` - Whether to show a progress spinner
+    /// * `cwd` - Optional working directory (required for Gemini session-scoped operations)
+    ///
+    /// # Returns
+    /// A tuple of (output_text, usage_metrics)
+    pub async fn run_llm_with_cwd(
+        &self,
+        provider: LlmProvider,
+        args: Vec<String>,
+        env: HashMap<String, String>,
+        prompt: &str,
+        show_progress: bool,
+        cwd: Option<&std::path::Path>,
+    ) -> Result<(String, UsageMetrics)> {
         let start = Instant::now();
-        let output = self.run_command(provider.command(), &args, env, prompt, show_progress).await?;
+        let command_name = provider.command();
+        let output = self.run_command_with_cwd(command_name, &args, env, prompt, show_progress, cwd).await?;
         let duration_ms = start.elapsed().as_millis() as u64;
 
         // Parse usage from output
@@ -127,20 +163,29 @@ impl ScriptRunner {
         }
     }
 
-    /// Parse Gemini stream-json output for usage metadata
+    /// Parse Gemini stream-json output for usage metadata and session_id
     fn parse_gemini_usage(output: &str) -> UsageMetrics {
         let mut metrics = UsageMetrics::default();
 
         // Gemini stream-json outputs JSON objects one per line
-        // Look for the "result" type message with stats
-        for line in output.lines().rev() {
+        // Look for "init" type to extract session_id, and "result" type for stats
+        for line in output.lines() {
+            // Try to parse init message for session_id (appears early in output)
+            if metrics.session_id.is_none() {
+                if let Ok(init) = serde_json::from_str::<GeminiInitResponse>(line) {
+                    if init.response_type.as_deref() == Some("init") {
+                        metrics.session_id = init.session_id;
+                    }
+                }
+            }
+
+            // Try to parse result message for stats (appears at end of output)
             if let Ok(response) = serde_json::from_str::<GeminiUsageResponse>(line) {
                 if response.response_type.as_deref() == Some("result") {
                     if let Some(stats) = response.stats {
                         metrics.tokens_in = stats.input_tokens;
                         metrics.tokens_out = stats.output_tokens;
                         metrics.duration_ms = stats.duration_ms;
-                        return metrics;
                     }
                 }
             }
@@ -196,20 +241,26 @@ impl ScriptRunner {
         metrics
     }
 
-    /// Internal: Run a CLI command
-    async fn run_command(
+    /// Internal: Run a CLI command with optional working directory
+    async fn run_command_with_cwd(
         &self,
         command_name: &str,
         args: &[String],
         env: HashMap<String, String>,
         prompt: &str,
         show_progress: bool,
+        cwd: Option<&std::path::Path>,
     ) -> Result<String> {
         let mut cmd = Command::new(command_name);
         cmd.args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+
+        // Set working directory if provided
+        if let Some(dir) = cwd {
+            cmd.current_dir(dir);
+        }
 
         // Set environment variables
         for (key, value) in env {
@@ -415,12 +466,48 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_gemini_usage_extracts_session_id() {
+        let output = r#"{"type":"init","session_id":"abc123-def456-789"}
+{"type":"message","role":"user","content":"Hello"}
+{"type":"message","role":"assistant","content":"Hi there"}
+{"type":"result","status":"success","stats":{"input_tokens":100,"output_tokens":50,"duration_ms":1234}}"#;
+
+        let metrics = ScriptRunner::parse_gemini_usage(output);
+        assert_eq!(metrics.session_id, Some("abc123-def456-789".to_string()));
+        assert_eq!(metrics.tokens_in, Some(100));
+    }
+
+    #[test]
+    fn test_parse_gemini_usage_no_init_message() {
+        // When there's no init message, session_id should be None
+        let output = r#"{"type":"message","role":"assistant","content":"Hi there"}
+{"type":"result","status":"success","stats":{"input_tokens":100,"output_tokens":50}}"#;
+
+        let metrics = ScriptRunner::parse_gemini_usage(output);
+        assert_eq!(metrics.session_id, None);
+    }
+
+    #[test]
+    fn test_parse_gemini_usage_with_uuid_format_session_id() {
+        // Test with a realistic UUID format
+        let output = r#"{"type":"init","session_id":"550e8400-e29b-41d4-a716-446655440000"}
+{"type":"result","status":"success","stats":{"input_tokens":50,"output_tokens":25}}"#;
+
+        let metrics = ScriptRunner::parse_gemini_usage(output);
+        assert_eq!(
+            metrics.session_id,
+            Some("550e8400-e29b-41d4-a716-446655440000".to_string())
+        );
+    }
+
+    #[test]
     fn test_parse_gemini_usage_no_metadata() {
         let output = r#"{"type":"message","content":"Hello world"}"#;
 
         let metrics = ScriptRunner::parse_gemini_usage(output);
         assert_eq!(metrics.tokens_in, None);
         assert_eq!(metrics.tokens_out, None);
+        assert_eq!(metrics.session_id, None);
     }
 
     #[test]

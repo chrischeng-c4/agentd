@@ -411,6 +411,10 @@ pub struct State {
     #[serde(default)]
     pub last_action: Option<String>,
 
+    /// Gemini session ID for resume-by-index
+    #[serde(default)]
+    pub session_id: Option<String>,
+
     /// File checksums
     #[serde(default)]
     pub checksums: HashMap<String, ChecksumEntry>,
@@ -728,6 +732,7 @@ impl Default for State {
             phase: StatePhase::Proposed,
             iteration: 1,
             last_action: None,
+            session_id: None,
             checksums: HashMap::new(),
             validations: Vec::new(),
             telemetry: None,

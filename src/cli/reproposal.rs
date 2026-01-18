@@ -1,5 +1,5 @@
 use crate::context::ContextPhase;
-use crate::orchestrator::{GeminiOrchestrator, UsageMetrics};
+use crate::orchestrator::{find_session_index, GeminiOrchestrator, UsageMetrics};
 use crate::state::StateManager;
 use crate::{
     models::{Change, AgentdConfig, Complexity},
@@ -71,7 +71,40 @@ pub async fn run(change_id: &str) -> Result<()> {
     );
 
     let orchestrator = GeminiOrchestrator::new(&config, &project_root);
-    let (_output, usage) = orchestrator.run_reproposal(change_id, complexity).await?;
+
+    // Load session_id from STATE.yaml for resume-by-index - R2 requires strict enforcement
+    let state_path = project_root
+        .join("agentd/changes")
+        .join(change_id)
+        .join("STATE.yaml");
+
+    let session_index = match StateManager::load(&state_path) {
+        Ok(manager) => {
+            match manager.session_id() {
+                Some(sid) => {
+                    match find_session_index(sid, &project_root).await {
+                        Ok(index) => index,
+                        Err(e) => {
+                            println!("{}", format!("❌ Session not found, please re-run proposal: {}", e).red().bold());
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                None => {
+                    println!("{}", "❌ Failed to capture session ID".red().bold());
+                    std::process::exit(1);
+                }
+            }
+        }
+        Err(_) => {
+            println!("{}", "❌ Failed to load STATE.yaml".red().bold());
+            std::process::exit(1);
+        }
+    };
+
+    // Use resume-by-index (R2 requires strict enforcement - no fallback to --resume latest)
+    let (_output, usage) = orchestrator.run_reproposal_with_session(change_id, session_index, complexity).await?;
+
     let model = config.gemini.select_model(complexity).model.clone();
     record_usage(change_id, &project_root, "reproposal", &model, &usage, &config, complexity);
 

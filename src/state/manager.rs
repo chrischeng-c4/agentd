@@ -52,6 +52,7 @@ impl StateManager {
                 phase: StatePhase::Proposed,
                 iteration: 1,
                 last_action: None,
+                session_id: None,
                 checksums: HashMap::new(),
                 validations: Vec::new(),
                 telemetry: None,
@@ -122,6 +123,17 @@ impl StateManager {
     pub fn set_last_action(&mut self, action: impl Into<String>) {
         self.state.last_action = Some(action.into());
         self.dirty = true;
+    }
+
+    /// Set Gemini session ID for resume-by-index
+    pub fn set_session_id(&mut self, session_id: String) {
+        self.state.session_id = Some(session_id);
+        self.dirty = true;
+    }
+
+    /// Get current session ID
+    pub fn session_id(&self) -> Option<&str> {
+        self.state.session_id.as_deref()
     }
 
     /// Update phase based on challenge verdict
@@ -1022,5 +1034,98 @@ mod tests {
         // Expected cost: 0.0001 * $0.10 + 0.00005 * $0.40 = $0.00001 + $0.00002 = $0.00003
         let expected = 0.00003;
         assert!((telemetry.total_cost_usd - expected).abs() < 0.000001);
+    }
+
+    // =========================================================================
+    // Session ID Tests
+    // =========================================================================
+
+    #[test]
+    fn test_session_id_setter_and_getter() {
+        let (_temp, change_dir) = setup_test_change();
+
+        let mut manager = StateManager::load(&change_dir).unwrap();
+
+        // No session_id initially
+        assert!(manager.session_id().is_none());
+
+        // Set session_id
+        manager.set_session_id("abc123-def456-789".to_string());
+        assert_eq!(manager.session_id(), Some("abc123-def456-789"));
+
+        // Change session_id
+        manager.set_session_id("new-session-uuid".to_string());
+        assert_eq!(manager.session_id(), Some("new-session-uuid"));
+    }
+
+    #[test]
+    fn test_session_id_persistence() {
+        let (_temp, change_dir) = setup_test_change();
+
+        // Set and save session_id
+        {
+            let mut manager = StateManager::load(&change_dir).unwrap();
+            manager.set_session_id("550e8400-e29b-41d4-a716-446655440000".to_string());
+            manager.save().unwrap();
+        }
+
+        // Load in new instance and verify
+        {
+            let manager = StateManager::load(&change_dir).unwrap();
+            assert_eq!(
+                manager.session_id(),
+                Some("550e8400-e29b-41d4-a716-446655440000")
+            );
+        }
+    }
+
+    #[test]
+    fn test_session_id_in_yaml_serialization() {
+        let (_temp, change_dir) = setup_test_change();
+
+        let mut manager = StateManager::load(&change_dir).unwrap();
+        manager.set_session_id("test-session-id".to_string());
+        manager.save().unwrap();
+
+        // Read the STATE.yaml file and verify session_id is serialized
+        let state_content = std::fs::read_to_string(change_dir.join("STATE.yaml")).unwrap();
+        assert!(state_content.contains("session_id: test-session-id"));
+    }
+
+    #[test]
+    fn test_session_id_null_handling() {
+        let (_temp, change_dir) = setup_test_change();
+
+        // Create state without session_id and verify it loads correctly
+        let state_yaml = r#"change_id: test-change
+schema_version: "2.0"
+phase: proposed
+iteration: 1
+"#;
+        std::fs::write(change_dir.join("STATE.yaml"), state_yaml).unwrap();
+
+        let manager = StateManager::load(&change_dir).unwrap();
+        assert!(manager.session_id().is_none());
+    }
+
+    #[test]
+    fn test_session_id_marks_dirty() {
+        let (_temp, change_dir) = setup_test_change();
+
+        let mut manager = StateManager::load(&change_dir).unwrap();
+
+        // Save initial state to clear dirty flag
+        manager.save().unwrap();
+
+        // Set session_id should mark as dirty
+        manager.set_session_id("new-id".to_string());
+
+        // Verify dirty flag is set by checking if save would write
+        // (we can't directly check dirty, but we know it's set because the setter does it)
+        manager.save().unwrap();
+
+        // Reload and verify value persisted (proves dirty flag was set)
+        let manager = StateManager::load(&change_dir).unwrap();
+        assert_eq!(manager.session_id(), Some("new-id"));
     }
 }
