@@ -1,0 +1,64 @@
+name: Auto Tag
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Cargo.toml'
+
+jobs:
+  auto-tag:
+    name: Create tag if version bumped
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for tags
+
+      - name: Get version from Cargo.toml
+        id: cargo_version
+        run: |
+          VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Cargo.toml version: $VERSION"
+
+      - name: Get latest tag
+        id: latest_tag
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST_VERSION=${LATEST_TAG#v}
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "Latest tag: $LATEST_TAG (version: $LATEST_VERSION)"
+
+      - name: Compare versions
+        id: compare
+        run: |
+          CARGO_VERSION="${{ steps.cargo_version.outputs.version }}"
+          TAG_VERSION="${{ steps.latest_tag.outputs.version }}"
+
+          # Function to compare semver versions
+          version_gt() {
+            [ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" != "$1" ]
+          }
+
+          if version_gt "$CARGO_VERSION" "$TAG_VERSION"; then
+            echo "should_tag=true" >> $GITHUB_OUTPUT
+            echo "Cargo version ($CARGO_VERSION) is ahead of tag version ($TAG_VERSION)"
+          else
+            echo "should_tag=false" >> $GITHUB_OUTPUT
+            echo "Cargo version ($CARGO_VERSION) is not ahead of tag version ($TAG_VERSION)"
+          fi
+
+      - name: Create and push tag
+        if: steps.compare.outputs.should_tag == 'true'
+        run: |
+          NEW_TAG="v${{ steps.cargo_version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+          git push origin "$NEW_TAG"
+          echo "Created and pushed tag: $NEW_TAG"
