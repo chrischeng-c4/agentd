@@ -3,7 +3,8 @@ use crate::cli::validate_proposal::validate_proposal;
 use crate::context::ContextPhase;
 use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, Complexity, ValidationOptions};
 use crate::orchestrator::{detect_self_review_marker, find_session_index, GeminiOrchestrator, CodexOrchestrator, SelfReviewResult, UsageMetrics};
-use crate::parser::parse_challenge_verdict;
+use crate::parser::{parse_challenge_verdict, parse_affected_specs};
+use crate::orchestrator::prompts;
 use crate::state::StateManager;
 use crate::Result;
 use colored::Colorize;
@@ -34,6 +35,38 @@ pub async fn run_proposal_loop(config: ProposalEngineConfig) -> Result<ProposalE
         project_root,
         config: agentd_config,
     } = config;
+
+    // Check if sequential generation is enabled
+    if agentd_config.workflow.use_sequential_generation {
+        println!("{}", "🎯 Using sequential generation mode (proposal → specs → tasks)".cyan());
+
+        // Step 1: Generate proposal, specs, and tasks sequentially
+        let resolved_change_id = run_proposal_step_sequential(&change_id, &description, &project_root, &agentd_config).await?;
+
+        // Step 2: Validate proposal format
+        let format_valid = run_validate_proposal_step(&resolved_change_id, &project_root)?;
+        if !format_valid {
+            println!("{}", "⚠️  Format validation failed after sequential generation".yellow());
+            println!("   Please manually review and fix: agentd/changes/{}/proposal.md", resolved_change_id);
+            std::process::exit(1);
+        }
+
+        // Step 3: Challenge with Codex
+        let verdict = run_challenge_step(&resolved_change_id, &project_root, &agentd_config).await?;
+
+        // Step 4: Validate challenge format
+        let _challenge_valid = run_validate_challenge_step(&resolved_change_id, &project_root)?;
+
+        // For sequential mode, we stop after first challenge (no auto-reproposal loop)
+        // User can manually iterate using agentd reproposal + agentd challenge
+        return Ok(ProposalEngineResult {
+            resolved_change_id,
+            verdict,
+            iteration_count: 0,
+        });
+    }
+
+    println!("{}", "🔄 Using legacy generation mode (one-shot with session reuse)".cyan());
 
     // Step 1: Generate proposal (resolves change-id conflicts)
     let resolved_change_id = run_proposal_step(&change_id, &description, &project_root, &agentd_config).await?;
@@ -747,4 +780,234 @@ fn open_viewer_if_available(change_id: &str, project_root: &PathBuf) {
     // Print exact message without ANSI formatting to match spec requirement
     println!("UI feature disabled. View plan manually at: {}", change_path.display());
     println!();
+}
+
+/// Sequential generation workflow: proposal → specs → tasks
+/// Each phase uses fresh session, context passed via reviewed files (MCP read_file)
+pub async fn run_proposal_step_sequential(
+    change_id: &str,
+    description: &str,
+    project_root: &PathBuf,
+    config: &AgentdConfig,
+) -> Result<String> {
+    println!("{}", "🎯 Multi-Phase Sequential Generation".cyan().bold());
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+
+    // Create change directory
+    let changes_dir = project_root.join("agentd/changes");
+    std::fs::create_dir_all(&changes_dir)?;
+
+    // Resolve change-id conflicts
+    let resolved_change_id = crate::context::resolve_change_id_conflict(change_id, &changes_dir)?;
+    let change_dir = changes_dir.join(&resolved_change_id);
+    std::fs::create_dir_all(&change_dir)?;
+
+    // Assess complexity
+    let change = Change::new(&resolved_change_id, description);
+    let complexity = change.assess_complexity(project_root);
+
+    let orchestrator = GeminiOrchestrator::new(config, project_root);
+
+    // ====================
+    // Phase 1: Generate proposal.md
+    // ====================
+    println!();
+    println!("{}", "📝 Phase 1/3: Generating proposal.md...".cyan().bold());
+
+    // Generate GEMINI.md context for proposal phase
+    crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
+
+    let proposal_prompt = prompts::gemini_proposal_with_mcp_prompt(&resolved_change_id, description);
+
+    // Run one-shot generation (fresh session)
+    let (_output, usage) = orchestrator.run_one_shot(&resolved_change_id, &proposal_prompt, complexity).await?;
+    let model = config.gemini.select_model(complexity).model.clone();
+    record_usage(&resolved_change_id, project_root, "proposal-gen", &model, &usage, config, complexity);
+
+    println!("{}", "✅ proposal.md generated".green());
+
+    // Self-review loop for proposal (max 3 iterations, each with fresh session)
+    println!("{}", "🔍 Self-reviewing proposal.md...".cyan());
+    let max_review_iterations = 3;
+
+    for iteration in 0..max_review_iterations {
+        let review_prompt = prompts::proposal_self_review_with_mcp_prompt(&resolved_change_id);
+
+        match orchestrator.run_one_shot(&resolved_change_id, &review_prompt, complexity).await {
+            Ok((review_output, review_usage)) => {
+                let model = config.gemini.select_model(complexity).model.clone();
+                record_usage(&resolved_change_id, project_root, "proposal-review", &model, &review_usage, config, complexity);
+
+                let result = detect_self_review_marker(&review_output);
+                match result {
+                    SelfReviewResult::Pass => {
+                        println!("{}", format!("   ✓ Review {}: PASS", iteration + 1).green());
+                        break;
+                    }
+                    SelfReviewResult::NeedsRevision => {
+                        println!("{}", format!("   ⚠ Review {}: NEEDS_REVISION (auto-fixed)", iteration + 1).yellow());
+                        if iteration >= max_review_iterations - 1 {
+                            println!("{}", "   ⚠ Max review iterations reached".yellow());
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!("{}", format!("   ⚠ Review {} failed: {}", iteration + 1, e).yellow());
+                break;
+            }
+        }
+    }
+
+    // Parse affected_specs from proposal.md
+    let proposal_path = change_dir.join("proposal.md");
+    let proposal_content = std::fs::read_to_string(&proposal_path)?;
+    let affected_specs = parse_affected_specs(&proposal_content)?;
+
+    if affected_specs.is_empty() {
+        println!("{}", "ℹ️  No specs required for this change".blue());
+    } else {
+        println!("{}", format!("📋 Found {} specs to generate: {:?}", affected_specs.len(), affected_specs).cyan());
+    }
+
+    // ====================
+    // Phase 2: Generate specs sequentially
+    // ====================
+    if !affected_specs.is_empty() {
+        println!();
+        println!("{}", format!("📝 Phase 2/3: Generating {} specs...", affected_specs.len()).cyan().bold());
+
+        for (idx, spec_id) in affected_specs.iter().enumerate() {
+            println!();
+            println!("{}", format!("  📄 Spec {}/{}: {}", idx + 1, affected_specs.len(), spec_id).cyan());
+
+            // Prepare context: proposal.md + previously generated specs
+            let mut context_specs = vec![];
+            for prev_spec_id in &affected_specs[..idx] {
+                context_specs.push(prev_spec_id.clone());
+            }
+
+            let spec_prompt = prompts::gemini_spec_with_mcp_prompt(
+                &resolved_change_id,
+                spec_id,
+                &context_specs,
+            );
+
+            // Run one-shot generation (fresh session)
+            let (_spec_output, spec_usage) = orchestrator.run_one_shot(&resolved_change_id, &spec_prompt, complexity).await?;
+            let model = config.gemini.select_model(complexity).model.clone();
+            record_usage(&resolved_change_id, project_root, &format!("spec-gen-{}", spec_id), &model, &spec_usage, config, complexity);
+
+            println!("{}", format!("     ✅ {}.md generated", spec_id).green());
+
+            // Self-review loop for this spec
+            println!("{}", format!("     🔍 Self-reviewing {}...", spec_id).cyan());
+
+            for review_iter in 0..max_review_iterations {
+                let spec_review_prompt = prompts::spec_self_review_with_mcp_prompt(&resolved_change_id, spec_id, &context_specs);
+
+                match orchestrator.run_one_shot(&resolved_change_id, &spec_review_prompt, complexity).await {
+                    Ok((spec_review_output, spec_review_usage)) => {
+                        let model = config.gemini.select_model(complexity).model.clone();
+                        record_usage(&resolved_change_id, project_root, &format!("spec-review-{}", spec_id), &model, &spec_review_usage, config, complexity);
+
+                        let result = detect_self_review_marker(&spec_review_output);
+                        match result {
+                            SelfReviewResult::Pass => {
+                                println!("{}", format!("        ✓ Review {}: PASS", review_iter + 1).green());
+                                break;
+                            }
+                            SelfReviewResult::NeedsRevision => {
+                                println!("{}", format!("        ⚠ Review {}: NEEDS_REVISION (auto-fixed)", review_iter + 1).yellow());
+                                if review_iter >= max_review_iterations - 1 {
+                                    println!("{}", "        ⚠ Max review iterations reached".yellow());
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("{}", format!("        ⚠ Review {} failed: {}", review_iter + 1, e).yellow());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // ====================
+    // Phase 3: Generate tasks.md
+    // ====================
+    println!();
+    println!("{}", "📝 Phase 3/3: Generating tasks.md...".cyan().bold());
+
+    let tasks_prompt = prompts::gemini_tasks_with_mcp_prompt(&resolved_change_id, &affected_specs);
+
+    // Run one-shot generation (fresh session)
+    let (_tasks_output, tasks_usage) = orchestrator.run_one_shot(&resolved_change_id, &tasks_prompt, complexity).await?;
+    let model = config.gemini.select_model(complexity).model.clone();
+    record_usage(&resolved_change_id, project_root, "tasks-gen", &model, &tasks_usage, config, complexity);
+
+    println!("{}", "✅ tasks.md generated".green());
+
+    // Self-review loop for tasks
+    println!("{}", "🔍 Self-reviewing tasks.md...".cyan());
+
+    // Prepare all files for tasks review (proposal.md + all specs)
+    let mut all_files = vec!["proposal.md".to_string()];
+    for spec_id in &affected_specs {
+        all_files.push(format!("specs/{}.md", spec_id));
+    }
+
+    for iteration in 0..max_review_iterations {
+        let tasks_review_prompt = prompts::tasks_self_review_with_mcp_prompt(&resolved_change_id, &all_files);
+
+        match orchestrator.run_one_shot(&resolved_change_id, &tasks_review_prompt, complexity).await {
+            Ok((tasks_review_output, tasks_review_usage)) => {
+                let model = config.gemini.select_model(complexity).model.clone();
+                record_usage(&resolved_change_id, project_root, "tasks-review", &model, &tasks_review_usage, config, complexity);
+
+                let result = detect_self_review_marker(&tasks_review_output);
+                match result {
+                    SelfReviewResult::Pass => {
+                        println!("{}", format!("   ✓ Review {}: PASS", iteration + 1).green());
+                        break;
+                    }
+                    SelfReviewResult::NeedsRevision => {
+                        println!("{}", format!("   ⚠ Review {}: NEEDS_REVISION (auto-fixed)", iteration + 1).yellow());
+                        if iteration >= max_review_iterations - 1 {
+                            println!("{}", "   ⚠ Max review iterations reached".yellow());
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!("{}", format!("   ⚠ Review {} failed: {}", iteration + 1, e).yellow());
+                break;
+            }
+        }
+    }
+
+    // ====================
+    // Finalization
+    // ====================
+    println!();
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+    println!("{}", "✨ Sequential generation completed!".green().bold());
+    println!("{}", format!("   Location: agentd/changes/{}", resolved_change_id).cyan());
+
+    // Update change phase
+    let mut change = Change::new(&resolved_change_id, description);
+    change.update_phase(ChangePhase::Proposed);
+
+    // Validate structure
+    match change.validate_structure(project_root) {
+        Ok(_) => {
+            println!("{}", "✅ All files validated".green());
+            Ok(resolved_change_id)
+        }
+        Err(e) => {
+            println!("{}", format!("⚠️  Warning: Structure validation issues: {}", e).yellow());
+            Ok(resolved_change_id)
+        }
+    }
 }

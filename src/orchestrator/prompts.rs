@@ -20,6 +20,332 @@ Create proposal files in agentd/changes/{change_id}/.
     )
 }
 
+/// Generate Gemini proposal prompt using MCP create_proposal tool (sequential generation)
+pub fn gemini_proposal_with_mcp_prompt(change_id: &str, description: &str) -> String {
+    format!(
+        r#"## Task: Create proposal.md
+
+Use the `create_proposal` MCP tool to generate proposal.md for this change.
+
+## Change ID
+{change_id}
+
+## User Request
+{description}
+
+## Instructions
+
+1. **Analyze the codebase** using your 2M context window:
+   - Read project structure, existing code, patterns
+   - Understand the technical landscape
+   - Identify affected areas
+
+2. **Determine required specs**:
+   - What major components/features need detailed design?
+   - List them in the `affected_specs` field
+   - Use clear, descriptive IDs (e.g., `auth-flow`, `user-model`, `api-endpoints`)
+
+3. **Use create_proposal MCP tool** with this structure:
+   ```json
+   {{
+     "change_id": "{change_id}",
+     "summary": "Brief 1-sentence description",
+     "why": "Detailed business/technical motivation (min 50 chars)",
+     "what_changes": [
+       "Add X to handle Y",
+       "Modify Z to support W"
+     ],
+     "impact": {{
+       "scope": "patch|minor|major",
+       "affected_files": <estimated number>,
+       "affected_specs": [
+         "spec-id-1",
+         "spec-id-2"
+       ],
+       "affected_code": [
+         "path/to/component/",
+         "path/to/module/"
+       ],
+       "breaking_changes": null or "description"
+     }}
+   }}
+   ```
+
+IMPORTANT: The `affected_specs` list determines which specs will be generated next. Be thorough but focused.
+"#,
+        change_id = change_id,
+        description = description
+    )
+}
+
+/// Generate Gemini spec prompt using MCP create_spec tool (sequential generation)
+pub fn gemini_spec_with_mcp_prompt(change_id: &str, spec_id: &str, context_files: &[String]) -> String {
+    let context_list = if context_files.is_empty() {
+        String::from("- agentd/changes/{change_id}/proposal.md")
+    } else {
+        context_files.iter().map(|f| format!("- {}", f)).collect::<Vec<_>>().join("\n")
+    };
+
+    format!(
+        r#"## Task: Create spec '{spec_id}'
+
+Use the `create_spec` MCP tool to generate specs/{spec_id}.md for this change.
+
+## Context Files (read these first):
+{context_list}
+
+## Instructions
+
+1. **Read context files**:
+   - Read proposal.md to understand the overall change
+   - Read existing specs (if any) to maintain consistency and avoid duplication
+
+2. **Design this spec**:
+   - Define clear, testable requirements (R1, R2, ...)
+   - Add Mermaid diagrams if helpful:
+     - Flow: sequenceDiagram for interactions
+     - State: stateDiagram-v2 for state machines
+     - Data Model: JSON Schema for data structures
+   - Write acceptance scenarios (WHEN/THEN format)
+   - Ensure consistency with proposal.md and other specs
+
+3. **Use create_spec MCP tool** with this structure:
+   ```json
+   {{
+     "change_id": "{change_id}",
+     "spec_id": "{spec_id}",
+     "title": "Human-readable title",
+     "overview": "What this spec covers and why (min 50 chars)",
+     "requirements": [
+       {{
+         "id": "R1",
+         "title": "Short title",
+         "description": "Detailed requirement description",
+         "priority": "high|medium|low"
+       }}
+     ],
+     "scenarios": [
+       {{
+         "name": "Happy path scenario",
+         "given": "Optional precondition",
+         "when": "Trigger condition with specific values",
+         "then": "Expected outcome"
+       }},
+       {{
+         "name": "Error case scenario",
+         "when": "Error condition",
+         "then": "Error handling behavior"
+       }}
+     ],
+     "flow_diagram": "```mermaid\\nsequenceDiagram...```",
+     "data_model": {{ JSON Schema object }}
+   }}
+   ```
+
+IMPORTANT:
+- Minimum 3 scenarios required (happy path + error cases + edge cases)
+- Use specific values in scenarios, not placeholders
+- Maintain consistency with other specs (no duplicate definitions)
+"#,
+        change_id = change_id,
+        spec_id = spec_id,
+        context_list = context_list
+    )
+}
+
+/// Generate Gemini tasks prompt using MCP create_tasks tool (sequential generation)
+pub fn gemini_tasks_with_mcp_prompt(change_id: &str, all_files: &[String]) -> String {
+    let context_list = all_files.iter().map(|f| format!("- {}", f)).collect::<Vec<_>>().join("\n");
+
+    format!(
+        r#"## Task: Create tasks.md
+
+Use the `create_tasks` MCP tool to generate tasks.md for this change.
+
+## Context Files (read all):
+{context_list}
+
+## Instructions
+
+1. **Read all context files**:
+   - Read proposal.md for overall scope
+   - Read all specs/*.md for detailed requirements
+
+2. **Break down into tasks**:
+   - Organize by layer (build order):
+     - **data**: Database schemas, models, data structures
+     - **logic**: Business logic, algorithms, core functionality
+     - **integration**: API endpoints, external integrations
+     - **testing**: Unit tests, integration tests
+   - Each task should reference a spec requirement (e.g., `auth-flow:R1`)
+   - Define file actions: CREATE, MODIFY, or DELETE
+   - Set dependencies between tasks (e.g., task 2.1 depends on [1.1])
+
+3. **Use create_tasks MCP tool** with this structure:
+   ```json
+   {{
+     "change_id": "{change_id}",
+     "tasks": [
+       {{
+         "layer": "data",
+         "number": 1,
+         "title": "Create User model",
+         "file": {{
+           "path": "src/models/user.rs",
+           "action": "CREATE"
+         }},
+         "spec_ref": "user-model:R1",
+         "description": "Detailed task description",
+         "depends": []
+       }},
+       {{
+         "layer": "logic",
+         "number": 1,
+         "title": "Implement OAuth flow",
+         "file": {{
+           "path": "src/auth/oauth.rs",
+           "action": "CREATE"
+         }},
+         "spec_ref": "auth-flow:R1",
+         "description": "Detailed task description",
+         "depends": ["1.1"]
+       }}
+     ]
+   }}
+   ```
+
+IMPORTANT:
+- All spec requirements must be covered by tasks
+- Dependencies must be correct (no circular deps)
+- File paths must be specific and accurate
+- Layer organization must be logical (data → logic → integration → testing)
+"#,
+        change_id = change_id,
+        context_list = context_list
+    )
+}
+
+/// Generate self-review prompt for proposal.md (sequential generation)
+pub fn proposal_self_review_with_mcp_prompt(change_id: &str) -> String {
+    format!(
+        r#"## Task: Review proposal.md
+
+Read and review: agentd/changes/{change_id}/proposal.md
+
+## Quality Criteria
+
+1. **Summary** is clear and specific (not vague)
+2. **Why** section has compelling business/technical value
+3. **affected_specs** list is complete and well-scoped
+4. **Impact** analysis covers all affected areas
+5. **Formatting** follows markdown standards
+
+## Instructions
+
+1. Read the proposal.md file
+2. Check against quality criteria
+
+If issues found:
+  1. Use `create_proposal` MCP tool to update the file
+  2. Output: `<review>NEEDS_REVISION</review>`
+
+If no issues:
+  1. Output: `<review>PASS</review>`
+
+IMPORTANT: You MUST output exactly one of the two markers above.
+"#,
+        change_id = change_id
+    )
+}
+
+/// Generate self-review prompt for a spec (sequential generation)
+pub fn spec_self_review_with_mcp_prompt(change_id: &str, spec_id: &str, other_specs: &[String]) -> String {
+    let other_specs_list = if other_specs.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\nOther specs (check consistency):\n{}",
+            other_specs.iter().map(|f| format!("- {}", f)).collect::<Vec<_>>().join("\n")
+        )
+    };
+
+    format!(
+        r#"## Task: Review spec '{spec_id}'
+
+Read and review: agentd/changes/{change_id}/specs/{spec_id}.md
+
+## Context Files:
+- agentd/changes/{change_id}/proposal.md (for reference){other_specs_list}
+
+## Quality Criteria
+
+1. **Requirements** are testable and clear
+2. **Scenarios** cover happy path, errors, edge cases (min 3)
+3. **Consistent** with proposal.md
+4. **Consistent** with other specs (no duplicate definitions)
+5. **Mermaid diagrams** are correct (if present)
+6. **Formatting** follows markdown standards
+
+## Instructions
+
+1. Read the spec file and context files
+2. Check against quality criteria
+
+If issues found:
+  1. Use `create_spec` MCP tool to update the file
+  2. Output: `<review>NEEDS_REVISION</review>`
+
+If no issues:
+  1. Output: `<review>PASS</review>`
+
+IMPORTANT: You MUST output exactly one of the two markers above.
+"#,
+        change_id = change_id,
+        spec_id = spec_id,
+        other_specs_list = other_specs_list
+    )
+}
+
+/// Generate self-review prompt for tasks.md (sequential generation)
+pub fn tasks_self_review_with_mcp_prompt(change_id: &str, all_files: &[String]) -> String {
+    let context_list = all_files.iter().map(|f| format!("- {}", f)).collect::<Vec<_>>().join("\n");
+
+    format!(
+        r#"## Task: Review tasks.md
+
+Read and review: agentd/changes/{change_id}/tasks.md
+
+## Context Files:
+{context_list}
+
+## Quality Criteria
+
+1. **Coverage**: All spec requirements are covered by tasks
+2. **Dependencies**: Correct, no circular deps
+3. **Layer organization**: Logical (data → logic → integration → testing)
+4. **File paths**: Accurate and specific
+5. **Spec refs**: Each task has clear spec_ref
+6. **Formatting**: Follows markdown standards
+
+## Instructions
+
+1. Read tasks.md and all context files
+2. Check against quality criteria
+
+If issues found:
+  1. Use `create_tasks` MCP tool to update the file
+  2. Output: `<review>NEEDS_REVISION</review>`
+
+If no issues:
+  1. Output: `<review>PASS</review>`
+
+IMPORTANT: You MUST output exactly one of the two markers above.
+"#,
+        change_id = change_id,
+        context_list = context_list
+    )
+}
+
 /// Generate Gemini reproposal prompt (for resuming sessions)
 pub fn gemini_reproposal_prompt(change_id: &str) -> String {
     format!(

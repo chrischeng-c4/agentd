@@ -327,6 +327,34 @@ impl<'a> GeminiOrchestrator<'a> {
 
         self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
     }
+
+    /// Run a one-shot command without session reuse
+    ///
+    /// Each call is independent - context comes from files (via MCP), not session history.
+    /// This is used for sequential generation where each phase reads the output of previous phases.
+    ///
+    /// # Arguments
+    /// * `change_id` - The change ID (used for GEMINI.md context)
+    /// * `prompt` - The prompt to send to Gemini
+    /// * `complexity` - Complexity level for model selection
+    ///
+    /// # Returns
+    /// Tuple of (output text, usage metrics)
+    pub async fn run_one_shot(
+        &self,
+        change_id: &str,
+        prompt: &str,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        // Ensure Gemini MCP config exists before running
+        crate::mcp::ensure_gemini_mcp_config(&self.project_root)?;
+
+        let env = self.build_env(change_id);
+        // No resume - each call is a fresh session
+        let args = self.build_args("agentd:one-shot", complexity, false);
+
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, prompt, true, Some(&self.project_root)).await
+    }
 }
 
 #[cfg(test)]

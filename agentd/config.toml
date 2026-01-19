@@ -8,6 +8,9 @@ implementation_iterations = 2
 archive_iterations = 1
 script_retries = 3
 retry_delay_secs = 5
+# Use sequential generation (proposal → specs → tasks with fresh sessions)
+# If false, uses legacy one-shot generation (all files in one session)
+use_sequential_generation = false
 
 [gemini]
 command = "gemini"
