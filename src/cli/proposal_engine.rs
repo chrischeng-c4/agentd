@@ -36,9 +36,9 @@ pub async fn run_proposal_loop(config: ProposalEngineConfig) -> Result<ProposalE
         config: agentd_config,
     } = config;
 
-    // Check if sequential generation is enabled
-    if agentd_config.workflow.use_sequential_generation {
-        println!("{}", "🎯 Using sequential generation mode (proposal → specs → tasks)".cyan());
+    // Check if Human-in-the-Loop mode is enabled
+    if agentd_config.workflow.human_in_loop {
+        println!("{}", "🎯 Human-in-the-Loop mode (proposal → specs → tasks with manual iteration)".cyan());
 
         // Step 1: Generate proposal, specs, and tasks sequentially
         let resolved_change_id = run_proposal_step_sequential(&change_id, &description, &project_root, &agentd_config).await?;
@@ -57,8 +57,8 @@ pub async fn run_proposal_loop(config: ProposalEngineConfig) -> Result<ProposalE
         // Step 4: Validate challenge format
         let _challenge_valid = run_validate_challenge_step(&resolved_change_id, &project_root)?;
 
-        // For sequential mode, we stop after first challenge (no auto-reproposal loop)
-        // User can manually iterate using agentd reproposal + agentd challenge
+        // For HITL mode, we stop after first challenge (no auto-reproposal loop)
+        // Skill will use AskUserQuestion to let user decide next action
         return Ok(ProposalEngineResult {
             resolved_change_id,
             verdict,
@@ -66,7 +66,7 @@ pub async fn run_proposal_loop(config: ProposalEngineConfig) -> Result<ProposalE
         });
     }
 
-    println!("{}", "🔄 Using legacy generation mode (one-shot with session reuse)".cyan());
+    println!("{}", "🤖 Fully automated mode (auto-reproposal on NEEDS_REVISION)".cyan());
 
     // Step 1: Generate proposal (resolves change-id conflicts)
     let resolved_change_id = run_proposal_step(&change_id, &description, &project_root, &agentd_config).await?;

@@ -591,10 +591,10 @@ pub struct WorkflowConfig {
     #[serde(default = "default_retry_delay_secs")]
     pub retry_delay_secs: u64,
 
-    /// Use sequential generation (proposal → specs → tasks with fresh sessions)
-    /// If false, uses legacy one-shot generation (all files in one session)
-    #[serde(default = "default_use_sequential_generation")]
-    pub use_sequential_generation: bool,
+    /// Human-in-the-Loop mode: Sequential generation (proposal → specs → tasks) with manual iteration control
+    /// If false, uses fully automated mode (auto-reproposal loop on NEEDS_REVISION)
+    #[serde(default = "default_human_in_loop", alias = "use_sequential_generation")]
+    pub human_in_loop: bool,
 }
 
 fn default_format_iterations() -> u32 { 2 }
@@ -603,7 +603,7 @@ fn default_implementation_iterations() -> u32 { 2 }
 fn default_archive_iterations() -> u32 { 1 }
 fn default_script_retries() -> u32 { 3 }
 fn default_retry_delay_secs() -> u64 { 5 }
-fn default_use_sequential_generation() -> bool { false }
+fn default_human_in_loop() -> bool { true }
 
 impl Default for WorkflowConfig {
     fn default() -> Self {
@@ -614,7 +614,7 @@ impl Default for WorkflowConfig {
             archive_iterations: default_archive_iterations(),
             script_retries: default_script_retries(),
             retry_delay_secs: default_retry_delay_secs(),
-            use_sequential_generation: default_use_sequential_generation(),
+            human_in_loop: default_human_in_loop(),
         }
     }
 }

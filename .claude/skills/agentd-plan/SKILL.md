@@ -117,14 +117,59 @@ The skill determines the next action based on the `phase` field in `STATE.yaml`:
 | `rejected` | ⛔ Rejected, suggest reviewing CHALLENGE.md |
 | Other phases | ℹ️ Beyond planning phase |
 
-**Note**: The `agentd plan` command internally handles the entire workflow: clarifications check, proposal generation, challenge analysis, and auto-reproposal loops. It will iterate until the proposal is either APPROVED (phase → `challenged`) or REJECTED (phase → `rejected`).
+**Note**: The `agentd plan` command uses **Human-in-the-Loop (HITL)** mode by default:
+- Generates proposal → specs → tasks sequentially with fresh sessions
+- Runs challenge with Codex
+- **Stops and waits for human decision** (no auto-reproposal loop)
 
-## State transitions
+## Human-in-the-Loop Flow
+
+After `agentd plan` completes, check the challenge verdict and use **AskUserQuestion** to let user decide:
+
+### If verdict is APPROVED:
+- ✅ Planning complete
+- Suggest: `/agentd:impl <change-id>`
+
+### If verdict is NEEDS_REVISION:
+Use AskUserQuestion with these options:
 
 ```
-No STATE.yaml → [Clarify] → proposed → challenged  (APPROVED)
-                          ↓         ↗ (NEEDS_REVISION - auto-reproposal)
-                          → rejected (REJECTED)
+AskUserQuestion:
+  question: "The proposal needs revision. What would you like to do?"
+  header: "Next Action"
+  options:
+    - label: "Auto-fix and rechallenge (Recommended)"
+      description: "Run agentd reproposal to fix issues, then rechallenge with Codex"
+    - label: "Review manually"
+      description: "Let me review the CHALLENGE.md and proposal files first"
+    - label: "Stop here"
+      description: "I'll handle this manually later"
+```
+
+**Then execute based on user choice:**
+- **Auto-fix**: Run `agentd reproposal <change-id>` → then `agentd challenge <change-id>` → repeat this flow
+- **Review manually**: Read CHALLENGE.md and show issues to user
+- **Stop**: Exit gracefully
+
+### If verdict is REJECTED:
+- ⛔ Fundamental issues detected
+- Read and display key issues from CHALLENGE.md
+- Suggest manual review and fixes
+
+## State transitions (Human-in-the-Loop)
+
+```
+No STATE.yaml → [Clarify] → proposed → [Challenge] → APPROVED → challenged ✅
+                          ↓                       ↓
+                          ↓                    NEEDS_REVISION
+                          ↓                       ↓
+                          ↓              [AskUserQuestion] ← YOU ARE HERE
+                          ↓                       ↓
+                          ↓            User chooses: Auto-fix / Review / Stop
+                          ↓                       ↓
+                          ↓              [reproposal] → [rechallenge] → loop
+                          ↓
+                          → REJECTED → rejected ⛔
 ```
 
 ## Next steps

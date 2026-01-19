@@ -21,18 +21,6 @@ The actual codebase exploration and analysis is done by:
 
 You are a dispatcher, not an explorer.
 
-## Knowledge Phase (Before Proposal)
-
-For **NEW changes**, check if relevant knowledge exists:
-
-1. Run `list_knowledge` MCP tool to see available documentation
-2. Read relevant knowledge for the change area:
-   - Architecture decisions: `read_knowledge("00-architecture/index.md")`
-   - Module-specific docs: `read_knowledge("10-<module>/index.md")`
-3. Use this context to inform clarification questions and proposal
-
-**Skip if**: No knowledge directory exists, or change is trivial.
-
 ## Clarification Phase (Before Proposal)
 
 For **NEW changes** (no existing `STATE.yaml`), clarify requirements before running `agentd proposal`:
@@ -59,23 +47,28 @@ AskUserQuestion with questions array:
 
 **Important**: Always use the AskUserQuestion tool for interactive clarification, not text-based questions.
 
-3. After user answers, write to `agentd/changes/<change-id>/clarifications.md`:
+3. After user answers, use the **create_clarifications MCP tool**:
 
-```markdown
----
-change: <change-id>
-date: YYYY-MM-DD
----
-
-# Clarifications
-
-## Q1: [Topic]
-- **Question**: [the question asked]
-- **Answer**: [user's answer]
-- **Rationale**: [why this choice]
+```json
+{
+  "change_id": "<change-id>",
+  "questions": [
+    {
+      "topic": "Short Label",
+      "question": "What is your preferred approach for X?",
+      "answer": "User's answer from AskUserQuestion",
+      "rationale": "Why this choice makes sense"
+    }
+  ]
+}
 ```
 
-4. Then run `agentd proposal` with the clarified context
+The tool will:
+- Create `agentd/changes/<change-id>/` directory if needed
+- Write `clarifications.md` with proper frontmatter
+- Return success message
+
+4. Then run `agentd plan` with the clarified context
 
 ### Skip clarification if
 - User explicitly says "skip" or uses `--skip-clarify`
@@ -98,7 +91,7 @@ Skip if change already exists.
 # New change (description required)
 /agentd:plan <change-id> "<description>"
 
-# Existing change (continue planning)
+# Existing change (description optional)
 /agentd:plan <change-id>
 ```
 
@@ -118,20 +111,65 @@ The skill determines the next action based on the `phase` field in `STATE.yaml`:
 
 | Phase | Action |
 |-------|--------|
-| No STATE.yaml | **Clarify** → write `clarifications.md` → run `agentd proposal` |
-| `proposed` | Run `agentd proposal` to continue planning cycle |
+| No STATE.yaml | **Clarify** → write `clarifications.md` → run `agentd plan` |
+| `proposed` | Run `agentd plan` to continue planning cycle |
 | `challenged` | ✅ Planning complete, suggest `/agentd:impl` |
 | `rejected` | ⛔ Rejected, suggest reviewing CHALLENGE.md |
 | Other phases | ℹ️ Beyond planning phase |
 
-**Note**: The `agentd proposal` command internally handles challenge analysis and auto-reproposal loops. It will iterate until the proposal is either APPROVED (phase → `challenged`) or REJECTED (phase → `rejected`).
+**Note**: The `agentd plan` command uses **Human-in-the-Loop (HITL)** mode by default:
+- Generates proposal → specs → tasks sequentially with fresh sessions
+- Runs challenge with Codex
+- **Stops and waits for human decision** (no auto-reproposal loop)
 
-## State transitions
+## Human-in-the-Loop Flow
+
+After `agentd plan` completes, check the challenge verdict and use **AskUserQuestion** to let user decide:
+
+### If verdict is APPROVED:
+- ✅ Planning complete
+- Suggest: `/agentd:impl <change-id>`
+
+### If verdict is NEEDS_REVISION:
+Use AskUserQuestion with these options:
 
 ```
-No STATE.yaml → [Clarify] → proposed → challenged  (APPROVED)
-                          ↓         ↗ (NEEDS_REVISION - auto-reproposal)
-                          → rejected (REJECTED)
+AskUserQuestion:
+  question: "The proposal needs revision. What would you like to do?"
+  header: "Next Action"
+  options:
+    - label: "Auto-fix and rechallenge (Recommended)"
+      description: "Run agentd reproposal to fix issues, then rechallenge with Codex"
+    - label: "Review manually"
+      description: "Let me review the CHALLENGE.md and proposal files first"
+    - label: "Stop here"
+      description: "I'll handle this manually later"
+```
+
+**Then execute based on user choice:**
+- **Auto-fix**: Run `agentd reproposal <change-id>` → then `agentd challenge <change-id>` → repeat this flow
+- **Review manually**: Read CHALLENGE.md and show issues to user
+- **Stop**: Exit gracefully
+
+### If verdict is REJECTED:
+- ⛔ Fundamental issues detected
+- Read and display key issues from CHALLENGE.md
+- Suggest manual review and fixes
+
+## State transitions (Human-in-the-Loop)
+
+```
+No STATE.yaml → [Clarify] → proposed → [Challenge] → APPROVED → challenged ✅
+                          ↓                       ↓
+                          ↓                    NEEDS_REVISION
+                          ↓                       ↓
+                          ↓              [AskUserQuestion] ← YOU ARE HERE
+                          ↓                       ↓
+                          ↓            User chooses: Auto-fix / Review / Stop
+                          ↓                       ↓
+                          ↓              [reproposal] → [rechallenge] → loop
+                          ↓
+                          → REJECTED → rejected ⛔
 ```
 
 ## Next steps
