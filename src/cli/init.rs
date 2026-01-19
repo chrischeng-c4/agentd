@@ -543,12 +543,18 @@ pub fn check_and_auto_upgrade(auto_upgrade: bool) -> bool {
         .unwrap_or_else(|_| "0.0.0".to_string());
     let installed_version = installed_version.trim();
 
-    // Compare versions
+    // Compare versions - only upgrade if CLI version is newer than installed
     if installed_version == AGENTD_VERSION {
         return false; // Already up to date
     }
 
-    // Version mismatch detected
+    // Check if CLI version is actually newer (not older)
+    if !super::update::is_newer(AGENTD_VERSION, installed_version) {
+        // CLI is older than installed - don't downgrade
+        return false;
+    }
+
+    // CLI version is newer - upgrade
     if auto_upgrade {
         println!(
             "{}",

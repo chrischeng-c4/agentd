@@ -86,7 +86,7 @@ fn get_latest_version() -> Result<String> {
 }
 
 /// Compare versions (simple semver comparison)
-fn is_newer(new_version: &str, current: &str) -> bool {
+pub fn is_newer(new_version: &str, current: &str) -> bool {
     let parse_version = |v: &str| -> Vec<u32> {
         v.trim_start_matches('v')
             .split('.')
