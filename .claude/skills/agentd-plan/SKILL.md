@@ -47,23 +47,28 @@ AskUserQuestion with questions array:
 
 **Important**: Always use the AskUserQuestion tool for interactive clarification, not text-based questions.
 
-3. After user answers, write to `agentd/changes/<change-id>/clarifications.md`:
+3. After user answers, use the **create_clarifications MCP tool**:
 
-```markdown
----
-change: <change-id>
-date: YYYY-MM-DD
----
-
-# Clarifications
-
-## Q1: [Topic]
-- **Question**: [the question asked]
-- **Answer**: [user's answer]
-- **Rationale**: [why this choice]
+```json
+{
+  "change_id": "<change-id>",
+  "questions": [
+    {
+      "topic": "Short Label",
+      "question": "What is your preferred approach for X?",
+      "answer": "User's answer from AskUserQuestion",
+      "rationale": "Why this choice makes sense"
+    }
+  ]
+}
 ```
 
-4. Then run `agentd proposal` with the clarified context
+The tool will:
+- Create `agentd/changes/<change-id>/` directory if needed
+- Write `clarifications.md` with proper frontmatter
+- Return success message
+
+4. Then run `agentd plan` with the clarified context
 
 ### Skip clarification if
 - User explicitly says "skip" or uses `--skip-clarify`
@@ -86,7 +91,7 @@ Skip if change already exists.
 # New change (description required)
 /agentd:plan <change-id> "<description>"
 
-# Existing change (continue planning)
+# Existing change (description optional)
 /agentd:plan <change-id>
 ```
 
@@ -106,13 +111,13 @@ The skill determines the next action based on the `phase` field in `STATE.yaml`:
 
 | Phase | Action |
 |-------|--------|
-| No STATE.yaml | **Clarify** → write `clarifications.md` → run `agentd proposal` |
-| `proposed` | Run `agentd proposal` to continue planning cycle |
+| No STATE.yaml | **Clarify** → write `clarifications.md` → run `agentd plan` |
+| `proposed` | Run `agentd plan` to continue planning cycle |
 | `challenged` | ✅ Planning complete, suggest `/agentd:impl` |
 | `rejected` | ⛔ Rejected, suggest reviewing CHALLENGE.md |
 | Other phases | ℹ️ Beyond planning phase |
 
-**Note**: The `agentd proposal` command internally handles challenge analysis and auto-reproposal loops. It will iterate until the proposal is either APPROVED (phase → `challenged`) or REJECTED (phase → `rejected`).
+**Note**: The `agentd plan` command internally handles the entire workflow: clarifications check, proposal generation, challenge analysis, and auto-reproposal loops. It will iterate until the proposal is either APPROVED (phase → `challenged`) or REJECTED (phase → `rejected`).
 
 ## State transitions
 

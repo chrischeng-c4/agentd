@@ -17,6 +17,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Orchestrate the entire planning phase (proposal → challenge → reproposal loop)
+    Plan {
+        /// Change ID
+        change_id: String,
+
+        /// Description (required for new changes, optional for existing)
+        description: Option<String>,
+
+        /// Skip clarifications.md check
+        #[arg(long)]
+        skip_clarify: bool,
+    },
+
     /// Generate a new proposal with Gemini (2M context)
     Proposal {
         /// Change ID (e.g., "add-oauth")
@@ -239,6 +252,18 @@ async fn run_async(cli: Cli) -> Result<()> {
     }
 
     match cli.command {
+        Commands::Plan {
+            change_id,
+            description,
+            skip_clarify,
+        } => {
+            println!(
+                "{}",
+                "🤖 Orchestrating planning workflow...".cyan()
+            );
+            agentd::cli::plan::run(&change_id, description, skip_clarify).await?;
+        }
+
         Commands::Proposal {
             change_id,
             description,

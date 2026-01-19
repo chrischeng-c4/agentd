@@ -3,6 +3,7 @@
 //! Each tool provides structured input validation and generates properly formatted
 //! markdown files, eliminating format errors from free-form LLM output.
 
+pub mod clarifications;
 pub mod knowledge;
 pub mod proposal;
 pub mod read;
@@ -32,6 +33,7 @@ impl ToolRegistry {
     pub fn new() -> Self {
         Self {
             tools: vec![
+                clarifications::definition(),
                 proposal::definition(),
                 spec::definition(),
                 tasks::definition(),
@@ -67,6 +69,7 @@ impl ToolRegistry {
         project_root: &Path,
     ) -> Result<String> {
         match name {
+            "create_clarifications" => clarifications::execute(arguments, project_root),
             "create_proposal" => proposal::execute(arguments, project_root),
             "create_spec" => spec::execute(arguments, project_root),
             "create_tasks" => tasks::execute(arguments, project_root),
