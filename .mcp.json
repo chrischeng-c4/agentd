@@ -2,8 +2,8 @@
   "mcpServers": {
     "agentd": {
       "type": "stdio",
-      "command": "agentd",
-      "args": ["mcp-server"]
+      "command": "cargo",
+      "args": ["run", "--manifest-path", "/Users/chris.cheng/chris-project/agentd/Cargo.toml", "--", "mcp-server"]
     }
   }
 }

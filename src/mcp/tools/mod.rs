@@ -40,6 +40,7 @@ impl ToolRegistry {
                 read::list_specs_definition(),
                 knowledge::read_definition(),
                 knowledge::list_definition(),
+                knowledge::write_definition(),
             ],
         }
     }
@@ -74,6 +75,7 @@ impl ToolRegistry {
             "list_specs" => read::execute_list_specs(arguments, project_root),
             "read_knowledge" => knowledge::execute_read(arguments, project_root),
             "list_knowledge" => knowledge::execute_list(arguments, project_root),
+            "write_knowledge" => knowledge::execute_write(arguments, project_root),
             _ => anyhow::bail!("Unknown tool: {}", name),
         }
     }
