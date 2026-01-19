@@ -193,6 +193,9 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
 
     content.push_str("---\n\n");
 
+    // Wrap spec content in XML
+    content.push_str("<spec>\n\n");
+
     // Title
     content.push_str(&format!("# {}\n\n", title));
 
@@ -275,6 +278,9 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
         content.push_str(&serde_json::to_string_pretty(&model)?);
         content.push_str("\n```\n\n");
     }
+
+    // Close spec XML tag
+    content.push_str("</spec>\n");
 
     // Write the file
     let spec_path = specs_dir.join(format!("{}.md", spec_id));

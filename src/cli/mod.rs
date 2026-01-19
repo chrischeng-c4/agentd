@@ -5,6 +5,7 @@ pub mod implement;
 pub mod init;
 pub mod list;
 pub mod mcp_server;
+pub mod migrate_xml;
 pub mod plan;
 pub mod proposal;
 pub mod proposal_engine;

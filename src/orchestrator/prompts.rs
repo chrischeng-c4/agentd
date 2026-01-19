@@ -472,8 +472,30 @@ pub fn codex_challenge_prompt(change_id: &str) -> String {
 
 ## Instructions
 Review the proposal in agentd/changes/{change_id}/.
-Analyze technical feasibility, potential issues, and suggest improvements.
-Create CHALLENGE.md with findings.
+
+**IMPORTANT**: Append a <review> block to proposal.md (do NOT create CHALLENGE.md):
+
+```xml
+<review status="approved|needs_revision|rejected" iteration="1" reviewer="codex">
+## Summary
+[Overall assessment]
+
+## Issues
+### Issue: [Title]
+- **Severity**: High|Medium|Low
+- **Description**: [What's wrong]
+- **Location**: [File path]
+- **Recommendation**: [How to fix]
+
+## Verdict
+APPROVED | NEEDS_REVISION | REJECTED
+
+## Next Steps
+[Recommendations]
+</review>
+```
+
+Read proposal.md, analyze it, then use MCP tools or direct file editing to append the review block.
 "#,
         change_id = change_id
     )
@@ -487,7 +509,7 @@ pub fn codex_rechallenge_prompt(change_id: &str) -> String {
 
 ## Instructions
 Continue challenging the proposal based on previous analysis.
-Update CHALLENGE.md in agentd/changes/{change_id}/ as needed.
+Append or update the <review> block in proposal.md in agentd/changes/{change_id}/ as needed.
 "#,
         change_id = change_id
     )

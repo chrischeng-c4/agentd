@@ -164,6 +164,9 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
 
     content.push_str("---\n\n");
 
+    // Wrap proposal content in XML
+    content.push_str("<proposal>\n\n");
+
     // Title
     content.push_str(&format!("# Change: {}\n\n", change_id));
 
@@ -213,6 +216,9 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
     }
     content.push('\n');
 
+    // Close proposal XML tag
+    content.push_str("</proposal>\n");
+
     // Write the file
     let proposal_path = change_dir.join("proposal.md");
     std::fs::write(&proposal_path, &content)?;
@@ -244,6 +250,64 @@ validations: []
         change_id,
         proposal_path.display()
     ))
+}
+
+/// Append review block to existing proposal.md
+///
+/// Smart iteration logic:
+/// - If iteration N already exists with status="resolved" → replace
+/// - If iteration N exists with status !="resolved" → append new iteration
+/// - If iteration N doesn't exist → append
+pub fn append_review(
+    proposal_path: &std::path::Path,
+    status: &str,
+    iteration: u32,
+    reviewer: &str,
+    review_content: &str,
+) -> Result<(), anyhow::Error> {
+    let content = std::fs::read_to_string(proposal_path)?;
+
+    // Create attributes map
+    let mut attrs = std::collections::HashMap::new();
+    attrs.insert("status".to_string(), status.to_string());
+    attrs.insert("iteration".to_string(), iteration.to_string());
+    attrs.insert("reviewer".to_string(), reviewer.to_string());
+
+    // Wrap review content in XML tags
+    let review_xml = crate::parser::wrap_in_xml("review", review_content, attrs);
+
+    // Check existing reviews
+    let existing_reviews = crate::parser::extract_xml_blocks(&content, "review")?;
+
+    // Check if this iteration exists and is resolved
+    let should_replace = existing_reviews.iter().any(|r| {
+        let iter = r
+            .attributes
+            .get("iteration")
+            .and_then(|i| i.parse::<u32>().ok())
+            .unwrap_or(0);
+        let r_status = r.attributes.get("status").map(|s| s.as_str()).unwrap_or("");
+        iter == iteration && r_status == "resolved"
+    });
+
+    let updated = if should_replace {
+        crate::parser::update_xml_blocks(
+            &content,
+            "review",
+            &review_xml,
+            crate::parser::UpdateMode::ReplaceLatest,
+        )?
+    } else {
+        crate::parser::update_xml_blocks(
+            &content,
+            "review",
+            &review_xml,
+            crate::parser::UpdateMode::Append,
+        )?
+    };
+
+    std::fs::write(proposal_path, updated)?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -22,6 +22,17 @@ use regex::Regex;
 ///
 /// Returns: `vec!["auth-flow", "user-model", "api-endpoints"]`
 pub fn parse_affected_specs(content: &str) -> Result<Vec<String>> {
+    // Try new XML format first
+    if let Ok(Some(proposal_block)) = crate::parser::extract_xml_block(content, "proposal") {
+        return parse_affected_specs_from_content(&proposal_block.content);
+    }
+
+    // Fallback to old format (backward compatibility)
+    parse_affected_specs_from_content(content)
+}
+
+/// Parse affected specs from proposal content (XML or plain text)
+fn parse_affected_specs_from_content(content: &str) -> Result<Vec<String>> {
     // Look for "Affected specs:" line in Impact section
     // Match patterns like:
     // - Affected specs: ["auth-flow", "user-model"]
@@ -67,6 +78,61 @@ pub fn parse_affected_specs(content: &str) -> Result<Vec<String>> {
             - Affected specs: `spec-1`, `spec-2`, `spec-3`"
         );
     }
+}
+
+/// Represents a review block from proposal.md
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReviewBlock {
+    pub status: String,
+    pub iteration: u32,
+    pub reviewer: String,
+    pub content: String,
+}
+
+/// Extract latest review from proposal.md
+///
+/// Parses all `<review>` blocks and returns the one with the highest iteration number.
+///
+/// # Returns
+/// - `Ok(Some(ReviewBlock))` if at least one review is found
+/// - `Ok(None)` if no reviews are found
+/// - `Err` if parsing fails
+pub fn parse_latest_review(content: &str) -> Result<Option<ReviewBlock>> {
+    let reviews = crate::parser::extract_xml_blocks(content, "review")?;
+
+    if reviews.is_empty() {
+        return Ok(None);
+    }
+
+    // Get review with highest iteration number
+    let latest = reviews
+        .iter()
+        .max_by_key(|r| {
+            r.attributes
+                .get("iteration")
+                .and_then(|i| i.parse::<u32>().ok())
+                .unwrap_or(0)
+        })
+        .unwrap();
+
+    Ok(Some(ReviewBlock {
+        status: latest
+            .attributes
+            .get("status")
+            .cloned()
+            .unwrap_or_default(),
+        iteration: latest
+            .attributes
+            .get("iteration")
+            .and_then(|i| i.parse::<u32>().ok())
+            .unwrap_or(1),
+        reviewer: latest
+            .attributes
+            .get("reviewer")
+            .cloned()
+            .unwrap_or_default(),
+        content: latest.content.clone(),
+    }))
 }
 
 #[cfg(test)]

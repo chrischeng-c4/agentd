@@ -197,11 +197,40 @@ pub fn validate_challenge(
         );
     }
 
-    // Check if CHALLENGE.md exists
+    // Check both formats: CHALLENGE.md (old) or proposal.md with reviews (new)
     let change = Change::new(change_id, "");
     let challenge_path = change.challenge_path(project_root);
+    let proposal_path = change_dir.join("proposal.md");
 
-    if !challenge_path.exists() {
+    let (content, is_xml) = if challenge_path.exists() {
+        // Old format: CHALLENGE.md
+        if !options.json {
+            println!("   Checking CHALLENGE.md structure...");
+        }
+        (std::fs::read_to_string(&challenge_path)?, false)
+    } else if proposal_path.exists() {
+        // New format: extract review from proposal.md
+        if !options.json {
+            println!("   Checking review in proposal.md...");
+        }
+        let proposal_content = std::fs::read_to_string(&proposal_path)?;
+        let latest_review = crate::parser::parse_latest_review(&proposal_content)?;
+
+        match latest_review {
+            Some(review) => (review.content, true),
+            None => {
+                return Ok(ChallengeValidationResult {
+                    verdict: ChallengeVerdict::Unknown,
+                    has_valid_structure: false,
+                    issue_count: 0,
+                    high_count: 0,
+                    medium_count: 0,
+                    low_count: 0,
+                    errors: vec!["No review found in proposal.md. Run 'agentd challenge' first.".to_string()],
+                });
+            }
+        }
+    } else {
         return Ok(ChallengeValidationResult {
             verdict: ChallengeVerdict::Unknown,
             has_valid_structure: false,
@@ -209,52 +238,52 @@ pub fn validate_challenge(
             high_count: 0,
             medium_count: 0,
             low_count: 0,
-            errors: vec!["CHALLENGE.md not found. Run 'agentd challenge' first.".to_string()],
+            errors: vec!["Neither CHALLENGE.md nor proposal.md found.".to_string()],
         });
-    }
+    };
 
-    let content = std::fs::read_to_string(&challenge_path)?;
     let mut errors = Vec::new();
     let mut has_valid_structure = true;
 
-    if !options.json {
-        println!("   Checking CHALLENGE.md structure...");
-    }
+    // Check for required sections (skip strict checks for XML format)
+    if !is_xml {
+        // Old format structure checks
+        let has_title = content.contains("# Challenge Report");
+        let has_verdict = content.contains("## Verdict");
+        let has_issues_section = content.contains("## Issues")
+            || content.contains("## Internal Consistency Issues")
+            || content.contains("## Code Alignment Issues")
+            || content.contains("## Quality Suggestions");
 
-    // Check for required sections
-    // Note: "## Issues" is the old format; new format uses categorized sections
-    let has_title = content.contains("# Challenge Report");
-    let has_verdict = content.contains("## Verdict");
-    // Accept either "## Issues" (old) or categorized sections (new Codex format)
-    let has_issues_section = content.contains("## Issues")
-        || content.contains("## Internal Consistency Issues")
-        || content.contains("## Code Alignment Issues")
-        || content.contains("## Quality Suggestions");
-
-    if !has_title {
-        has_valid_structure = false;
-        errors.push("Missing required section: # Challenge Report".to_string());
-        if !options.json {
-            println!("      {} Missing: # Challenge Report", "HIGH:".red());
+        if !has_title {
+            has_valid_structure = false;
+            errors.push("Missing required section: # Challenge Report".to_string());
+            if !options.json {
+                println!("      {} Missing: # Challenge Report", "HIGH:".red());
+            }
         }
-    }
-    if !has_verdict {
-        has_valid_structure = false;
-        errors.push("Missing required section: ## Verdict".to_string());
-        if !options.json {
-            println!("      {} Missing: ## Verdict", "HIGH:".red());
+        if !has_verdict {
+            has_valid_structure = false;
+            errors.push("Missing required section: ## Verdict".to_string());
+            if !options.json {
+                println!("      {} Missing: ## Verdict", "HIGH:".red());
+            }
         }
-    }
-    if !has_issues_section {
-        has_valid_structure = false;
-        errors.push("Missing issues section (## Issues or categorized sections)".to_string());
-        if !options.json {
-            println!("      {} Missing: issues section", "HIGH:".red());
+        if !has_issues_section {
+            has_valid_structure = false;
+            errors.push("Missing issues section (## Issues or categorized sections)".to_string());
+            if !options.json {
+                println!("      {} Missing: issues section", "HIGH:".red());
+            }
         }
     }
 
     // Parse verdict
-    let verdict = parse_challenge_verdict(&challenge_path).unwrap_or(ChallengeVerdict::Unknown);
+    let verdict = if is_xml {
+        crate::parser::parse_challenge_verdict(&proposal_path).unwrap_or(ChallengeVerdict::Unknown)
+    } else {
+        parse_challenge_verdict(&challenge_path).unwrap_or(ChallengeVerdict::Unknown)
+    };
     if !options.json {
         println!("   Checking verdict...");
     }

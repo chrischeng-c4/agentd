@@ -7,10 +7,11 @@ pub mod proposal;
 pub mod requirement;
 pub mod review;
 pub mod scenario;
+pub mod xml;
 
 pub use archive_review::parse_archive_review_verdict;
 pub use challenge::{parse_challenge_verdict, ChallengeParser};
-pub use proposal::parse_affected_specs;
+pub use proposal::{parse_affected_specs, parse_latest_review, ReviewBlock};
 pub use frontmatter::{
     calculate_body_checksum, calculate_checksum, has_frontmatter, is_stale, normalize_content,
     parse_document, parse_frontmatter_value, split_frontmatter, ParsedDocument,
@@ -23,3 +24,4 @@ pub use markdown::extract_heading_section;
 pub use requirement::RequirementParser;
 pub use review::parse_review_verdict;
 pub use scenario::ScenarioParser;
+pub use xml::{extract_xml_block, extract_xml_blocks, parse_xml_attributes, update_xml_blocks, wrap_in_xml, UpdateMode, XmlBlock};

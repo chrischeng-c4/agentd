@@ -136,6 +136,12 @@ enum Commands {
         change_id: String,
     },
 
+    /// Migrate files to XML format
+    MigrateXml {
+        /// Change ID to migrate (optional, migrates all if not specified)
+        change_id: Option<String>,
+    },
+
     /// Initialize Agentd in current directory
     Init {
         /// Project name
@@ -333,6 +339,10 @@ async fn run_async(cli: Cli) -> Result<()> {
         Commands::Archive { change_id } => {
             println!("{}", format!("📦 Archiving: {}", change_id).cyan());
             agentd::cli::archive::run(&change_id).await?;
+        }
+
+        Commands::MigrateXml { change_id } => {
+            agentd::cli::migrate_xml::run(change_id.as_deref()).await?;
         }
 
         Commands::Init { name, force } => {

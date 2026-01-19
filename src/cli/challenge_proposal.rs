@@ -2,7 +2,7 @@ use crate::context::ContextPhase;
 use crate::orchestrator::{CodexOrchestrator, UsageMetrics};
 use crate::state::StateManager;
 use crate::{
-    models::{Change, AgentdConfig, Complexity, ValidationOptions},
+    models::{Change, AgentdConfig, Complexity},
     Result,
 };
 use colored::Colorize;
@@ -67,8 +67,7 @@ pub async fn run(change_id: &str) -> Result<()> {
     // Generate AGENTS.md context for this change
     crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
 
-    // Create CHALLENGE.md skeleton for Codex to fill
-    crate::context::create_challenge_skeleton(&change_dir, change_id)?;
+    // No longer need to create CHALLENGE.md skeleton - reviews go in proposal.md
 
     println!(
         "{}",
@@ -81,121 +80,85 @@ pub async fn run(change_id: &str) -> Result<()> {
     let model = config.codex.select_model(complexity).model.clone();
     record_usage(change_id, &project_root, "challenge", &model, &usage, &config, complexity);
 
-    println!("\n{}", "📊 Challenge Report Generated".green().bold());
+    println!("\n{}", "📊 Challenge Review Generated".green().bold());
 
-    // Check if CHALLENGE.md was created
-    let challenge_path = change.challenge_path(&project_root);
-    if challenge_path.exists() {
-        println!("   Location: {}", challenge_path.display());
+    // Check proposal.md for review block (new format)
+    let proposal_path = change_dir.join("proposal.md");
+    if !proposal_path.exists() {
+        anyhow::bail!("proposal.md not found");
+    }
 
-        // Try to parse and display summary
-        if let Ok(content) = std::fs::read_to_string(&challenge_path) {
-            display_challenge_summary(&content);
-        }
+    let proposal_content = std::fs::read_to_string(&proposal_path)?;
+    let latest_review = crate::parser::parse_latest_review(&proposal_content)?;
 
-        // Validate and update phase based on verdict
-        println!();
-        println!("{}", "📝 Updating STATE.yaml from verdict...".cyan());
-        let validation_options = ValidationOptions::new().with_json(true);
-        let verdict = match crate::cli::validate_challenge::validate_challenge(
-            change_id,
-            &project_root,
-            &validation_options,
-        ) {
-            Ok(result) => {
-                println!("   {} Phase updated based on verdict: {:?}", "✓".green(), result.verdict);
-                result.verdict
-            }
-            Err(e) => {
-                println!("   {} Failed to update phase: {}", "⚠".yellow(), e);
-                crate::models::ChallengeVerdict::Unknown
-            }
-        };
+    match latest_review {
+        Some(review) => {
+            println!("   Location: {} (review block)", proposal_path.display());
 
-        // Provide next steps based on verdict
-        println!("\n{}", "⏭️  Next steps:".yellow());
-        println!("   1. Review full report:");
-        println!("      cat {}", challenge_path.display());
+            // Display review summary
+            display_review_summary(&review.content);
 
-        match verdict {
-            crate::models::ChallengeVerdict::Approved => {
-                println!("\n   2. Proceed to implementation:");
-                println!("      agentd implement {}", change_id);
-            }
-            crate::models::ChallengeVerdict::NeedsRevision => {
-                println!("\n   2. Address issues automatically:");
-                println!("      agentd reproposal {}", change_id);
-                println!("\n   3. Or edit manually and re-challenge:");
-                println!("      agentd challenge {}", change_id);
-            }
-            crate::models::ChallengeVerdict::Rejected => {
-                println!("\n   2. Review rejection reasons in CHALLENGE.md");
-                println!("      This proposal has fundamental issues requiring manual intervention.");
-                println!("\n   3. Consider creating a new proposal with a different approach.");
-            }
-            crate::models::ChallengeVerdict::Unknown => {
-                println!("\n   2. Address issues automatically:");
-                println!("      agentd reproposal {}", change_id);
-                println!("\n   3. Or edit manually and re-challenge:");
-                println!("      agentd challenge {}", change_id);
+            // Parse verdict from review
+            let verdict = match review.status.to_lowercase().as_str() {
+                "approved" => crate::models::ChallengeVerdict::Approved,
+                "needs_revision" => crate::models::ChallengeVerdict::NeedsRevision,
+                "rejected" => crate::models::ChallengeVerdict::Rejected,
+                _ => crate::models::ChallengeVerdict::Unknown,
+            };
+
+            // Update STATE.yaml
+            println!();
+            println!("{}", "📝 Updating STATE.yaml...".cyan());
+            let state_path = change_dir.join("STATE.yaml");
+            let mut state_manager = crate::state::StateManager::load(&state_path)?;
+            state_manager.update_phase_from_verdict(&review.status);
+            state_manager.update_checksum("proposal.md")?;
+            state_manager.save()?;
+            println!("   {} Phase updated based on verdict: {:?}", "✓".green(), verdict);
+
+            // Provide next steps based on verdict
+            println!("\n{}", "⏭️  Next steps:".yellow());
+            match verdict {
+                crate::models::ChallengeVerdict::Approved => {
+                    println!("   ✅ Proposal approved!");
+                    println!("   agentd implement {}", change_id);
+                }
+                crate::models::ChallengeVerdict::NeedsRevision => {
+                    println!("   ⚠️  Needs revision");
+                    println!("   agentd reproposal {}", change_id);
+                }
+                crate::models::ChallengeVerdict::Rejected => {
+                    println!("   ❌ Proposal rejected");
+                    println!("   Review issues and update manually");
+                }
+                crate::models::ChallengeVerdict::Unknown => {
+                    println!("   ❓ Unknown verdict");
+                }
             }
         }
-    } else {
-        println!("\n{}", "⚠️  Warning: CHALLENGE.md not found".yellow());
-        println!("   The Codex orchestrator may need adjustment.");
-        println!("\n   Codex output:");
-        println!("{}", output);
+        None => {
+            println!("\n{}", "⚠️  Warning: No review found in proposal.md".yellow());
+            println!("   Codex may not have appended the review block correctly.");
+            println!("\n   Codex output:");
+            println!("{}", output);
+        }
     }
 
     Ok(())
 }
 
-fn display_challenge_summary(content: &str) {
-    // Parse basic statistics from CHALLENGE.md
+fn display_review_summary(content: &str) {
+    // Parse severity counts from review content
     let high_count = content.matches("**Severity**: High").count();
     let medium_count = content.matches("**Severity**: Medium").count();
     let low_count = content.matches("**Severity**: Low").count();
 
-    println!("\n{}", "📊 Summary:".cyan());
-
-    if high_count > 0 {
-        println!("   🔴 High:    {} issues", high_count);
-    }
-    if medium_count > 0 {
-        println!("   🟡 Medium:  {} issues", medium_count);
-    }
-    if low_count > 0 {
-        println!("   🟢 Low:     {} issues", low_count);
-    }
-
-    if high_count == 0 && medium_count == 0 && low_count == 0 {
-        println!("   ✅ No critical issues found!");
-    }
-
-    // Try to extract first high-severity issue
-    if high_count > 0 {
-        if let Some(issue_start) = content.find("**Severity**: High") {
-            let section = &content[issue_start.saturating_sub(200)
-                ..issue_start.saturating_add(400).min(content.len())];
-
-            println!(
-                "\n{}",
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
-            );
-            println!("{}", "🔴 HIGH SEVERITY ISSUE (first)".red().bold());
-
-            // Try to extract title
-            if let Some(title_start) = section.rfind("#### Issue") {
-                if let Some(title_end) = section[title_start..].find('\n') {
-                    let title = &section[title_start..title_start + title_end];
-                    println!("{}", title.trim().yellow());
-                }
-            }
-
-            println!(
-                "{}",
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black()
-            );
-        }
+    if high_count > 0 || medium_count > 0 || low_count > 0 {
+        println!(
+            "   Issues: {} HIGH, {} MEDIUM, {} LOW",
+            high_count, medium_count, low_count
+        );
+    } else {
+        println!("   ✅ No issues found");
     }
 }

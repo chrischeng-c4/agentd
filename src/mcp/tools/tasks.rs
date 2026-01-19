@@ -190,6 +190,9 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
 
     content.push_str("---\n\n");
 
+    // Wrap tasks content in XML
+    content.push_str("<tasks>\n\n");
+
     // Title
     content.push_str("# Implementation Tasks\n\n");
 
@@ -273,6 +276,9 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
             }
         }
     }
+
+    // Close tasks XML tag
+    content.push_str("</tasks>\n");
 
     // Write the file
     let tasks_path = change_dir.join("tasks.md");
