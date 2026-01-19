@@ -26,6 +26,9 @@ const CODEX_REVIEW: &str = include_str!("../../templates/codex/prompts/agentd-re
 // Project Context Template
 const PROJECT_TEMPLATE: &str = include_str!("../../templates/project.md");
 
+// Knowledge Base Template
+const KNOWLEDGE_INDEX_TEMPLATE: &str = include_str!("../../templates/knowledge/index.md");
+
 // CLAUDE.md Template for target projects
 const CLAUDE_TEMPLATE: &str = include_str!("../../templates/CLAUDE.md");
 
@@ -128,11 +131,17 @@ fn run_fresh_install(
     std::fs::create_dir_all(agentd_dir.join("changes"))?;
     std::fs::create_dir_all(agentd_dir.join("archive"))?;
     std::fs::create_dir_all(agentd_dir.join("scripts"))?;
+    std::fs::create_dir_all(agentd_dir.join("knowledge"))?;
 
     // Create project.md for project context
     let project_md_path = agentd_dir.join("project.md");
     std::fs::write(&project_md_path, PROJECT_TEMPLATE)?;
     println!("   ✓ agentd/project.md");
+
+    // Create knowledge/index.md
+    let knowledge_index_path = agentd_dir.join("knowledge/index.md");
+    std::fs::write(&knowledge_index_path, KNOWLEDGE_INDEX_TEMPLATE)?;
+    println!("   ✓ agentd/knowledge/index.md");
 
     // Try to auto-generate project.md with Gemini
     generate_project_md(&project_md_path);
@@ -178,6 +187,7 @@ fn run_update(
     println!("   ✓ agentd/specs/     (untouched)");
     println!("   ✓ agentd/changes/   (untouched)");
     println!("   ✓ agentd/archive/   (untouched)");
+    println!("   ✓ agentd/knowledge/ (untouched)");
 
     // Overwrite config.toml (opinionated defaults)
     let mut config = AgentdConfig::default();
@@ -202,6 +212,14 @@ fn run_update(
 
     // Ensure scripts directory exists
     std::fs::create_dir_all(agentd_dir.join("scripts"))?;
+
+    // Ensure knowledge directory exists
+    std::fs::create_dir_all(agentd_dir.join("knowledge"))?;
+    let knowledge_index_path = agentd_dir.join("knowledge/index.md");
+    if !knowledge_index_path.exists() {
+        std::fs::write(&knowledge_index_path, KNOWLEDGE_INDEX_TEMPLATE)?;
+        println!("   {} agentd/knowledge/index.md (created)", "✓".green());
+    }
 
     // Install/update system files
     install_system_files(project_root, agentd_dir, claude_dir)?;
@@ -276,6 +294,7 @@ fn print_init_success() {
     println!("   agentd/specs/             - Main specifications");
     println!("   agentd/changes/           - Active changes");
     println!("   agentd/archive/           - Completed changes");
+    println!("   agentd/knowledge/         - System documentation");
     println!("   .claude/skills/           - 3 Skills installed");
     println!("   .gemini/commands/agentd/  - 3 Gemini commands");
     println!("   ~/.codex/prompts/         - 2 Codex prompts");

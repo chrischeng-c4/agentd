@@ -50,6 +50,15 @@ The skill determines readiness based on the `phase` field in `STATE.yaml`:
   - `tasks.md`
   - `specs/*.md`
 
+## Knowledge Reference
+
+Before implementation, the spawned session may consult `agentd/knowledge/` for:
+- Existing patterns and conventions
+- Module-specific implementation details
+- Architecture constraints
+
+Use `read_knowledge` MCP tool to access documentation.
+
 ## State transitions
 
 ```

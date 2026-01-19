@@ -21,6 +21,18 @@ The actual codebase exploration and analysis is done by:
 
 You are a dispatcher, not an explorer.
 
+## Knowledge Phase (Before Proposal)
+
+For **NEW changes**, check if relevant knowledge exists:
+
+1. Run `list_knowledge` MCP tool to see available documentation
+2. Read relevant knowledge for the change area:
+   - Architecture decisions: `read_knowledge("00-architecture/index.md")`
+   - Module-specific docs: `read_knowledge("10-<module>/index.md")`
+3. Use this context to inform clarification questions and proposal
+
+**Skip if**: No knowledge directory exists, or change is trivial.
+
 ## Clarification Phase (Before Proposal)
 
 For **NEW changes** (no existing `STATE.yaml`), clarify requirements before running `agentd proposal`:

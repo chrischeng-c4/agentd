@@ -3,6 +3,7 @@
 //! Each tool provides structured input validation and generates properly formatted
 //! markdown files, eliminating format errors from free-form LLM output.
 
+pub mod knowledge;
 pub mod proposal;
 pub mod read;
 pub mod spec;
@@ -37,6 +38,8 @@ impl ToolRegistry {
                 validate::definition(),
                 read::definition(),
                 read::list_specs_definition(),
+                knowledge::read_definition(),
+                knowledge::list_definition(),
             ],
         }
     }
@@ -69,6 +72,8 @@ impl ToolRegistry {
             "validate_change" => validate::execute(arguments, project_root).await,
             "read_file" => read::execute(arguments, project_root),
             "list_specs" => read::execute_list_specs(arguments, project_root),
+            "read_knowledge" => knowledge::execute_read(arguments, project_root),
+            "list_knowledge" => knowledge::execute_list(arguments, project_root),
             _ => anyhow::bail!("Unknown tool: {}", name),
         }
     }
