@@ -8,6 +8,14 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
 
+/// Project type detection
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectType {
+    Rust,
+    TypeScript,
+    Python,
+}
+
 /// Codex orchestrator for challenge and review tasks
 pub struct CodexOrchestrator<'a> {
     model_selector: ModelSelector<'a>,
@@ -64,6 +72,30 @@ impl<'a> CodexOrchestrator<'a> {
         LlmProvider::Codex.build_args(&args, resume)
     }
 
+    /// Detect project type based on configuration files
+    fn detect_project_type(&self) -> ProjectType {
+        // Check for package.json (TypeScript/Node.js)
+        if self.project_root.join("package.json").exists() {
+            return ProjectType::TypeScript;
+        }
+
+        // Check for Python files
+        if self.project_root.join("pyproject.toml").exists()
+            || self.project_root.join("requirements.txt").exists()
+            || self.project_root.join("setup.py").exists()
+        {
+            return ProjectType::Python;
+        }
+
+        // Check for Cargo.toml (Rust)
+        if self.project_root.join("Cargo.toml").exists() {
+            return ProjectType::Rust;
+        }
+
+        // Default to Rust for backward compatibility
+        ProjectType::Rust
+    }
+
     /// Run challenge (initial proposal review)
     pub async fn run_challenge(&self, change_id: &str, complexity: Complexity) -> Result<(String, UsageMetrics)> {
         // Ensure Codex MCP config exists before running
@@ -93,6 +125,17 @@ impl<'a> CodexOrchestrator<'a> {
 
     /// Run local verification tools and capture output
     async fn run_verification_tools(&self) -> Result<(String, String, String, String)> {
+        let project_type = self.detect_project_type();
+
+        match project_type {
+            ProjectType::Rust => self.run_rust_verification_tools().await,
+            ProjectType::TypeScript => self.run_typescript_verification_tools().await,
+            ProjectType::Python => self.run_python_verification_tools().await,
+        }
+    }
+
+    /// Run Rust-specific verification tools
+    async fn run_rust_verification_tools(&self) -> Result<(String, String, String, String)> {
         // Run tests
         let test_output = self.run_local_command("cargo", &["test"]).await?;
 
@@ -115,6 +158,65 @@ impl<'a> CodexOrchestrator<'a> {
             .unwrap_or_else(|_| "clippy failed".to_string());
 
         Ok((test_output, audit_output, semgrep_output, clippy_output))
+    }
+
+    /// Run TypeScript/Node.js-specific verification tools
+    async fn run_typescript_verification_tools(&self) -> Result<(String, String, String, String)> {
+        // Run tests (prefer npm test)
+        let test_output = if let Ok(output) = self.run_local_command("npm", &["test", "--", "--run"]).await {
+            output
+        } else {
+            "Test run failed: No test runner configured in package.json".to_string()
+        };
+
+        // Run npm audit for dependency vulnerabilities
+        let audit_output = self
+            .run_local_command("npm", &["audit", "--json"])
+            .await
+            .unwrap_or_else(|_| "npm audit not available".to_string());
+
+        // Run semgrep (if available)
+        let semgrep_output = self
+            .run_local_command("semgrep", &["--config=auto", "--json"])
+            .await
+            .unwrap_or_else(|_| "semgrep not available".to_string());
+
+        // Run TypeScript compiler check
+        let linter_output = self
+            .run_local_command("npx", &["tsc", "--noEmit"])
+            .await
+            .unwrap_or_else(|_| "TypeScript compiler check not available".to_string());
+
+        Ok((test_output, audit_output, semgrep_output, linter_output))
+    }
+
+    /// Run Python-specific verification tools
+    async fn run_python_verification_tools(&self) -> Result<(String, String, String, String)> {
+        // Run tests (try pytest first)
+        let test_output = self
+            .run_local_command("pytest", &["-v"])
+            .await
+            .unwrap_or_else(|_| "Test run failed: pytest not found".to_string());
+
+        // Run pip-audit for dependency vulnerabilities (if available)
+        let audit_output = self
+            .run_local_command("pip-audit", &["--format", "json"])
+            .await
+            .unwrap_or_else(|_| "pip-audit not available (install with: pip install pip-audit)".to_string());
+
+        // Run semgrep (if available)
+        let semgrep_output = self
+            .run_local_command("semgrep", &["--config=auto", "--json"])
+            .await
+            .unwrap_or_else(|_| "semgrep not available".to_string());
+
+        // Run linter (try ruff first)
+        let linter_output = self
+            .run_local_command("ruff", &["check", ".", "--output-format", "json"])
+            .await
+            .unwrap_or_else(|_| "Linter not available: ruff not found".to_string());
+
+        Ok((test_output, audit_output, semgrep_output, linter_output))
     }
 
     /// Check if cargo-audit is installed and run it
