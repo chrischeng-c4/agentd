@@ -1,4 +1,18 @@
 {
+  "approvals": {
+    "autoApprove": {
+      "replace": true,
+      "write_file": true
+    }
+  },
+  "mcpServers": {
+    "agentd": {
+      "args": [
+        "mcp-server"
+      ],
+      "command": "agentd"
+    }
+  },
   "tools": {
     "allowed": [
       "list_directory",
@@ -8,17 +22,5 @@
       "write_file",
       "replace"
     ]
-  },
-  "approvals": {
-    "autoApprove": {
-      "write_file": true,
-      "replace": true
-    }
-  },
-  "mcpServers": {
-    "agentd": {
-      "command": "agentd",
-      "args": ["mcp-server"]
-    }
   }
 }

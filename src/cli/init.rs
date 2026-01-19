@@ -244,8 +244,12 @@ fn install_system_files(
     let home_dir = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .unwrap_or_else(|_| ".".to_string());
-    let codex_prompts_dir = PathBuf::from(home_dir).join(".codex/prompts");
+    let codex_prompts_dir = PathBuf::from(&home_dir).join(".codex/prompts");
     install_codex_prompts(&codex_prompts_dir)?;
+
+    // Add Codex MCP server config (user-level, upsert)
+    crate::mcp::ensure_codex_mcp_config()?;
+    println!("   ✓ ~/.codex/config.toml (mcpServers.agentd)");
 
     // Note: Shell scripts are no longer generated. Orchestrators now call CLI tools directly.
     // The agentd/scripts/ directory is kept for backward compatibility and custom user scripts.
@@ -660,9 +664,14 @@ fn install_gemini_commands(gemini_dir: &Path) -> Result<()> {
     println!("   ✓ gemini agentd:reproposal");
     println!("   ✓ gemini agentd:fillback");
 
-    // Install settings
+    // Install settings (base config)
     std::fs::write(gemini_dir.join("settings.json"), GEMINI_SETTINGS)?;
     println!("   ✓ settings.json");
+
+    // Add MCP server config (upsert)
+    let project_root = gemini_dir.parent().unwrap_or(Path::new("."));
+    crate::mcp::ensure_gemini_mcp_config(project_root)?;
+    println!("   ✓ mcpServers.agentd");
 
     Ok(())
 }
