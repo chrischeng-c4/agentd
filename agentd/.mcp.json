@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "agentd": {
-      "type": "stdio",
-      "command": "agentd",
-      "args": ["mcp-server"]
-    }
-  }
-}
