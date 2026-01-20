@@ -244,21 +244,20 @@ impl ValidationRules {
     /// - ## Interfaces (pseudo code)
     /// - ## Acceptance Criteria (WHEN/THEN)
     pub fn for_spec() -> Self {
+        // Use central spec format rules
+        let spec_rules = crate::models::spec_rules::SpecFormatRules::spec_defaults();
+
         Self {
-            required_headings: vec![
-                "Overview".to_string(),
-                "Acceptance Criteria".to_string(),
-            ],
-            // No strict requirement naming - allow descriptive headings
-            requirement_pattern: String::new(),
-            // Look for WHEN...THEN pattern as our "scenario" marker
-            scenario_pattern: r"WHEN\s.*THEN\s".to_string(),
-            scenario_min_count: 1,
-            // Require WHEN/THEN clauses in Acceptance Criteria
-            require_when_then: true,
-            // More flexible patterns - just WHEN and THEN anywhere
-            when_pattern: r"WHEN\s".to_string(),
-            then_pattern: r"THEN\s".to_string(),
+            required_headings: spec_rules.required_headings.clone(),
+            requirement_pattern: spec_rules.requirement_pattern.clone().unwrap_or_default(),
+            // Use regex pattern from central rules (supports multiline format)
+            scenario_pattern: spec_rules.scenario_regex_pattern(),
+            scenario_min_count: spec_rules.min_scenarios,
+            require_when_then: spec_rules.require_when_then,
+            // Flexible patterns - match both plain "WHEN" and bold "**WHEN**"
+            // Use \* to match literal asterisk (in raw string, \* becomes literal \* in regex)
+            when_pattern: format!(r"\*\*{}\*\*|{}", spec_rules.when_keyword, spec_rules.when_keyword),
+            then_pattern: format!(r"\*\*{}\*\*|{}", spec_rules.then_keyword, spec_rules.then_keyword),
             severity_map: SeverityMap::default(),
         }
     }
@@ -270,6 +269,28 @@ impl ValidationRules {
             DocumentType::Task => Self::for_task(),
             DocumentType::Spec => Self::for_spec(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_spec_rules_use_central_format() {
+        let rules = ValidationRules::for_spec();
+
+        // Should use the multiline pattern
+        assert!(rules.scenario_pattern.contains("(?m)"),
+            "Spec rules should use multiline pattern, got: {}", rules.scenario_pattern);
+        assert!(rules.scenario_pattern.contains("###"),
+            "Spec rules should check for ### Scenario headings");
+
+        // Should require at least 1 scenario
+        assert_eq!(rules.scenario_min_count, 1, "Spec should require at least 1 scenario");
+
+        // Should require WHEN/THEN
+        assert!(rules.require_when_then, "Spec should require WHEN/THEN");
     }
 }
 

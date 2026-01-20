@@ -296,8 +296,8 @@ pub fn validate_proposal(
     let task_rules = ValidationRules::for_task();
     let task_format_validator = SpecFormatValidator::new(task_rules);
 
-    // Spec validator for specs/*.md (strict rules)
-    let spec_rules = config.validation.clone();
+    // Spec validator for specs/*.md (strict rules - use central format rules)
+    let spec_rules = ValidationRules::for_spec();
     let spec_format_validator = SpecFormatValidator::new(spec_rules.clone());
     let semantic_validator = SemanticValidator::new(spec_rules);
 

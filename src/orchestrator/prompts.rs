@@ -494,27 +494,23 @@ pub fn codex_challenge_prompt(change_id: &str) -> String {
 {change_id}
 
 ## Instructions
-Review the proposal in agentd/changes/{change_id}/.
 
-**IMPORTANT**: You MUST use the `append_review` MCP tool to add your review. Do NOT create CHALLENGE.md or edit files directly.
+1. **Get Requirements**: Use the `read_all_requirements` MCP tool with change_id: "{change_id}"
+   - This will retrieve proposal.md, tasks.md, and all specs/*.md in one call
 
-## Review Focus
+2. **Review for Content/Logical Issues**:
+   - **Completeness** - Are all requirements covered? Missing scenarios?
+   - **Consistency** - Do specs align with proposal? Do tasks cover all requirements?
+   - **Technical feasibility** - Is the design implementable? Any blockers?
+   - **Clarity** - Are requirements specific and testable? Ambiguous language?
+   - **Dependencies** - Are task dependencies correct? Missing prerequisites?
 
-**DO NOT check format issues** - MCP tools guarantee correct structure.
+3. **Submit Review**: Use the `append_review` MCP tool with your findings
 
-Focus ONLY on content/logical issues:
-1. **Completeness** - Are all requirements covered? Missing scenarios?
-2. **Consistency** - Do specs align with proposal? Do tasks cover all requirements?
-3. **Technical feasibility** - Is the design implementable? Any blockers?
-4. **Clarity** - Are requirements specific and testable? Ambiguous language?
-5. **Dependencies** - Are task dependencies correct? Missing prerequisites?
-
-## Review Process
-
-1. Read proposal.md, tasks.md, and all specs/*.md
-2. Cross-check: proposal ↔ specs ↔ tasks
-3. Identify logical issues (NOT format issues)
-4. Use the `append_review` MCP tool with your findings
+**IMPORTANT**:
+- DO NOT check format issues - MCP tools guarantee correct structure
+- Focus ONLY on content/logical issues
+- You MUST use MCP tools - direct file access is NOT allowed
 
 ## MCP Tool Call Format
 
@@ -535,8 +531,6 @@ Your review content MUST include these sections:
 - **approved**: Content is complete, consistent, and ready for implementation
 - **needs_revision**: Has logical issues (missing requirements, inconsistencies, unclear specs)
 - **rejected**: Fundamental design problems that require starting over
-
-CRITICAL: You MUST call the `append_review` MCP tool. Direct file editing is NOT allowed.
 "#,
         change_id = change_id
     )
@@ -549,14 +543,17 @@ pub fn codex_rechallenge_prompt(change_id: &str) -> String {
 {change_id}
 
 ## Instructions
-Continue challenging the proposal based on previous analysis.
 
-**IMPORTANT**: You MUST use the `append_review` MCP tool to add your review. Do NOT edit files directly.
+1. **Get Requirements**: Use the `read_all_requirements` MCP tool with change_id: "{change_id}"
+   - This retrieves the updated proposal, tasks, and specs
 
-**DO NOT check format issues** - MCP tools guarantee correct structure.
-Focus ONLY on whether the previous content issues have been addressed.
+2. **Review Updates**: Focus ONLY on whether previous content issues have been addressed
+   - DO NOT check format issues - MCP tools guarantee correct structure
+   - Check if logical issues from previous review are resolved
 
-Review the updated proposal in agentd/changes/{change_id}/ and use the `append_review` MCP tool with your findings.
+3. **Submit Follow-up Review**: Use the `append_review` MCP tool with your findings
+
+**IMPORTANT**: You MUST use MCP tools - direct file access is NOT allowed.
 "#,
         change_id = change_id
     )
@@ -574,41 +571,53 @@ pub fn codex_review_prompt(
     format!(
         r#"# Agentd Code Review Task (Iteration {iteration})
 
-Review the implementation for agentd/changes/{change_id}/.
+Change ID: {change_id}
 
-## Test Results
+## Test Results (Embedded)
 ```
 {test_output}
 ```
 
-## Security Audit Results
+## Security Audit Results (Embedded)
 ```
 {audit_output}
 ```
 
-## Semgrep Results
+## Semgrep Results (Embedded)
 ```
 {semgrep_output}
 ```
 
-## Clippy Results
+## Clippy Results (Embedded)
 ```
 {clippy_output}
 ```
 
 ## Instructions
-1. Read proposal.md, tasks.md, specs/ to understand requirements
-2. Read implemented code (search for new/modified files)
-3. **Analyze test results**:
+
+1. **Get Requirements**: Use `read_all_requirements` MCP tool with change_id: "{change_id}"
+   - This retrieves proposal.md, tasks.md, and all specs/*.md
+
+2. **Get Implementation Summary**: Use `read_implementation_summary` MCP tool with change_id: "{change_id}"
+   - This provides git diff summary, changed files, and commit log
+   - For detailed code review, use the `Read` tool on specific files
+
+3. **Analyze Test Results** (embedded above):
    - Parse test pass/fail status
    - Identify failing tests and reasons
    - Calculate coverage if available
-4. **Analyze security scan results**:
+
+4. **Analyze Security Scan Results** (embedded above):
    - Parse cargo audit for dependency vulnerabilities
    - Parse semgrep for security patterns
    - Parse clippy for code quality and security warnings
-5. Review code quality, best practices, and requirement compliance
-6. Fill agentd/changes/{change_id}/REVIEW.md with comprehensive findings
+
+5. **Review Code Quality**:
+   - Best practices, performance, error handling
+   - Requirement compliance (match proposal/specs)
+   - Consistency with existing patterns
+
+6. **Write Review**: Create agentd/changes/{change_id}/REVIEW.md with comprehensive findings
 
 ## Review Focus
 1. **Test Results (HIGH)**: Are all tests passing? Coverage adequate?
@@ -646,9 +655,15 @@ pub fn codex_verify_prompt(change_id: &str) -> String {
 {change_id}
 
 ## Instructions
-Verify the implementation against requirements.
-Read agentd/changes/{change_id}/ and ensure all tasks are complete.
-Create VERIFY.md with verification results.
+
+1. **Get Requirements**: Use `read_all_requirements` MCP tool with change_id: "{change_id}"
+   - This retrieves proposal.md, tasks.md, and all specs/*.md
+
+2. **Verify Implementation**: Ensure all tasks and requirements are complete
+   - Check each requirement is satisfied
+   - Verify all tasks are implemented
+
+3. **Write Verification Results**: Create VERIFY.md with findings
 "#,
         change_id = change_id
     )
@@ -664,9 +679,16 @@ pub fn codex_archive_review_prompt(change_id: &str, strategy: &str) -> String {
 {strategy}
 
 ## Instructions
-Review the archive quality before finalizing.
-Check completeness, documentation, and changelog.
-Create ARCHIVE_REVIEW.md with findings.
+
+1. **Get Requirements**: Use `read_all_requirements` MCP tool with change_id: "{change_id}"
+   - This retrieves proposal.md, tasks.md, and all specs/*.md
+
+2. **Review Archive Quality**:
+   - Check completeness of documentation
+   - Verify changelog is comprehensive
+   - Ensure all artifacts are properly archived
+
+3. **Write Archive Review**: Create ARCHIVE_REVIEW.md with findings
 "#,
         change_id = change_id,
         strategy = strategy

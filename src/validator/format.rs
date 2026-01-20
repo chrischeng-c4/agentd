@@ -179,17 +179,20 @@ impl SpecFormatValidator {
     ) -> Vec<ValidationError> {
         let mut errors = Vec::new();
 
-        let scenario_regex = match Regex::new(&self.rules.scenario_pattern) {
-            Ok(r) => r,
-            Err(_) => return errors,
-        };
+        // For individual heading validation, just check if it starts with expected prefix
+        // (Full content-based validation happens in validate_requirement_completeness)
+        // The scenario_pattern is designed for full markdown content (with ### prefix),
+        // but markdown parser gives us just the text after ###
 
-        if !scenario_regex.is_match(text) {
+        // Get expected prefix from spec rules if available, fallback to "Scenario:"
+        let expected_prefix = "Scenario:";
+
+        if !text.trim().starts_with(expected_prefix) {
             let severity = self.rules.severity_map.missing_scenario;
             errors.push(ValidationError::new(
                 format!(
-                    "Scenario heading '{}' doesn't match pattern '{}'",
-                    text, self.rules.scenario_pattern
+                    "Scenario heading '{}' should start with '{}'",
+                    text, expected_prefix
                 ),
                 state.file_path.clone(),
                 line_num,
@@ -233,19 +236,28 @@ impl SpecFormatValidator {
 
         // Count scenarios from text content (more flexible than H4 headings)
         let scenario_count = if !self.rules.scenario_pattern.is_empty() {
-            // Enable multiline mode for patterns that use ^ or $ anchors
-            let pattern = if self.rules.scenario_pattern.starts_with('^')
-                && !self.rules.scenario_pattern.starts_with("(?m)") {
-                format!("(?m){}", self.rules.scenario_pattern)
-            } else {
-                self.rules.scenario_pattern.clone()
-            };
+            // Pattern already includes (?m) if needed, use as-is
+            let pattern = &self.rules.scenario_pattern;
 
-            if let Ok(scenario_regex) = Regex::new(&pattern) {
-                scenario_regex.find_iter(content).count()
-            } else {
-                // Fall back to H4 heading count if regex is invalid
-                state.headings.iter().filter(|(level, _)| *level == 4).count()
+            match Regex::new(pattern) {
+                Ok(scenario_regex) => {
+                    let count = scenario_regex.find_iter(content).count();
+                    // Debug: print pattern and matches
+                    if std::env::var("AGENTD_DEBUG").is_ok() {
+                        eprintln!("[DEBUG] Scenario pattern: {}", pattern);
+                        eprintln!("[DEBUG] Content length: {} bytes", content.len());
+                        eprintln!("[DEBUG] Found {} scenarios", count);
+                        for (i, m) in scenario_regex.find_iter(content).take(3).enumerate() {
+                            eprintln!("[DEBUG]   {}: {:?}", i+1, m.as_str());
+                        }
+                    }
+                    count
+                }
+                Err(e) => {
+                    eprintln!("Warning: Invalid scenario regex pattern '{}': {}", pattern, e);
+                    // Fall back to H4 heading count if regex is invalid
+                    state.headings.iter().filter(|(level, _)| *level == 4).count()
+                }
             }
         } else {
             // No scenario pattern defined, skip scenario validation

@@ -4,6 +4,7 @@
 //! markdown files, eliminating format errors from free-form LLM output.
 
 pub mod clarifications;
+pub mod implementation;
 pub mod knowledge;
 pub mod proposal;
 pub mod read;
@@ -44,6 +45,9 @@ impl ToolRegistry {
                 knowledge::read_definition(),
                 knowledge::list_definition(),
                 knowledge::write_definition(),
+                implementation::read_all_requirements_definition(),
+                implementation::read_implementation_summary_definition(),
+                implementation::list_changed_files_definition(),
             ],
         }
     }
@@ -81,6 +85,15 @@ impl ToolRegistry {
             "read_knowledge" => knowledge::execute_read(arguments, project_root),
             "list_knowledge" => knowledge::execute_list(arguments, project_root),
             "write_knowledge" => knowledge::execute_write(arguments, project_root),
+            "read_all_requirements" => {
+                implementation::execute_read_all_requirements(arguments, project_root)
+            }
+            "read_implementation_summary" => {
+                implementation::execute_read_implementation_summary(arguments, project_root)
+            }
+            "list_changed_files" => {
+                implementation::execute_list_changed_files(arguments, project_root)
+            }
             _ => anyhow::bail!("Unknown tool: {}", name),
         }
     }
