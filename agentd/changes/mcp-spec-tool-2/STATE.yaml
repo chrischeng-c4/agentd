@@ -1,0 +1,161 @@
+change_id: mcp-spec-tool-2
+schema_version: '2.0'
+created_at: 2026-01-19T13:19:25.254577Z
+updated_at: 2026-01-19T14:11:11.851998Z
+phase: proposed
+iteration: 1
+last_action: validate-challenge
+checksums:
+  CHALLENGE.md:
+    hash: sha256:a38a59131f87fa2a2f7c3785f733dca4901bb7fa5497f4164222c31691cb6dde
+    validated_at: 2026-01-19T14:11:11.851998Z
+  specs/mcp-tool-enforcement.md:
+    hash: sha256:78067b85380ae8e25fcefa8d757549e830dafd250be7806de205b635ce2e6cde
+    validated_at: 2026-01-19T14:08:45.329437Z
+  tasks.md:
+    hash: sha256:545db760371894d61920abf59306948d0e12640e1c07c16e80466dcff4dd0ede
+    validated_at: 2026-01-19T14:08:45.329278Z
+  specs/_skeleton.md:
+    hash: sha256:b36a8641f8c91dcdda73cbb4ba9918e7ed1881a0d5c5de3fad5d6002b7429478
+    validated_at: 2026-01-19T14:08:45.329391Z
+  proposal.md:
+    hash: sha256:a94aef0414b2bec4c3c97503c0cb4cabb166104f180baac9bb583ad660318099
+    validated_at: 2026-01-19T14:08:45.329231Z
+validations:
+- step: validate-proposal
+  timestamp: 2026-01-19T13:19:25.254624Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 7
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/mcp-tool-enforcement.md] Scenario heading ''Scenario: Proposal Generation enforces MCP'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/mcp-tool-enforcement.md] Scenario heading ''Scenario: Spec Generation enforces MCP'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/mcp-tool-enforcement.md] Scenario heading ''Scenario: Self-Review enforces MCP'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/mcp-tool-enforcement.md] Scenario heading ''Scenario: Error handling for direct writing'' doesn''t match pattern ''WHEN\s.*THEN\s'''
+  - '[specs/mcp-tool-enforcement.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/mcp-tool-enforcement.md] Missing **WHEN** clause in scenarios'
+  - '[specs/mcp-tool-enforcement.md] Missing **THEN** clause in scenarios'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-19T13:21:46.387921Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: false
+    high: 3
+    medium: 0
+    low: 2
+    verdict: null
+    issues_parsed: null
+  errors:
+  - '[specs/mcp-tool-enforcement.md] Found 0 scenarios, but minimum 1 required'
+  - '[specs/mcp-tool-enforcement.md] Missing **WHEN** clause in scenarios'
+  - '[specs/mcp-tool-enforcement.md] Missing **THEN** clause in scenarios'
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-19T13:23:10.931860Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 0
+    medium: 0
+    low: 1
+    verdict: null
+    issues_parsed: null
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-19T13:26:07.988578Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 2
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-19T13:43:41.808839Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 1
+    low: 2
+    verdict: UNKNOWN
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-19T13:52:08.110164Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 2
+    medium: 1
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 5
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-19T14:02:39.570392Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 3
+    medium: 1
+    low: 2
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+- step: validate-proposal
+  timestamp: 2026-01-19T14:08:45.329191Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 0
+    medium: 0
+    low: 0
+    verdict: null
+    issues_parsed: null
+  errors: []
+  warnings: []
+- step: validate-challenge
+  timestamp: 2026-01-19T14:11:11.851936Z
+  rules_version: '2.0'
+  rules_hash: null
+  mode: normal
+  result:
+    valid: true
+    high: 4
+    medium: 1
+    low: 1
+    verdict: NEEDS_REVISION
+    issues_parsed: 6
+  errors: []
+  warnings: []
+telemetry: null
