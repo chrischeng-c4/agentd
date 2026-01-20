@@ -216,7 +216,11 @@ enum Commands {
     },
 
     /// Start MCP server for structured proposal generation
-    McpServer,
+    McpServer {
+        /// Filter tools by workflow stage (plan, challenge, implement, review, archive)
+        #[arg(long)]
+        tools: Option<String>,
+    },
 }
 
 fn main() {
@@ -246,7 +250,7 @@ async fn run_async(cli: Cli) -> Result<()> {
     // Auto-upgrade check for all commands except init, completions, archived, and mcp-server
     let skip_upgrade = matches!(
         cli.command,
-        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived | Commands::McpServer
+        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived | Commands::McpServer { .. }
     );
 
     #[cfg(feature = "ui")]
@@ -323,7 +327,8 @@ async fn run_async(cli: Cli) -> Result<()> {
 
         Commands::Implement { change_id, tasks } => {
             // Implement command now includes automatic review loop
-            agentd::cli::implement::run(&change_id, tasks.as_deref()).await?;
+            let _result = agentd::cli::implement::run(&change_id, tasks.as_deref()).await?;
+            // Result is used by skills for HITL decisions, CLI just needs success/error
         }
 
         Commands::Review { change_id } => {
@@ -393,8 +398,8 @@ async fn run_async(cli: Cli) -> Result<()> {
             unreachable!("View command should be handled before runtime creation");
         }
 
-        Commands::McpServer => {
-            agentd::cli::mcp_server::run().await?;
+        Commands::McpServer { tools } => {
+            agentd::cli::mcp_server::run(tools.as_deref()).await?;
         }
     }
 

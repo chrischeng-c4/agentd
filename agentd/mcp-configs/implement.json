@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "agentd": {
+      "command": "agentd",
+      "args": ["mcp-server", "--tools", "implement"],
+      "env": {}
+    }
+  }
+}

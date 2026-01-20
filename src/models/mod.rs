@@ -9,6 +9,7 @@ pub mod review;
 pub mod scenario;
 pub mod spec_generation;
 pub mod spec_rules;
+pub mod task_graph;
 pub mod validation;
 pub mod verification;
 
@@ -37,6 +38,7 @@ pub use review::{IssueCategory, ReviewIssue, ReviewVerdict};
 pub use scenario::Scenario;
 pub use spec_generation::{SourceFile, SpecGenerationRequest};
 pub use spec_rules::{DocumentType as SpecDocumentType, ScenarioFormat, SpecFormatRules};
+pub use task_graph::{Layer, SpecGroup, TaskGraph, TaskRef};
 pub use validation::{
     DocumentType, ErrorCategory, JsonValidationError, Severity, SeverityMap, ValidationCounts,
     ValidationError, ValidationJsonOutput, ValidationOptions, ValidationResult, ValidationRules,

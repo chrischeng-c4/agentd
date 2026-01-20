@@ -216,6 +216,8 @@ pub struct LayerBreakdown {
     #[serde(default)]
     pub logic: Option<LayerInfo>,
     #[serde(default)]
+    pub integration: Option<LayerInfo>,
+    #[serde(default)]
     pub testing: Option<LayerInfo>,
 }
 

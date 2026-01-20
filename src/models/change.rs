@@ -585,6 +585,10 @@ pub struct WorkflowConfig {
     /// Delay between retries in seconds
     #[serde(default = "default_retry_delay_secs")]
     pub retry_delay_secs: u64,
+
+    /// Enable spec-by-spec sequential implementation (default: true)
+    #[serde(default = "default_sequential_implementation")]
+    pub sequential_implementation: bool,
 }
 
 fn default_format_iterations() -> u32 { 2 }
@@ -593,6 +597,7 @@ fn default_implementation_iterations() -> u32 { 2 }
 fn default_archive_iterations() -> u32 { 1 }
 fn default_script_retries() -> u32 { 3 }
 fn default_retry_delay_secs() -> u64 { 5 }
+fn default_sequential_implementation() -> bool { true }
 
 impl Default for WorkflowConfig {
     fn default() -> Self {
@@ -603,6 +608,7 @@ impl Default for WorkflowConfig {
             archive_iterations: default_archive_iterations(),
             script_retries: default_script_retries(),
             retry_delay_secs: default_retry_delay_secs(),
+            sequential_implementation: default_sequential_implementation(),
         }
     }
 }

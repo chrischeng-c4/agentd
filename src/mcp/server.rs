@@ -55,11 +55,36 @@ const METHOD_NOT_FOUND: i32 = -32601;
 const INVALID_PARAMS: i32 = -32602;
 
 impl McpServer {
-    /// Create a new MCP server
+    /// Create a new MCP server with all tools
     pub fn new() -> Result<Self> {
         let project_root = std::env::current_dir()?;
         Ok(Self {
             tool_registry: ToolRegistry::new(),
+            project_root,
+        })
+    }
+
+    /// Create a new MCP server with tools filtered by workflow stage
+    ///
+    /// # Arguments
+    ///
+    /// * `stage` - Optional workflow stage (plan, challenge, implement, review, archive)
+    ///             If None, all tools are loaded
+    pub fn new_for_stage(stage: Option<&str>) -> Result<Self> {
+        let project_root = std::env::current_dir()?;
+        let tool_registry = match stage {
+            Some(s) => {
+                eprintln!("[agentd-mcp] Loading tools for stage: {}", s);
+                ToolRegistry::new_for_stage(s)
+            }
+            None => {
+                eprintln!("[agentd-mcp] Loading all tools (no stage filter)");
+                ToolRegistry::new()
+            }
+        };
+
+        Ok(Self {
+            tool_registry,
             project_root,
         })
     }

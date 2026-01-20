@@ -7,7 +7,11 @@ use crate::mcp::McpServer;
 use crate::Result;
 
 /// Run the MCP server
-pub async fn run() -> Result<()> {
-    let server = McpServer::new()?;
+///
+/// # Arguments
+///
+/// * `tools` - Optional workflow stage to filter tools (plan, challenge, implement, review, archive)
+pub async fn run(tools: Option<&str>) -> Result<()> {
+    let server = McpServer::new_for_stage(tools)?;
     server.run().await
 }

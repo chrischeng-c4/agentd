@@ -752,6 +752,94 @@ Fix issues found during code review for agentd/changes/{change_id}/.
     )
 }
 
+/// Generate Claude spec-level implementation prompt
+pub fn claude_implement_spec_prompt(change_id: &str, spec_id: &str) -> String {
+    format!(
+        r#"# Agentd Implement Spec: {spec_id}
+
+Implement the tasks for spec `{spec_id}` in agentd/changes/{change_id}/.
+
+## Spec to Implement
+Read: agentd/changes/{change_id}/specs/{spec_id}.md
+
+## Tasks for This Spec
+Find all tasks in agentd/changes/{change_id}/tasks.md that reference spec `{spec_id}`.
+
+## Instructions
+1. Read the spec file to understand requirements
+2. Read tasks.md to find all tasks for this spec
+3. Implement ONLY the tasks for this spec
+4. Write tests for implemented features (unit + integration)
+   - Test all spec scenarios (WHEN/THEN cases)
+   - Include edge cases and error handling
+5. Update IMPLEMENTATION.md with notes for this spec
+
+## Focus
+- Implement ONLY this spec's requirements
+- Other specs will be handled separately
+- Ensure this spec's acceptance criteria are met
+
+**IMPORTANT**: Write comprehensive tests for this spec's scenarios.
+"#,
+        change_id = change_id,
+        spec_id = spec_id
+    )
+}
+
+/// Generate Claude spec-level self-review prompt
+pub fn claude_self_review_spec_prompt(change_id: &str, spec_id: &str) -> String {
+    format!(
+        r#"# Self-Review: Spec {spec_id}
+
+Review your implementation of spec `{spec_id}` in agentd/changes/{change_id}/.
+
+## What to Check
+1. Read the spec: agentd/changes/{change_id}/specs/{spec_id}.md
+2. Verify all tasks for this spec are implemented correctly
+3. Check that tests cover all scenarios (WHEN/THEN cases)
+4. Verify code follows existing patterns
+5. Check for any obvious bugs or issues
+
+## Output Format
+Provide a brief review in this format:
+
+```yaml
+spec: {spec_id}
+status: PASS | NEEDS_FIX
+issues:
+  - [Issue description if NEEDS_FIX]
+```
+
+Be critical but fair. If implementation looks good, output a message containing "✅" or "PASS". If there are issues, list them clearly and the message should indicate problems found.
+"#,
+        change_id = change_id,
+        spec_id = spec_id
+    )
+}
+
+/// Generate Claude spec-level fix prompt
+pub fn claude_resolve_spec_prompt(change_id: &str, spec_id: &str) -> String {
+    format!(
+        r#"# Fix Issues: Spec {spec_id}
+
+Fix the issues found during self-review of spec `{spec_id}` in agentd/changes/{change_id}/.
+
+## Instructions
+1. Review the self-review feedback from the previous response
+2. Fix all identified issues
+3. Ensure tests pass
+4. Update IMPLEMENTATION.md with fix notes
+
+## Code Quality
+- Follow existing code style and patterns
+- Add proper error handling
+- Maintain test coverage
+"#,
+        change_id = change_id,
+        spec_id = spec_id
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

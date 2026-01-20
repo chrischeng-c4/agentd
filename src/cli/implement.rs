@@ -1,5 +1,6 @@
 use crate::context::ContextPhase;
 use crate::models::frontmatter::StatePhase;
+use crate::models::{SpecGroup, TaskGraph};
 use crate::orchestrator::{ClaudeOrchestrator, CodexOrchestrator, UsageMetrics};
 use crate::parser::parse_review_verdict;
 use crate::state::StateManager;
@@ -8,8 +9,118 @@ use crate::{
     Result,
 };
 use colored::Colorize;
+use std::collections::HashSet;
 use std::env;
 use std::path::PathBuf;
+
+/// Result from running the implementation workflow
+pub struct ImplementEngineResult {
+    pub change_id: String,
+    pub final_verdict: ReviewVerdict,
+    pub iteration_count: u32,
+    pub phase: StatePhase,
+}
+
+/// Run implementation for a single spec
+async fn run_spec_implementation(
+    change_id: &str,
+    spec_group: &SpecGroup,
+    project_root: &PathBuf,
+    config: &AgentdConfig,
+) -> Result<()> {
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(project_root);
+
+    let orchestrator = ClaudeOrchestrator::new(config, project_root);
+    let (_output, usage) = orchestrator
+        .run_implement_spec(change_id, &spec_group.spec_id, complexity)
+        .await?;
+
+    let model = config.claude.select_model(complexity).model.clone();
+    record_usage(
+        change_id,
+        project_root,
+        &format!("implement_spec_{}", spec_group.spec_id),
+        &model,
+        &usage,
+        config,
+        complexity,
+        "claude",
+    );
+
+    println!("   ✅ Spec {} implemented", spec_group.spec_id);
+    Ok(())
+}
+
+/// Run self-review for a single spec
+async fn run_spec_self_review(
+    change_id: &str,
+    spec_group: &SpecGroup,
+    project_root: &PathBuf,
+    config: &AgentdConfig,
+) -> Result<bool> {
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(project_root);
+
+    let orchestrator = ClaudeOrchestrator::new(config, project_root);
+    let (output, usage) = orchestrator
+        .run_self_review_spec(change_id, &spec_group.spec_id, complexity)
+        .await?;
+
+    let model = config.claude.select_model(complexity).model.clone();
+    record_usage(
+        change_id,
+        project_root,
+        &format!("self_review_spec_{}", spec_group.spec_id),
+        &model,
+        &usage,
+        config,
+        complexity,
+        "claude",
+    );
+
+    // Parse self-review verdict - look for markers
+    let is_ok = output.contains("✅") || output.to_lowercase().contains("pass");
+
+    if is_ok {
+        println!("   ✅ Self-review passed");
+    } else {
+        println!("   ⚠️  Self-review found issues");
+    }
+
+    Ok(is_ok)
+}
+
+/// Fix issues found in spec self-review
+async fn run_spec_fix(
+    change_id: &str,
+    spec_group: &SpecGroup,
+    project_root: &PathBuf,
+    config: &AgentdConfig,
+) -> Result<()> {
+    let change = Change::new(change_id, "");
+    let complexity = change.assess_complexity(project_root);
+
+    let orchestrator = ClaudeOrchestrator::new(config, project_root);
+    let (_output, usage) = orchestrator
+        .run_resolve_spec(change_id, &spec_group.spec_id, complexity)
+        .await?;
+
+    let model = config.claude.select_model(complexity).model.clone();
+    record_usage(
+        change_id,
+        project_root,
+        &format!("fix_spec_{}", spec_group.spec_id),
+        &model,
+        &usage,
+        config,
+        complexity,
+        "claude",
+    );
+
+    println!("   ✅ Issues fixed");
+    Ok(())
+}
 
 /// Record LLM usage to StateManager
 fn record_usage(
@@ -54,9 +165,186 @@ fn record_usage(
 
 pub struct ImplementCommand;
 
-pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
+/// Run spec-by-spec sequential implementation
+pub async fn run_sequential(change_id: &str) -> Result<ImplementEngineResult> {
     let project_root = env::current_dir()?;
     let config = AgentdConfig::load(&project_root)?;
+    let change_dir = project_root.join("agentd/changes").join(change_id);
+    let tasks_path = change_dir.join("tasks.md");
+
+    // Update STATE to Implementing phase
+    let mut state_manager = StateManager::load(&change_dir)?;
+    state_manager.set_phase(StatePhase::Implementing);
+    state_manager.save()?;
+
+    println!("{}", "🎨 Agentd Spec-by-Spec Implementation".cyan().bold());
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+    println!();
+
+    // 1. Parse task graph
+    println!("{}", "📋 Parsing tasks.md...".cyan());
+    let task_graph = TaskGraph::from_tasks_file(&tasks_path)?;
+    let execution_order = task_graph.get_execution_order();
+
+    let total_specs: usize = task_graph.layers.iter().map(|l| l.specs.len()).sum();
+    println!("   Found {} layers, {} specs", task_graph.layers.len(), total_specs);
+    println!();
+
+    // 2. Track completed specs
+    let mut completed = HashSet::new();
+
+    // 3. Execute spec by spec
+    for (idx, spec_group) in execution_order.iter().enumerate() {
+        println!(
+            "{}",
+            format!("⚡ [{}/{}] Implementing spec: {}", idx + 1, total_specs, spec_group.spec_id)
+                .cyan()
+                .bold()
+        );
+
+        // Check prerequisites
+        if !task_graph.can_execute_spec(&spec_group.spec_id, &completed) {
+            anyhow::bail!("Prerequisites not met for {}", spec_group.spec_id);
+        }
+
+        // Implement this spec's tasks
+        run_spec_implementation(change_id, spec_group, &project_root, &config).await?;
+
+        // Self-review
+        let review_ok = run_spec_self_review(change_id, spec_group, &project_root, &config).await?;
+
+        if !review_ok {
+            // Auto-fix issues
+            println!("   🔧 Auto-fixing issues...");
+            run_spec_fix(change_id, spec_group, &project_root, &config).await?;
+        }
+
+        // Mark complete
+        completed.insert(spec_group.spec_id.clone());
+        println!();
+    }
+
+    // 4. Final review by Codex (all specs)
+    println!("{}", "🔍 Final review by Codex...".cyan().bold());
+    let verdict = run_review_step(change_id, &project_root, &config, 0).await?;
+
+    // Implementation iteration loop (same as current implementation)
+    let max_iterations = config.workflow.implementation_iterations;
+    let mut current_verdict = verdict;
+    let mut iteration = 0;
+
+    loop {
+        match current_verdict {
+            ReviewVerdict::Approved => {
+                // Update STATE to Complete phase
+                let mut state_manager = StateManager::load(&change_dir)?;
+                state_manager.set_phase(StatePhase::Complete);
+                state_manager.save()?;
+
+                println!();
+                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                if iteration == 0 {
+                    println!("{}", "✨ Implementation approved!".green().bold());
+                } else {
+                    println!(
+                        "{}",
+                        format!("✨ Fixed and approved (iteration {})!", iteration)
+                            .green()
+                            .bold()
+                    );
+                }
+
+                // Return result - Skill will use AskUserQuestion for next action
+                return Ok(ImplementEngineResult {
+                    change_id: change_id.to_string(),
+                    final_verdict: ReviewVerdict::Approved,
+                    iteration_count: iteration,
+                    phase: StatePhase::Complete,
+                });
+            }
+            ReviewVerdict::NeedsChanges => {
+                iteration += 1;
+                if iteration > max_iterations {
+                    println!();
+                    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                    println!(
+                        "{}",
+                        format!(
+                            "⚠️  Automatic refinement limit reached ({} iterations)",
+                            max_iterations
+                        )
+                        .yellow()
+                        .bold()
+                    );
+                    display_remaining_issues(change_id, &project_root)?;
+
+                    // Return result - Skill will use AskUserQuestion for next action
+                    return Ok(ImplementEngineResult {
+                        change_id: change_id.to_string(),
+                        final_verdict: ReviewVerdict::NeedsChanges,
+                        iteration_count: iteration - 1,
+                        phase: StatePhase::Implementing,
+                    });
+                }
+
+                println!();
+                println!(
+                    "{}",
+                    format!("⚠️  NEEDS_CHANGES - Auto-fixing (iteration {})...", iteration).yellow()
+                );
+
+                // Resolve with Claude
+                println!();
+                println!("{}", format!("🔧 Resolving issues (iteration {})...", iteration).cyan());
+                run_resolve_step(change_id, &project_root, &config).await?;
+
+                // Re-review with Codex
+                println!();
+                println!("{}", format!("🔍 Re-reviewing (iteration {})...", iteration).cyan());
+                current_verdict = run_review_step(change_id, &project_root, &config, iteration).await?;
+            }
+            ReviewVerdict::MajorIssues => {
+                println!();
+                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                println!("{}", "❌ Major issues found".red().bold());
+                display_remaining_issues(change_id, &project_root)?;
+
+                // Return result - Skill will use AskUserQuestion for next action
+                return Ok(ImplementEngineResult {
+                    change_id: change_id.to_string(),
+                    final_verdict: ReviewVerdict::MajorIssues,
+                    iteration_count: iteration,
+                    phase: StatePhase::Implementing,
+                });
+            }
+            ReviewVerdict::Unknown => {
+                println!("{}", "⚠️  Could not parse review verdict".yellow());
+
+                // Return result - Skill will use AskUserQuestion for next action
+                return Ok(ImplementEngineResult {
+                    change_id: change_id.to_string(),
+                    final_verdict: ReviewVerdict::Unknown,
+                    iteration_count: iteration,
+                    phase: StatePhase::Implementing,
+                });
+            }
+        }
+    }
+}
+
+pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<ImplementEngineResult> {
+    let project_root = env::current_dir()?;
+    let config = AgentdConfig::load(&project_root)?;
+
+    // Check if sequential mode enabled
+    let sequential_mode = config.workflow.sequential_implementation;
+
+    if sequential_mode && tasks.is_none() {
+        // Use sequential spec-by-spec implementation
+        return run_sequential(change_id).await;
+    }
+
+    // Legacy: all-at-once implementation
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
     // Update STATE to Implementing phase
@@ -97,9 +385,14 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
                 } else {
                     println!("{}", format!("✨ Fixed and approved (iteration {})!", iteration).green().bold());
                 }
-                println!("\n{}", "⏭️  Next:".yellow());
-                println!("   agentd archive {}", change_id);
-                return Ok(());
+
+                // Return result - Skill will use AskUserQuestion for next action
+                return Ok(ImplementEngineResult {
+                    change_id: change_id.to_string(),
+                    final_verdict: ReviewVerdict::Approved,
+                    iteration_count: iteration,
+                    phase: StatePhase::Complete,
+                });
             }
             ReviewVerdict::NeedsChanges => {
                 iteration += 1;
@@ -111,7 +404,14 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
                         format!("⚠️  Automatic refinement limit reached ({} iterations)", max_iterations).yellow().bold()
                     );
                     display_remaining_issues(change_id, &project_root)?;
-                    return Ok(());
+
+                    // Return result - Skill will use AskUserQuestion for next action
+                    return Ok(ImplementEngineResult {
+                        change_id: change_id.to_string(),
+                        final_verdict: ReviewVerdict::NeedsChanges,
+                        iteration_count: iteration - 1,
+                        phase: StatePhase::Implementing,
+                    });
                 }
 
                 println!();
@@ -135,11 +435,25 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<()> {
                 println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
                 println!("{}", "❌ Major issues found".red().bold());
                 display_remaining_issues(change_id, &project_root)?;
-                return Ok(());
+
+                // Return result - Skill will use AskUserQuestion for next action
+                return Ok(ImplementEngineResult {
+                    change_id: change_id.to_string(),
+                    final_verdict: ReviewVerdict::MajorIssues,
+                    iteration_count: iteration,
+                    phase: StatePhase::Implementing,
+                });
             }
             ReviewVerdict::Unknown => {
                 println!("{}", "⚠️  Could not parse review verdict".yellow());
-                return Ok(());
+
+                // Return result - Skill will use AskUserQuestion for next action
+                return Ok(ImplementEngineResult {
+                    change_id: change_id.to_string(),
+                    final_verdict: ReviewVerdict::Unknown,
+                    iteration_count: iteration,
+                    phase: StatePhase::Implementing,
+                });
             }
         }
     }

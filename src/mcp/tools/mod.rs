@@ -6,6 +6,7 @@
 pub mod clarifications;
 pub mod implementation;
 pub mod knowledge;
+pub mod mermaid;
 pub mod proposal;
 pub mod read;
 pub mod spec;
@@ -32,24 +33,103 @@ pub struct ToolDefinition {
 impl ToolRegistry {
     /// Create a new tool registry with all available tools
     pub fn new() -> Self {
+        Self::all_tools()
+    }
+
+    /// Create a tool registry filtered by workflow stage
+    pub fn new_for_stage(stage: &str) -> Self {
+        let tools = match stage {
+            "plan" => Self::plan_tools(),
+            "challenge" => Self::challenge_tools(),
+            "implement" => Self::implement_tools(),
+            "review" => Self::review_tools(),
+            "archive" => Self::archive_tools(),
+            _ => Self::all_tools_vec(),
+        };
+        Self { tools }
+    }
+
+    /// All tools (22 total)
+    fn all_tools() -> Self {
         Self {
-            tools: vec![
-                clarifications::definition(),
-                proposal::definition(),
-                proposal::append_review_definition(),
-                spec::definition(),
-                tasks::definition(),
-                validate::definition(),
-                read::definition(),
-                read::list_specs_definition(),
-                knowledge::read_definition(),
-                knowledge::list_definition(),
-                knowledge::write_definition(),
-                implementation::read_all_requirements_definition(),
-                implementation::read_implementation_summary_definition(),
-                implementation::list_changed_files_definition(),
-            ],
+            tools: Self::all_tools_vec(),
         }
+    }
+
+    fn all_tools_vec() -> Vec<ToolDefinition> {
+        let mut tools = vec![
+            clarifications::definition(),
+            proposal::definition(),
+            proposal::append_review_definition(),
+            spec::definition(),
+            tasks::definition(),
+            validate::definition(),
+            read::definition(),
+            read::list_specs_definition(),
+            knowledge::read_definition(),
+            knowledge::list_definition(),
+            knowledge::write_definition(),
+            implementation::read_all_requirements_definition(),
+            implementation::read_implementation_summary_definition(),
+            implementation::list_changed_files_definition(),
+        ];
+
+        // Add all Mermaid diagram tools
+        tools.extend(mermaid::definitions());
+
+        tools
+    }
+
+    /// Plan stage tools (22 tools: all core + Mermaid)
+    /// Used by: Gemini for proposal generation
+    fn plan_tools() -> Vec<ToolDefinition> {
+        Self::all_tools_vec()
+    }
+
+    /// Challenge stage tools (5 tools)
+    /// Used by: Codex for challenging proposals
+    fn challenge_tools() -> Vec<ToolDefinition> {
+        vec![
+            read::definition(),
+            read::list_specs_definition(),
+            knowledge::read_definition(),
+            knowledge::list_definition(),
+            validate::definition(),
+        ]
+    }
+
+    /// Implement stage tools (4 tools)
+    /// Used by: Claude for code implementation
+    fn implement_tools() -> Vec<ToolDefinition> {
+        vec![
+            implementation::read_all_requirements_definition(),
+            implementation::read_implementation_summary_definition(),
+            implementation::list_changed_files_definition(),
+            read::definition(),
+        ]
+    }
+
+    /// Review stage tools (3 tools)
+    /// Used by: Codex for code review
+    fn review_tools() -> Vec<ToolDefinition> {
+        vec![
+            validate::definition(),
+            proposal::append_review_definition(),
+            read::definition(),
+        ]
+    }
+
+    /// Archive stage tools (6 tools)
+    /// Used by: Gemini for merging specs to knowledge base
+    fn archive_tools() -> Vec<ToolDefinition> {
+        vec![
+            knowledge::read_definition(),
+            knowledge::list_definition(),
+            knowledge::write_definition(),
+            read::definition(),
+            read::list_specs_definition(),
+            spec::definition(),
+        ]
     }
 
     /// List all available tools in MCP format
@@ -94,6 +174,8 @@ impl ToolRegistry {
             "list_changed_files" => {
                 implementation::execute_list_changed_files(arguments, project_root)
             }
+            // Mermaid diagram tools
+            name if name.starts_with("generate_mermaid_") => mermaid::call_tool(name, arguments),
             _ => anyhow::bail!("Unknown tool: {}", name),
         }
     }
