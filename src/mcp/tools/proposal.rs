@@ -310,6 +310,93 @@ pub fn append_review(
     Ok(())
 }
 
+/// Get the tool definition for append_review
+pub fn append_review_definition() -> ToolDefinition {
+    ToolDefinition {
+        name: "append_review".to_string(),
+        description: "Append a review block to an existing proposal.md file".to_string(),
+        input_schema: json!({
+            "type": "object",
+            "required": ["change_id", "status", "iteration", "reviewer", "content"],
+            "properties": {
+                "change_id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]+$",
+                    "description": "Unique identifier for the change (lowercase, hyphens allowed)"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["approved", "needs_revision", "rejected"],
+                    "description": "Review verdict: approved, needs_revision, or rejected"
+                },
+                "iteration": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Review iteration number (starts at 1)"
+                },
+                "reviewer": {
+                    "type": "string",
+                    "description": "Reviewer identifier (e.g., 'codex', 'human')"
+                },
+                "content": {
+                    "type": "string",
+                    "minLength": 50,
+                    "description": "Review content in markdown format. Must include: ## Summary, ## Issues (if any), ## Verdict, ## Next Steps"
+                }
+            }
+        }),
+    }
+}
+
+/// Execute the append_review tool
+pub fn execute_append_review(args: &Value, project_root: &Path) -> Result<String> {
+    // Extract required fields
+    let change_id = get_required_string(args, "change_id")?;
+    let status = get_required_string(args, "status")?;
+    let iteration = args
+        .get("iteration")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| anyhow::anyhow!("Missing required field: iteration"))? as u32;
+    let reviewer = get_required_string(args, "reviewer")?;
+    let content = get_required_string(args, "content")?;
+
+    // Validate change_id format
+    if !change_id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+        anyhow::bail!("change_id must be lowercase alphanumeric with hyphens only");
+    }
+
+    // Validate status
+    if !["approved", "needs_revision", "rejected"].contains(&status.as_str()) {
+        anyhow::bail!("status must be 'approved', 'needs_revision', or 'rejected'");
+    }
+
+    // Validate content length
+    if content.len() < 50 {
+        anyhow::bail!("content must be at least 50 characters");
+    }
+
+    // Get proposal path
+    let proposal_path = project_root
+        .join("agentd/changes")
+        .join(&change_id)
+        .join("proposal.md");
+
+    if !proposal_path.exists() {
+        anyhow::bail!(
+            "proposal.md not found for change '{}'. Run create_proposal first.",
+            change_id
+        );
+    }
+
+    // Append review block
+    append_review(&proposal_path, &status, iteration, &reviewer, &content)?;
+
+    Ok(format!(
+        "Appended review block (status={}, iteration={}) to proposal.md for change '{}'",
+        status, iteration, change_id
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -12,6 +12,12 @@
 | `/agentd:archive` | Archive completed change |
 
 Start with: `/agentd:plan <id> "<description>"`
+
+### Knowledge Base
+
+System documentation is in `agentd/knowledge/`. Use MCP tools to read:
+- `list_knowledge` - List all knowledge files
+- `read_knowledge` - Read specific file (e.g., `read_knowledge("00-architecture/index.md")`)
 <!-- agentd:end -->
 
 # Project Context

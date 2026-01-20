@@ -11,7 +11,6 @@ const AGENTS_TEMPLATE: &str = include_str!("../templates/AGENTS.md");
 const PROPOSAL_SKELETON: &str = include_str!("../templates/skeletons/planning/proposal.md");
 const TASKS_SKELETON: &str = include_str!("../templates/skeletons/planning/tasks.md");
 const SPEC_SKELETON: &str = include_str!("../templates/skeletons/planning/spec.md");
-const CHALLENGE_SKELETON: &str = include_str!("../templates/skeletons/planning/challenge.md");
 
 // Implementation phase skeletons
 const REVIEW_SKELETON: &str = include_str!("../templates/skeletons/impl/review.md");
@@ -289,7 +288,6 @@ fn get_embedded_template(name: &str) -> Result<String> {
         "proposal.md" => Ok(PROPOSAL_SKELETON.to_string()),
         "tasks.md" => Ok(TASKS_SKELETON.to_string()),
         "spec.md" => Ok(SPEC_SKELETON.to_string()),
-        "challenge.md" => Ok(CHALLENGE_SKELETON.to_string()),
         "review.md" => Ok(REVIEW_SKELETON.to_string()),
         "archive_review.md" => Ok(ARCHIVE_REVIEW_SKELETON.to_string()),
         _ => anyhow::bail!("Unknown template: {}", name),
@@ -332,16 +330,6 @@ pub fn create_proposal_skeleton(change_dir: &Path, change_id: &str) -> Result<()
     Ok(())
 }
 
-/// Create challenge skeleton file to guide Codex review
-/// This provides structure for consistent challenge reports
-pub fn create_challenge_skeleton(change_dir: &Path, change_id: &str) -> Result<()> {
-    let project_root = derive_project_root(change_dir)?;
-    let vars = [("change_id", change_id)];
-
-    let challenge_content = load_template("challenge.md", &project_root, &vars)?;
-    std::fs::write(change_dir.join("CHALLENGE.md"), challenge_content)?;
-    Ok(())
-}
 
 /// Create REVIEW.md skeleton for code review process
 pub fn create_review_skeleton(change_dir: &Path, change_id: &str, iteration: u32) -> Result<()> {

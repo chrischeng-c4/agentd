@@ -168,11 +168,6 @@ impl Change {
         self.path(project_root).join("specs")
     }
 
-    /// Get path to CHALLENGE.md
-    pub fn challenge_path(&self, project_root: &Path) -> PathBuf {
-        self.path(project_root).join("CHALLENGE.md")
-    }
-
     /// Get path to IMPLEMENTATION.md
     pub fn implementation_path(&self, project_root: &Path) -> PathBuf {
         self.path(project_root).join("IMPLEMENTATION.md")
@@ -590,20 +585,14 @@ pub struct WorkflowConfig {
     /// Delay between retries in seconds
     #[serde(default = "default_retry_delay_secs")]
     pub retry_delay_secs: u64,
-
-    /// Human-in-the-Loop mode: Sequential generation (proposal → specs → tasks) with manual iteration control
-    /// If false, uses fully automated mode (auto-reproposal loop on NEEDS_REVISION)
-    #[serde(default = "default_human_in_loop", alias = "use_sequential_generation")]
-    pub human_in_loop: bool,
 }
 
 fn default_format_iterations() -> u32 { 2 }
-fn default_planning_iterations() -> u32 { 2 }
+fn default_planning_iterations() -> u32 { 3 }
 fn default_implementation_iterations() -> u32 { 2 }
 fn default_archive_iterations() -> u32 { 1 }
 fn default_script_retries() -> u32 { 3 }
 fn default_retry_delay_secs() -> u64 { 5 }
-fn default_human_in_loop() -> bool { true }
 
 impl Default for WorkflowConfig {
     fn default() -> Self {
@@ -614,7 +603,6 @@ impl Default for WorkflowConfig {
             archive_iterations: default_archive_iterations(),
             script_retries: default_script_retries(),
             retry_delay_secs: default_retry_delay_secs(),
-            human_in_loop: default_human_in_loop(),
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::models::{
-    Change, ChallengeVerdict, AgentdConfig, ValidationCounts, ValidationOptions,
+    ChallengeVerdict, AgentdConfig, ValidationCounts, ValidationOptions,
 };
 use crate::parser::parse_challenge_verdict;
 use crate::state::StateManager;
@@ -65,65 +65,7 @@ pub async fn run(change_id: &str, options: &ValidationOptions) -> Result<()> {
         println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
     }
 
-    let mut result = validate_challenge(change_id, &project_root, options)?;
-
-    // Auto-fix if requested and there are fixable errors
-    if options.fix && !result.has_valid_structure {
-        let change = Change::new(change_id, "");
-        let challenge_path = change.challenge_path(&project_root);
-
-        if challenge_path.exists() {
-            let mut content = std::fs::read_to_string(&challenge_path)?;
-            let mut fixes_applied = Vec::new();
-
-            // Fix missing # Challenge Report
-            if !content.contains("# Challenge Report") {
-                content = format!("# Challenge Report\n\n{}", content);
-                fixes_applied.push("Added '# Challenge Report' heading");
-            }
-
-            // Fix missing ## Verdict
-            if !content.contains("## Verdict") {
-                // Add after Challenge Report heading
-                if let Some(pos) = content.find("\n## ") {
-                    content.insert_str(pos, "\n\n## Verdict\n\n**Status**: NEEDS_REVISION\n");
-                } else {
-                    content.push_str("\n\n## Verdict\n\n**Status**: NEEDS_REVISION\n");
-                }
-                fixes_applied.push("Added '## Verdict' section");
-            }
-
-            // Fix missing ## Issues section
-            let has_issues_section = content.contains("## Issues")
-                || content.contains("## Internal Consistency Issues")
-                || content.contains("## Code Alignment Issues")
-                || content.contains("## Quality Suggestions");
-            if !has_issues_section {
-                content.push_str("\n\n## Issues\n\nNo issues documented.\n");
-                fixes_applied.push("Added '## Issues' section");
-            }
-
-            if !fixes_applied.is_empty() {
-                std::fs::write(&challenge_path, &content)?;
-                if !options.json {
-                    println!();
-                    println!("{}", "🔧 Auto-fixes applied:".cyan());
-                    for fix in &fixes_applied {
-                        println!("   {} {}", "✓".green(), fix);
-                    }
-                    println!();
-                    println!("{}", "Re-validating...".bright_black());
-                    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-                }
-                // Re-validate after fixes
-                let revalidate_options = ValidationOptions::new()
-                    .with_strict(options.strict)
-                    .with_verbose(options.verbose)
-                    .with_json(options.json);
-                result = validate_challenge(change_id, &project_root, &revalidate_options)?;
-            }
-        }
-    }
+    let result = validate_challenge(change_id, &project_root, options)?;
 
     // JSON output mode
     if options.json {
@@ -197,40 +139,10 @@ pub fn validate_challenge(
         );
     }
 
-    // Check both formats: CHALLENGE.md (old) or proposal.md with reviews (new)
-    let change = Change::new(change_id, "");
-    let challenge_path = change.challenge_path(project_root);
+    // Check proposal.md for review blocks (new format only)
     let proposal_path = change_dir.join("proposal.md");
 
-    let (content, is_xml) = if challenge_path.exists() {
-        // Old format: CHALLENGE.md
-        if !options.json {
-            println!("   Checking CHALLENGE.md structure...");
-        }
-        (std::fs::read_to_string(&challenge_path)?, false)
-    } else if proposal_path.exists() {
-        // New format: extract review from proposal.md
-        if !options.json {
-            println!("   Checking review in proposal.md...");
-        }
-        let proposal_content = std::fs::read_to_string(&proposal_path)?;
-        let latest_review = crate::parser::parse_latest_review(&proposal_content)?;
-
-        match latest_review {
-            Some(review) => (review.content, true),
-            None => {
-                return Ok(ChallengeValidationResult {
-                    verdict: ChallengeVerdict::Unknown,
-                    has_valid_structure: false,
-                    issue_count: 0,
-                    high_count: 0,
-                    medium_count: 0,
-                    low_count: 0,
-                    errors: vec!["No review found in proposal.md. Run 'agentd challenge' first.".to_string()],
-                });
-            }
-        }
-    } else {
+    if !proposal_path.exists() {
         return Ok(ChallengeValidationResult {
             verdict: ChallengeVerdict::Unknown,
             has_valid_structure: false,
@@ -238,52 +150,37 @@ pub fn validate_challenge(
             high_count: 0,
             medium_count: 0,
             low_count: 0,
-            errors: vec!["Neither CHALLENGE.md nor proposal.md found.".to_string()],
+            errors: vec!["proposal.md not found.".to_string()],
         });
+    }
+
+    if !options.json {
+        println!("   Checking review in proposal.md...");
+    }
+
+    let proposal_content = std::fs::read_to_string(&proposal_path)?;
+    let latest_review = crate::parser::parse_latest_review(&proposal_content)?;
+
+    let content = match latest_review {
+        Some(review) => review.content,
+        None => {
+            return Ok(ChallengeValidationResult {
+                verdict: ChallengeVerdict::Unknown,
+                has_valid_structure: false,
+                issue_count: 0,
+                high_count: 0,
+                medium_count: 0,
+                low_count: 0,
+                errors: vec!["No review found in proposal.md. Run 'agentd challenge' first.".to_string()],
+            });
+        }
     };
 
     let mut errors = Vec::new();
     let mut has_valid_structure = true;
 
-    // Check for required sections (skip strict checks for XML format)
-    if !is_xml {
-        // Old format structure checks
-        let has_title = content.contains("# Challenge Report");
-        let has_verdict = content.contains("## Verdict");
-        let has_issues_section = content.contains("## Issues")
-            || content.contains("## Internal Consistency Issues")
-            || content.contains("## Code Alignment Issues")
-            || content.contains("## Quality Suggestions");
-
-        if !has_title {
-            has_valid_structure = false;
-            errors.push("Missing required section: # Challenge Report".to_string());
-            if !options.json {
-                println!("      {} Missing: # Challenge Report", "HIGH:".red());
-            }
-        }
-        if !has_verdict {
-            has_valid_structure = false;
-            errors.push("Missing required section: ## Verdict".to_string());
-            if !options.json {
-                println!("      {} Missing: ## Verdict", "HIGH:".red());
-            }
-        }
-        if !has_issues_section {
-            has_valid_structure = false;
-            errors.push("Missing issues section (## Issues or categorized sections)".to_string());
-            if !options.json {
-                println!("      {} Missing: issues section", "HIGH:".red());
-            }
-        }
-    }
-
-    // Parse verdict
-    let verdict = if is_xml {
-        crate::parser::parse_challenge_verdict(&proposal_path).unwrap_or(ChallengeVerdict::Unknown)
-    } else {
-        parse_challenge_verdict(&challenge_path).unwrap_or(ChallengeVerdict::Unknown)
-    };
+    // Parse verdict from proposal.md
+    let verdict = parse_challenge_verdict(&proposal_path).unwrap_or(ChallengeVerdict::Unknown);
     if !options.json {
         println!("   Checking verdict...");
     }
@@ -387,8 +284,8 @@ pub fn validate_challenge(
     // Update phase based on verdict
     state_manager.update_phase_from_verdict(verdict_str);
 
-    // Update CHALLENGE.md checksum
-    state_manager.update_checksum("CHALLENGE.md")?;
+    // Update proposal.md checksum (contains review blocks)
+    state_manager.update_checksum("proposal.md")?;
     state_manager.set_last_action("validate-challenge");
 
     // Save state

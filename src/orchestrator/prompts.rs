@@ -13,7 +13,15 @@ pub fn gemini_proposal_prompt(change_id: &str, description: &str) -> String {
 {description}
 
 ## Instructions
-Create proposal files in agentd/changes/{change_id}/.
+
+**IMPORTANT**: You MUST use the `create_proposal` MCP tool to generate files. Do NOT output markdown directly.
+
+1. Analyze the codebase and understand the request
+2. Use the `create_proposal` MCP tool with:
+   - change_id: "{change_id}"
+   - summary, why, what_changes, impact fields
+
+Direct file creation or markdown output is NOT allowed. Use MCP tools only.
 "#,
         change_id = change_id,
         description = description
@@ -353,8 +361,16 @@ pub fn gemini_reproposal_prompt(change_id: &str) -> String {
 {change_id}
 
 ## Instructions
-Continue refining the proposal based on previous feedback.
-Update files in agentd/changes/{change_id}/ as needed.
+
+**IMPORTANT**: You MUST use MCP tools to update files. Do NOT edit files directly.
+
+1. Read the review feedback in proposal.md (look for <review> blocks)
+2. Address each issue using the appropriate MCP tool:
+   - `create_proposal` - to update proposal.md
+   - `create_spec` - to update spec files
+   - `create_tasks` - to update tasks.md
+
+Direct file editing is NOT allowed. Use MCP tools only.
 "#,
         change_id = change_id
     )
@@ -380,13 +396,20 @@ Review all generated proposal files in agentd/changes/{change_id}/:
 5. **Traceability**: Tasks reference specs, specs have clear requirements
 
 ## Instructions
+
+**IMPORTANT**: You MUST use MCP tools to fix any issues. Do NOT edit files directly.
+
 1. Read each file and check against the quality criteria
 2. If ANY issues are found:
-   - Edit the files directly to fix them
+   - Use MCP tools to fix them:
+     - `create_proposal` - to fix proposal.md
+     - `create_spec` - to fix spec files
+     - `create_tasks` - to fix tasks.md
    - Output: `<review>NEEDS_REVISION</review>`
 3. If NO issues are found:
    - Output: `<review>PASS</review>`
 
+CRITICAL: Direct file editing is NOT allowed. Use MCP tools only.
 IMPORTANT: You MUST output exactly one of the two markers above at the end of your response.
 "#,
         change_id = change_id
@@ -473,29 +496,47 @@ pub fn codex_challenge_prompt(change_id: &str) -> String {
 ## Instructions
 Review the proposal in agentd/changes/{change_id}/.
 
-**IMPORTANT**: Append a <review> block to proposal.md (do NOT create CHALLENGE.md):
+**IMPORTANT**: You MUST use the `append_review` MCP tool to add your review. Do NOT create CHALLENGE.md or edit files directly.
 
-```xml
-<review status="approved|needs_revision|rejected" iteration="1" reviewer="codex">
-## Summary
-[Overall assessment]
+## Review Focus
 
-## Issues
-### Issue: [Title]
-- **Severity**: High|Medium|Low
-- **Description**: [What's wrong]
-- **Location**: [File path]
-- **Recommendation**: [How to fix]
+**DO NOT check format issues** - MCP tools guarantee correct structure.
 
-## Verdict
-APPROVED | NEEDS_REVISION | REJECTED
+Focus ONLY on content/logical issues:
+1. **Completeness** - Are all requirements covered? Missing scenarios?
+2. **Consistency** - Do specs align with proposal? Do tasks cover all requirements?
+3. **Technical feasibility** - Is the design implementable? Any blockers?
+4. **Clarity** - Are requirements specific and testable? Ambiguous language?
+5. **Dependencies** - Are task dependencies correct? Missing prerequisites?
 
-## Next Steps
-[Recommendations]
-</review>
-```
+## Review Process
 
-Read proposal.md, analyze it, then use MCP tools or direct file editing to append the review block.
+1. Read proposal.md, tasks.md, and all specs/*.md
+2. Cross-check: proposal ↔ specs ↔ tasks
+3. Identify logical issues (NOT format issues)
+4. Use the `append_review` MCP tool with your findings
+
+## MCP Tool Call Format
+
+Use append_review with these parameters:
+- change_id: "{change_id}"
+- status: "approved" | "needs_revision" | "rejected"
+- iteration: 1
+- reviewer: "codex"
+- content: (markdown string with your review)
+
+Your review content MUST include these sections:
+- ## Summary - Overall assessment
+- ## Issues - List of CONTENT issues found (if any)
+- ## Verdict - APPROVED, NEEDS_REVISION, or REJECTED
+- ## Next Steps - Recommendations
+
+## Verdict Guidelines
+- **approved**: Content is complete, consistent, and ready for implementation
+- **needs_revision**: Has logical issues (missing requirements, inconsistencies, unclear specs)
+- **rejected**: Fundamental design problems that require starting over
+
+CRITICAL: You MUST call the `append_review` MCP tool. Direct file editing is NOT allowed.
 "#,
         change_id = change_id
     )
@@ -509,7 +550,13 @@ pub fn codex_rechallenge_prompt(change_id: &str) -> String {
 
 ## Instructions
 Continue challenging the proposal based on previous analysis.
-Append or update the <review> block in proposal.md in agentd/changes/{change_id}/ as needed.
+
+**IMPORTANT**: You MUST use the `append_review` MCP tool to add your review. Do NOT edit files directly.
+
+**DO NOT check format issues** - MCP tools guarantee correct structure.
+Focus ONLY on whether the previous content issues have been addressed.
+
+Review the updated proposal in agentd/changes/{change_id}/ and use the `append_review` MCP tool with your findings.
 "#,
         change_id = change_id
     )
@@ -692,7 +739,8 @@ mod tests {
         let prompt = gemini_proposal_prompt("test-change", "Add new feature");
         assert!(prompt.contains("test-change"));
         assert!(prompt.contains("Add new feature"));
-        assert!(prompt.contains("Create proposal files"));
+        assert!(prompt.contains("create_proposal"));
+        assert!(prompt.contains("MCP tool"));
     }
 
     #[test]
@@ -769,7 +817,8 @@ mod tests {
     fn test_gemini_reproposal_prompt_has_instructions() {
         let prompt = gemini_reproposal_prompt("test");
         assert!(prompt.contains("Instructions"));
-        assert!(prompt.contains("Continue refining"));
+        assert!(prompt.contains("MCP tools"));
+        assert!(prompt.contains("create_proposal"));
     }
 
     #[test]
@@ -794,7 +843,8 @@ mod tests {
         assert!(prompt.contains("## Change ID"));
         assert!(prompt.contains("new-feature"));
         assert!(prompt.contains("## Instructions"));
-        assert!(prompt.contains("CHALLENGE.md"));
+        assert!(prompt.contains("append_review"));
+        assert!(prompt.contains("MCP tool"));
     }
 
     #[test]

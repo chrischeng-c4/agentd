@@ -117,62 +117,82 @@ The skill determines the next action based on the `phase` field in `STATE.yaml`:
 | `rejected` | ⛔ Rejected, suggest reviewing CHALLENGE.md |
 | Other phases | ℹ️ Beyond planning phase |
 
-**Note**: The `agentd plan` command uses **Human-in-the-Loop (HITL)** mode by default:
-- Generates proposal → specs → tasks sequentially with fresh sessions
-- Runs challenge with Codex
-- **Stops and waits for human decision** (no auto-reproposal loop)
+## After `agentd plan` completes
 
-## Human-in-the-Loop Flow
+The proposal engine returns a result with:
+- `verdict`: APPROVED, NEEDS_REVISION, or REJECTED
+- `iteration_count`: Number of reproposal iterations completed
+- `has_only_minor_issues`: True if only LOW severity issues remain (or at most 1 MEDIUM)
 
-After `agentd plan` completes, check the challenge verdict and use **AskUserQuestion** to let user decide:
+Use **AskUserQuestion** based on the verdict and context:
 
-### If verdict is APPROVED:
-- ✅ Planning complete
-- Suggest: `/agentd:impl <change-id>`
-
-### If verdict is NEEDS_REVISION:
-Use AskUserQuestion with these options:
+### If verdict is APPROVED
 
 ```
 AskUserQuestion:
-  question: "The proposal needs revision. What would you like to do?"
+  question: "Proposal approved! What would you like to do?"
   header: "Next Action"
   options:
-    - label: "Auto-fix and rechallenge (Recommended)"
-      description: "Run agentd reproposal to fix issues, then rechallenge with Codex"
-    - label: "Review manually"
-      description: "Let me review the CHALLENGE.md and proposal files first"
-    - label: "Stop here"
-      description: "I'll handle this manually later"
+    - label: "Proceed to implementation (Recommended)"
+      description: "Run /agentd:impl to start implementing the change"
+    - label: "Open viewer"
+      description: "Review the approved plan in the UI viewer"
 ```
 
-**Then execute based on user choice:**
-- **Auto-fix**: Run `agentd reproposal <change-id>` → then `agentd challenge <change-id>` → repeat this flow
-- **Review manually**: Read CHALLENGE.md and show issues to user
-- **Stop**: Exit gracefully
+- **Proceed to implementation**: Suggest `/agentd:impl <change-id>`
+- **Open viewer**: Run `agentd view <change-id>`
 
-### If verdict is REJECTED:
-- ⛔ Fundamental issues detected
-- Read and display key issues from CHALLENGE.md
-- Suggest manual review and fixes
+### If verdict is NEEDS_REVISION
 
-## State transitions (Human-in-the-Loop)
+The options depend on context:
+
+#### When `iteration_count >= planning_iterations` OR `has_only_minor_issues`:
 
 ```
-No STATE.yaml → [Clarify] → proposed → [Challenge] → APPROVED → challenged ✅
-                          ↓                       ↓
-                          ↓                    NEEDS_REVISION
-                          ↓                       ↓
-                          ↓              [AskUserQuestion] ← YOU ARE HERE
-                          ↓                       ↓
-                          ↓            User chooses: Auto-fix / Review / Stop
-                          ↓                       ↓
-                          ↓              [reproposal] → [rechallenge] → loop
-                          ↓
-                          → REJECTED → rejected ⛔
+AskUserQuestion:
+  question: "Reproposal complete. Minor issues remain - can proceed to implementation."
+  header: "Next Action"
+  options:
+    - label: "Proceed to implementation (Recommended)"
+      description: "Minor issues can be addressed during implementation"
+    - label: "Open viewer"
+      description: "Review the remaining issues before deciding"
+    - label: "Continue fixing"
+      description: "Run another reproposal cycle to address issues"
 ```
 
-## Next steps
+- **Proceed to implementation**: Suggest `/agentd:impl <change-id>`
+- **Open viewer**: Run `agentd view <change-id>`
+- **Continue fixing**: Run `agentd reproposal <change-id>` then `agentd challenge <change-id>`
 
-- **If challenged**: Run `/agentd:impl <change-id>` to implement
-- **If rejected**: Review `CHALLENGE.md` and fix fundamental issues manually
+#### When significant issues remain (not minor):
+
+```
+AskUserQuestion:
+  question: "Issues found. How would you like to proceed?"
+  header: "Next Action"
+  options:
+    - label: "Open viewer (Recommended)"
+      description: "Review the issues before deciding"
+    - label: "Continue fixing"
+      description: "Run another reproposal cycle"
+    - label: "Proceed anyway"
+      description: "Skip to implementation despite issues"
+```
+
+- **Open viewer**: Run `agentd view <change-id>`
+- **Continue fixing**: Run `agentd reproposal <change-id>` then `agentd challenge <change-id>`
+- **Proceed anyway**: Suggest `/agentd:impl <change-id>`
+
+### If verdict is REJECTED
+
+Display rejection message and suggest reviewing the review block in proposal.md:
+
+```
+The proposal was rejected due to fundamental issues.
+Please review: agentd/changes/<change-id>/proposal.md
+
+Consider:
+- Revising the description and requirements
+- Starting a new proposal with a different approach
+```

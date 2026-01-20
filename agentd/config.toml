@@ -3,15 +3,11 @@ scripts_dir = "agentd/scripts"
 
 [workflow]
 format_iterations = 2
-planning_iterations = 2
+planning_iterations = 3
 implementation_iterations = 2
 archive_iterations = 1
 script_retries = 3
 retry_delay_secs = 5
-# Human-in-the-Loop mode: Sequential generation with manual iteration control
-# - true (default): Stop after challenge, let user decide next action via Claude Code
-# - false: Fully automated mode with auto-reproposal loop on NEEDS_REVISION
-human_in_loop = true
 
 [gemini]
 command = "gemini"

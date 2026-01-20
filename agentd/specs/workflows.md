@@ -6,6 +6,14 @@ This specification defines the behavior of the consolidated high-level Agentd wo
 
 **Key Design Principle**: Workflow commands only check `phase`. The `challenge` command is responsible for updating `phase` based on verdict.
 
+## Terminology
+
+| Term | Definition | Examples |
+|------|------------|----------|
+| **workflow** | High-level orchestration | `plan`, `impl`, `archive` |
+| **command** | CLI commands called by workflows | `proposal`, `challenge`, `reproposal`, `implement`, `review` |
+| **phase** | State in STATE.yaml | `proposed`, `challenged`, `implementing`, `complete` |
+
 ## Requirements
 
 ### R1: Phase-Only State Machine
@@ -31,13 +39,26 @@ The `agentd challenge` command MUST update `STATE.yaml` phase based on verdict:
 | `NEEDS_REVISION` | `proposed` | Stays in proposed, triggers reproposal |
 | `REJECTED` | `rejected` | Fundamental issues, manual intervention needed |
 
+**Note**: Review content is stored as a review block in `proposal.md` (not separate CHALLENGE.md).
+
 ### R3: Plan Workflow Orchestration
 
-The `plan` workflow MUST:
+The `plan` workflow MUST orchestrate these commands in sequence:
+
+1. **`proposal` command**: Sequential MCP generation (proposal.md → specs → tasks.md)
+2. **`challenge` command**: Codex reviews and appends verdict to proposal.md
+3. **`reproposal` command**: If NEEDS_REVISION, resume Gemini session to fix issues
+4. Loop steps 2-3 up to `planning_iterations` times (default: 3)
+5. Return result to Skill for user interaction via `AskUserQuestion`
+
+**After Workflow Completion**: The Skill uses `AskUserQuestion` to let user choose:
+- Open viewer (for manual review)
+- Proceed to implementation (`/agentd:impl`)
+- Continue fixing (for additional reproposal cycles)
+
+**Phase-Based Entry Points**:
 - If no STATE.yaml exists → run `agentd proposal` (requires description)
-  - Note: `agentd proposal` internally handles challenge + auto-reproposal loop
-  - Final phase is set by the challenge verdict (challenged/rejected)
-- If `phase: proposed` → run `agentd proposal` to continue the planning cycle
+- If `phase: proposed` → run `agentd challenge` to continue the planning cycle
 - If `phase: challenged` → inform user planning is complete, suggest `/agentd:impl`
 - If `phase: rejected` → inform user of rejection, suggest manual review
 - If `phase: implementing/complete/archived` → inform user change is beyond planning
@@ -63,7 +84,7 @@ The `archive` workflow MUST:
 stateDiagram-v2
     [*] --> proposed: agentd proposal
     proposed --> challenged: challenge APPROVED
-    proposed --> proposed: challenge NEEDS_REVISION (auto-reproposal)
+    proposed --> proposed: challenge NEEDS_REVISION → reproposal
     proposed --> rejected: challenge REJECTED
     rejected --> proposed: manual edit + re-challenge
     challenged --> implementing: agentd implement
@@ -77,17 +98,23 @@ stateDiagram-v2
 ```mermaid
 graph TD
     Start[agentd:plan] --> CheckState{STATE.yaml?}
-    CheckState -- No --> Proposal[agentd proposal<br/>includes challenge + reproposal]
+    CheckState -- No --> Proposal[agentd proposal<br/>sequential MCP generation]
     CheckState -- Yes --> Phase{phase?}
 
-    Phase -- proposed --> Proposal
+    Phase -- proposed --> Challenge[agentd challenge]
     Phase -- challenged --> Done[✅ Planning complete<br/>Run /agentd:impl]
-    Phase -- rejected --> Rejected[⛔ Rejected<br/>Review CHALLENGE.md]
+    Phase -- rejected --> Rejected[⛔ Rejected<br/>Review proposal.md]
     Phase -- other --> Beyond[ℹ️ Beyond planning phase]
 
-    Proposal --> FinalPhase{Final phase?}
-    FinalPhase -- challenged --> Done
-    FinalPhase -- rejected --> Rejected
+    Proposal --> Challenge
+    Challenge --> Verdict{verdict?}
+    Verdict -- APPROVED --> AskUser[AskUserQuestion:<br/>Implement / View]
+    Verdict -- NEEDS_REVISION --> CheckIter{iterations<br/>< max?}
+    Verdict -- REJECTED --> Rejected
+    CheckIter -- Yes --> Reproposal[agentd reproposal]
+    CheckIter -- No --> AskUserMinor[AskUserQuestion:<br/>Implement / View / Continue]
+    Reproposal --> Challenge
+    AskUser --> Done
 ```
 
 ### Implementation Workflow Logic
@@ -142,13 +169,18 @@ FUNCTION archive_workflow(change_id: String) -> Result<WorkflowAction, Error>
 
 ### Scenario: Initial Planning
 - **WHEN** `agentd:plan` is called for a new change-id with description
-- **THEN** runs `agentd proposal` (which includes challenge + auto-reproposal)
-- **THEN** final phase reflects challenge verdict: `challenged` (APPROVED) or `rejected` (REJECTED)
+- **THEN** runs `agentd proposal` (sequential MCP: proposal.md → specs → tasks.md)
+- **THEN** runs `agentd challenge` to get verdict
+- **THEN** if NEEDS_REVISION, runs `agentd reproposal` and loops back to challenge (up to `planning_iterations`)
+- **THEN** uses `AskUserQuestion` to let user choose next action
 
-### Scenario: Continue Planning
-- **WHEN** `agentd:plan` is called with `phase: proposed`
-- **THEN** runs `agentd proposal` to continue the planning cycle
-- **THEN** final phase reflects challenge verdict
+### Scenario: Planning with Reproposal Loop
+- **WHEN** challenge verdict is NEEDS_REVISION
+- **THEN** auto-runs `agentd reproposal` followed by `agentd challenge`
+- **THEN** continues loop until APPROVED, REJECTED, or `planning_iterations` reached
+- **THEN** uses `AskUserQuestion` with context-aware options:
+  - If APPROVED or only minor issues remain: recommend implementation
+  - If significant issues remain: recommend reviewing in viewer
 
 ### Scenario: Planning Complete
 - **WHEN** `agentd:plan` is called with `phase: challenged`
@@ -156,7 +188,7 @@ FUNCTION archive_workflow(change_id: String) -> Result<WorkflowAction, Error>
 
 ### Scenario: Rejected Proposal
 - **WHEN** `agentd:plan` is called with `phase: rejected`
-- **THEN** informs user of rejection and suggests reviewing CHALLENGE.md
+- **THEN** informs user of rejection and suggests reviewing review block in proposal.md
 
 ### Scenario: Start Implementation
 - **WHEN** `agentd:impl` is called with `phase: challenged`

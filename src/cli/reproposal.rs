@@ -45,13 +45,24 @@ pub async fn run(change_id: &str) -> Result<()> {
     let project_root = env::current_dir()?;
     let config = AgentdConfig::load(&project_root)?;
 
-    // Check if change and challenge exist
+    // Check if change and review exist
     let change = Change::new(change_id, "");
-    let challenge_path = change.challenge_path(&project_root);
+    let proposal_path = change.proposal_path(&project_root);
 
-    if !challenge_path.exists() {
+    if !proposal_path.exists() {
         anyhow::bail!(
-            "No challenge found for '{}'. Run 'agentd challenge {}' first.",
+            "No proposal found for '{}'. Run 'agentd proposal {}' first.",
+            change_id,
+            change_id
+        );
+    }
+
+    // Check for review block in proposal.md
+    let proposal_content = std::fs::read_to_string(&proposal_path)?;
+    let latest_review = crate::parser::parse_latest_review(&proposal_content)?;
+    if latest_review.is_none() {
+        anyhow::bail!(
+            "No review found for '{}'. Run 'agentd challenge {}' first.",
             change_id,
             change_id
         );

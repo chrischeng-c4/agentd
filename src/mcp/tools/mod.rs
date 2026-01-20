@@ -35,6 +35,7 @@ impl ToolRegistry {
             tools: vec![
                 clarifications::definition(),
                 proposal::definition(),
+                proposal::append_review_definition(),
                 spec::definition(),
                 tasks::definition(),
                 validate::definition(),
@@ -71,6 +72,7 @@ impl ToolRegistry {
         match name {
             "create_clarifications" => clarifications::execute(arguments, project_root),
             "create_proposal" => proposal::execute(arguments, project_root),
+            "append_review" => proposal::execute_append_review(arguments, project_root),
             "create_spec" => spec::execute(arguments, project_root),
             "create_tasks" => tasks::execute(arguments, project_root),
             "validate_change" => validate::execute(arguments, project_root).await,

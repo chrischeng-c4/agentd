@@ -24,6 +24,8 @@ pub struct ProposalEngineResult {
     pub resolved_change_id: String,
     pub verdict: ChallengeVerdict,
     pub iteration_count: usize,
+    /// True if only LOW severity issues remain (or at most 1 MEDIUM)
+    pub has_only_minor_issues: bool,
 }
 
 /// Main proposal engine loop that orchestrates the full workflow
@@ -36,156 +38,100 @@ pub async fn run_proposal_loop(config: ProposalEngineConfig) -> Result<ProposalE
         config: agentd_config,
     } = config;
 
-    // Check if Human-in-the-Loop mode is enabled
-    if agentd_config.workflow.human_in_loop {
-        println!("{}", "🎯 Human-in-the-Loop mode (proposal → specs → tasks with manual iteration)".cyan());
+    println!("{}", "🎯 Sequential MCP Generation (proposal → specs → tasks)".cyan());
 
-        // Step 1: Generate proposal, specs, and tasks sequentially
-        let resolved_change_id = run_proposal_step_sequential(&change_id, &description, &project_root, &agentd_config).await?;
+    // Step 1: Generate proposal, specs, and tasks sequentially
+    let resolved_change_id = run_proposal_step_sequential(&change_id, &description, &project_root, &agentd_config).await?;
 
-        // Step 2: Validate proposal format
-        let format_valid = run_validate_proposal_step(&resolved_change_id, &project_root)?;
-        if !format_valid {
-            println!("{}", "⚠️  Format validation failed after sequential generation".yellow());
-            println!("   Please manually review and fix: agentd/changes/{}/proposal.md", resolved_change_id);
-            std::process::exit(1);
-        }
-
-        // Step 3: Challenge with Codex
-        let verdict = run_challenge_step(&resolved_change_id, &project_root, &agentd_config).await?;
-
-        // Step 4: Validate challenge format
-        let _challenge_valid = run_validate_challenge_step(&resolved_change_id, &project_root)?;
-
-        // For HITL mode, we stop after first challenge (no auto-reproposal loop)
-        // Skill will use AskUserQuestion to let user decide next action
+    // Step 2: Validate proposal format
+    let format_valid = run_validate_proposal_step(&resolved_change_id, &project_root)?;
+    if !format_valid {
+        println!("{}", "⚠️  Format validation failed after sequential generation".yellow());
+        println!("   Please manually review and fix: agentd/changes/{}/proposal.md", resolved_change_id);
+        let proposal_path = project_root.join("agentd/changes").join(&resolved_change_id).join("proposal.md");
         return Ok(ProposalEngineResult {
             resolved_change_id,
-            verdict,
+            verdict: ChallengeVerdict::NeedsRevision,
             iteration_count: 0,
+            has_only_minor_issues: check_only_minor_issues(&proposal_path).unwrap_or(false),
         });
     }
 
-    println!("{}", "🤖 Fully automated mode (auto-reproposal on NEEDS_REVISION)".cyan());
+    // Step 3: Challenge with Codex
+    let mut verdict = run_challenge_step(&resolved_change_id, &project_root, &agentd_config).await?;
 
-    // Step 1: Generate proposal (resolves change-id conflicts)
-    let resolved_change_id = run_proposal_step(&change_id, &description, &project_root, &agentd_config).await?;
-
-    // Step 2: Validate proposal format (local, saves Codex tokens)
-    // Loop with Gemini reproposal until format is valid
-    let mut format_valid = run_validate_proposal_step(&resolved_change_id, &project_root)?;
-    let mut format_iteration = 0;
-    let max_format_iterations = agentd_config.workflow.format_iterations;
-
-    while !format_valid && format_iteration < max_format_iterations {
-        format_iteration += 1;
-        println!();
-        println!(
-            "{}",
-            format!("🔧 Format issues detected - Auto-fixing with Gemini (iteration {})...", format_iteration).yellow()
-        );
-
-        // Reproposal with Gemini to fix format
-        run_reproposal_step(&resolved_change_id, &project_root, &agentd_config).await?;
-
-        // Re-validate
-        println!();
-        println!("{}", format!("📋 Re-validating format (iteration {})...", format_iteration).cyan());
-        format_valid = run_validate_proposal_step(&resolved_change_id, &project_root)?;
-    }
-
-    if !format_valid {
-        println!();
-        println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-        println!(
-            "{}",
-            format!("⚠️  Format validation still failing after {} iterations", max_format_iterations).yellow().bold()
-        );
-        println!("   Fix manually and re-run: agentd challenge {}", resolved_change_id);
-        std::process::exit(1);
-    }
-
-    // Step 3: First challenge (use resolved ID)
-    let verdict = run_challenge_step(&resolved_change_id, &project_root, &agentd_config).await?;
-
-    // Step 4: Validate challenge format (local)
+    // Step 4: Validate challenge format
     let _challenge_valid = run_validate_challenge_step(&resolved_change_id, &project_root)?;
 
-    // Planning iteration loop
+    // Step 5: Reproposal loop (up to planning_iterations times)
     let max_iterations = agentd_config.workflow.planning_iterations;
-    let mut current_verdict = verdict;
     let mut iteration: usize = 0;
 
-    loop {
-        match current_verdict {
-            ChallengeVerdict::Approved => {
-                println!();
-                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-                if iteration == 0 {
-                    println!("{}", "✨ Proposal completed and approved!".green().bold());
-                } else {
-                    println!("{}", format!("✨ Fixed and approved (iteration {})!", iteration).green().bold());
-                }
-                println!("   Location: agentd/changes/{}", resolved_change_id);
-                println!();
+    while verdict == ChallengeVerdict::NeedsRevision && iteration < max_iterations as usize {
+        iteration += 1;
+        println!();
+        println!(
+            "{}",
+            format!("🔄 NEEDS_REVISION - Auto-fixing with reproposal (iteration {}/{})...", iteration, max_iterations).yellow()
+        );
 
-                // Auto-open viewer (if ui feature is enabled)
-                open_viewer_if_available(&resolved_change_id, &project_root);
+        // Reproposal with Gemini
+        run_reproposal_step(&resolved_change_id, &project_root, &agentd_config).await?;
 
-                println!("{}", "⏭️  Next steps:".yellow());
-                println!("   agentd implement {}", resolved_change_id);
+        // Re-challenge with Codex
+        verdict = run_rechallenge_step(&resolved_change_id, &project_root, &agentd_config).await?;
+    }
 
-                return Ok(ProposalEngineResult {
-                    resolved_change_id,
-                    verdict: ChallengeVerdict::Approved,
-                    iteration_count: iteration,
-                });
+    // Get proposal path for issue severity check
+    let proposal_path = project_root.join("agentd/changes").join(&resolved_change_id).join("proposal.md");
+    let has_only_minor_issues = check_only_minor_issues(&proposal_path).unwrap_or(false);
+
+    // Display final result
+    println!();
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+
+    match &verdict {
+        ChallengeVerdict::Approved => {
+            if iteration == 0 {
+                println!("{}", "✨ Proposal approved!".green().bold());
+            } else {
+                println!("{}", format!("✨ Fixed and approved (after {} iterations)!", iteration).green().bold());
             }
-            ChallengeVerdict::NeedsRevision => {
-                iteration += 1;
-                if iteration > max_iterations as usize {
-                    println!();
-                    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-                    println!(
-                        "{}",
-                        format!("⚠️  Automatic refinement limit reached ({} iterations)", max_iterations).yellow().bold()
-                    );
-                    println!();
-                    display_remaining_issues(&resolved_change_id, &project_root)?;
-                    std::process::exit(1);
-                }
-
-                println!();
+            println!("   Location: agentd/changes/{}", resolved_change_id);
+        }
+        ChallengeVerdict::NeedsRevision => {
+            if iteration >= max_iterations as usize {
                 println!(
                     "{}",
-                    format!("⚠️  NEEDS_REVISION - Auto-fixing (iteration {})...", iteration).yellow()
+                    format!("⚠️  Reached iteration limit ({} iterations)", max_iterations).yellow().bold()
                 );
-
-                // Reproposal with Gemini
-                run_reproposal_step(&resolved_change_id, &project_root, &agentd_config).await?;
-
-                // Re-challenge with Codex
-                current_verdict = run_rechallenge_step(&resolved_change_id, &project_root, &agentd_config).await?;
+            } else {
+                println!("{}", "⚠️  NEEDS_REVISION".yellow().bold());
             }
-            ChallengeVerdict::Rejected => {
-                println!();
-                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
-                println!("{}", "❌ Proposal rejected".red().bold());
-                println!();
-                display_remaining_issues(&resolved_change_id, &project_root)?;
-                std::process::exit(1);
+            if has_only_minor_issues {
+                println!("   Only minor issues remain - can proceed to implementation.");
+            } else {
+                println!("   Review the remaining issues in proposal.md");
             }
-            ChallengeVerdict::Unknown => {
-                println!();
-                println!(
-                    "{}",
-                    "⚠️  Could not parse challenge verdict".yellow()
-                );
-                println!("   Please review: agentd/changes/{}/CHALLENGE.md", resolved_change_id);
-                std::process::exit(1);
-            }
+            println!("   Location: agentd/changes/{}", resolved_change_id);
+        }
+        ChallengeVerdict::Rejected => {
+            println!("{}", "❌ Proposal rejected".red().bold());
+            display_remaining_issues(&resolved_change_id, &project_root)?;
+        }
+        ChallengeVerdict::Unknown => {
+            println!("{}", "❓ Could not parse challenge verdict".yellow());
+            println!("   Please review: agentd/changes/{}/proposal.md", resolved_change_id);
         }
     }
+
+    // Return result - Skill will use AskUserQuestion for next action
+    Ok(ProposalEngineResult {
+        resolved_change_id,
+        verdict,
+        iteration_count: iteration,
+        has_only_minor_issues,
+    })
 }
 
 /// Record LLM usage to StateManager
@@ -230,170 +176,6 @@ fn record_usage(
     }
 }
 
-/// Step 1: Generate proposal with Gemini
-/// Returns the resolved change-id (which may differ from input if conflict occurred)
-async fn run_proposal_step(
-    change_id: &str,
-    description: &str,
-    project_root: &PathBuf,
-    config: &AgentdConfig,
-) -> Result<String> {
-    println!("{}", "🤖 [1/6] Generating proposal with Gemini...".cyan());
-
-    // Create change directory
-    let changes_dir = project_root.join("agentd/changes");
-    std::fs::create_dir_all(&changes_dir)?;
-
-    // Resolve change-id conflicts before calling LLMs
-    let resolved_change_id = crate::context::resolve_change_id_conflict(change_id, &changes_dir)?;
-    let change_dir = changes_dir.join(&resolved_change_id);
-
-    std::fs::create_dir_all(&change_dir)?;
-
-    // Generate GEMINI.md context
-    crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
-
-    // Create proposal skeleton
-    crate::context::create_proposal_skeleton(&change_dir, &resolved_change_id)?;
-
-    // Run Gemini orchestrator with retry
-    let orchestrator = GeminiOrchestrator::new(config, project_root);
-    let max_retries = config.workflow.script_retries;
-    let retry_delay = std::time::Duration::from_secs(config.workflow.retry_delay_secs);
-
-    let mut last_error = None;
-    let mut session_id: Option<String> = None;
-
-    for attempt in 0..=max_retries {
-        if attempt > 0 {
-            println!(
-                "{}",
-                format!("🔄 Retrying Gemini proposal (attempt {}/{})", attempt + 1, max_retries + 1).yellow()
-            );
-            tokio::time::sleep(retry_delay).await;
-        }
-
-        // Assess complexity dynamically based on change structure
-        let change = Change::new(&resolved_change_id, description);
-        let complexity = change.assess_complexity(project_root);
-
-        match orchestrator.run_proposal(&resolved_change_id, description, complexity).await {
-            Ok((_output, usage)) => {
-                // Save session_id for later use in resume-by-index
-                session_id = usage.session_id.clone();
-
-                let model = config.gemini.select_model(complexity).model.clone();
-                record_usage(&resolved_change_id, project_root, "proposal", &model, &usage, config, complexity);
-                last_error = None;
-                break;
-            }
-            Err(e) => {
-                let err_msg = e.to_string();
-                if err_msg.contains("exit code") || err_msg.contains("connection") || err_msg.contains("timeout") {
-                    println!(
-                        "{}",
-                        format!("⚠️  Gemini proposal failed: {}", err_msg).yellow()
-                    );
-                    last_error = Some(e);
-                } else {
-                    return Err(e);
-                }
-            }
-        }
-    }
-
-    if let Some(e) = last_error {
-        return Err(e);
-    }
-
-    // Save session_id to STATE.yaml for resume-by-index
-    // R2 requires session_id capture - exit with error if not available
-    match &session_id {
-        Some(sid) => {
-            let state_path = project_root
-                .join("agentd/changes")
-                .join(&resolved_change_id)
-                .join("STATE.yaml");
-
-            if let Ok(mut manager) = StateManager::load(&state_path) {
-                manager.set_session_id(sid.clone());
-                let _ = manager.save();
-            }
-        }
-        None => {
-            println!("{}", "❌ Failed to capture session ID".red().bold());
-            std::process::exit(1);
-        }
-    }
-
-    // Run self-review loop - session_id is guaranteed to exist at this point
-    let sid = session_id.as_ref().unwrap();
-    println!();
-    println!("{}", "🔍 Running self-review...".cyan());
-
-    // Look up session index by UUID - R2 requires exit on failure
-    let session_index = match find_session_index(sid, project_root).await {
-        Ok(index) => index,
-        Err(e) => {
-            println!("{}", format!("❌ Session not found, please re-run proposal: {}", e).red().bold());
-            std::process::exit(1);
-        }
-    };
-
-    let change = Change::new(&resolved_change_id, description);
-    let complexity = change.assess_complexity(project_root);
-
-    // Self-review loop (max 3 iterations to prevent infinite loops)
-    let max_self_review_iterations = 3;
-    for iteration in 0..max_self_review_iterations {
-        match orchestrator.run_self_review(&resolved_change_id, session_index, complexity).await {
-            Ok((output, usage)) => {
-                let model = config.gemini.select_model(complexity).model.clone();
-                record_usage(&resolved_change_id, project_root, "self-review", &model, &usage, config, complexity);
-
-                let result = detect_self_review_marker(&output);
-                match result {
-                    SelfReviewResult::Pass => {
-                        println!("{}", "Self-review: PASS (no changes)".green());
-                        break;
-                    }
-                    SelfReviewResult::NeedsRevision => {
-                        println!("{}", "Self-review: NEEDS_REVISION (files updated)".yellow());
-                        if iteration >= max_self_review_iterations - 1 {
-                            println!("{}", "⚠️  Self-review still finding issues after max iterations".yellow());
-                        }
-                        // Continue to next iteration - Gemini already made the fixes
-                    }
-                }
-            }
-            Err(e) => {
-                println!("{}", format!("⚠️  Self-review failed: {}", e).yellow());
-                break;
-            }
-        }
-    }
-
-    // Create Change object
-    let mut change = Change::new(&resolved_change_id, description);
-    change.update_phase(ChangePhase::Proposed);
-
-    // Validate structure
-    match change.validate_structure(project_root) {
-        Ok(_) => {
-            println!(
-                "{}",
-                "✅ Proposal generated (proposal.md, tasks.md, specs/)".green()
-            );
-            Ok(resolved_change_id)
-        }
-        Err(e) => {
-            println!("{}", "⚠️  Warning: Proposal structure incomplete".yellow());
-            println!("   {}", e);
-            Ok(resolved_change_id)
-        }
-    }
-}
-
 /// Step 2: Validate proposal format (local validation, no AI)
 fn run_validate_proposal_step(
     change_id: &str,
@@ -435,9 +217,6 @@ async fn run_challenge_step(
 
     // Generate AGENTS.md context
     crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
-
-    // Create CHALLENGE.md skeleton
-    crate::context::create_challenge_skeleton(&change_dir, change_id)?;
 
     // Assess complexity dynamically based on change structure
     let change = Change::new(change_id, "");
@@ -486,18 +265,20 @@ async fn run_challenge_step(
         return Err(e);
     }
 
-    // Parse verdict
-    let challenge_path = change.challenge_path(project_root);
-    if !challenge_path.exists() {
-        println!("{}", "⚠️  CHALLENGE.md not created".yellow());
+    // Parse verdict from proposal.md review block
+    let proposal_path = change.proposal_path(project_root);
+    let verdict = parse_challenge_verdict(&proposal_path)?;
+
+    if verdict == ChallengeVerdict::Unknown {
+        println!("{}", "⚠️  No review block found in proposal.md".yellow());
         return Ok(ChallengeVerdict::Unknown);
     }
 
-    let verdict = parse_challenge_verdict(&challenge_path)?;
-
-    // Display summary
-    let content = std::fs::read_to_string(&challenge_path)?;
-    display_challenge_summary(&content, &verdict);
+    // Display summary from review block
+    let content = std::fs::read_to_string(&proposal_path)?;
+    if let Ok(Some(review)) = crate::parser::parse_latest_review(&content) {
+        display_challenge_summary(&review.content, &verdict);
+    }
 
     Ok(verdict)
 }
@@ -546,27 +327,26 @@ async fn run_rechallenge_step(
     // Regenerate AGENTS.md context
     crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
 
-    // Recreate CHALLENGE.md skeleton for re-challenge
-    crate::context::create_challenge_skeleton(&change_dir, change_id)?;
-
     // Run Codex rechallenge orchestrator (resumes session)
     let orchestrator = CodexOrchestrator::new(config, project_root);
     let (_output, usage) = orchestrator.run_rechallenge(change_id, complexity).await?;
     let model = config.codex.select_model(complexity).model.clone();
     record_usage(change_id, project_root, "rechallenge", &model, &usage, config, complexity);
 
-    // Parse verdict
-    let challenge_path = change.challenge_path(project_root);
-    if !challenge_path.exists() {
-        println!("{}", "⚠️  CHALLENGE.md not created".yellow());
+    // Parse verdict from proposal.md review block
+    let proposal_path = change.proposal_path(project_root);
+    let verdict = parse_challenge_verdict(&proposal_path)?;
+
+    if verdict == ChallengeVerdict::Unknown {
+        println!("{}", "⚠️  No review block found in proposal.md".yellow());
         return Ok(ChallengeVerdict::Unknown);
     }
 
-    let verdict = parse_challenge_verdict(&challenge_path)?;
-
-    // Display summary
-    let content = std::fs::read_to_string(&challenge_path)?;
-    display_challenge_summary(&content, &verdict);
+    // Display summary from review block
+    let content = std::fs::read_to_string(&proposal_path)?;
+    if let Ok(Some(review)) = crate::parser::parse_latest_review(&content) {
+        display_challenge_summary(&review.content, &verdict);
+    }
 
     Ok(verdict)
 }
@@ -712,26 +492,34 @@ fn display_challenge_summary(content: &str, verdict: &ChallengeVerdict) {
 
 /// Display remaining issues after auto-fix failed
 fn display_remaining_issues(change_id: &str, project_root: &PathBuf) -> Result<()> {
-    let challenge_path = project_root
+    let proposal_path = project_root
         .join("agentd/changes")
         .join(change_id)
-        .join("CHALLENGE.md");
+        .join("proposal.md");
 
-    if !challenge_path.exists() {
+    if !proposal_path.exists() {
         return Ok(());
     }
 
-    let content = std::fs::read_to_string(&challenge_path)?;
-    let high_count = content.matches("**Severity**: High").count();
+    let content = std::fs::read_to_string(&proposal_path)?;
+
+    // Try to extract review content
+    let review_content = if let Ok(Some(review)) = crate::parser::parse_latest_review(&content) {
+        review.content
+    } else {
+        return Ok(());
+    };
+
+    let high_count = review_content.matches("**Severity**: High").count();
 
     println!("   The following issues could not be auto-fixed:");
     println!();
 
     // Try to extract first HIGH severity issue as example
     if high_count > 0 {
-        if let Some(issue_start) = content.find("**Severity**: High") {
-            let section = &content[issue_start.saturating_sub(200)
-                ..issue_start.saturating_add(300).min(content.len())];
+        if let Some(issue_start) = review_content.find("**Severity**: High") {
+            let section = &review_content[issue_start.saturating_sub(200)
+                ..issue_start.saturating_add(300).min(review_content.len())];
 
             println!("   {}", "HIGH Severity (example):".red().bold());
 
@@ -748,7 +536,6 @@ fn display_remaining_issues(change_id: &str, project_root: &PathBuf) -> Result<(
 
     println!("   Please manually review and edit:");
     println!("     agentd/changes/{}/proposal.md", change_id);
-    println!("     agentd/changes/{}/CHALLENGE.md (full report)", change_id);
     println!();
     println!("   Then run:");
     println!("     agentd challenge {}", change_id);
@@ -757,8 +544,32 @@ fn display_remaining_issues(change_id: &str, project_root: &PathBuf) -> Result<(
     Ok(())
 }
 
+/// Check if only minor issues remain in the proposal
+/// Returns true if no HIGH severity issues and at most 1 MEDIUM severity issue
+fn check_only_minor_issues(proposal_path: &std::path::Path) -> Result<bool> {
+    if !proposal_path.exists() {
+        return Ok(true); // No proposal means no issues
+    }
+
+    let content = std::fs::read_to_string(proposal_path)?;
+
+    // Try to extract review content
+    let review_content = if let Ok(Some(review)) = crate::parser::parse_latest_review(&content) {
+        review.content
+    } else {
+        return Ok(true); // No review means no issues
+    };
+
+    let high_count = review_content.matches("**Severity**: High").count();
+    let medium_count = review_content.matches("**Severity**: Medium").count();
+
+    // Only minor if no HIGH and at most 1 MEDIUM
+    Ok(high_count == 0 && medium_count <= 1)
+}
+
 /// Open the plan viewer if the ui feature is enabled
 /// Spawns a detached process so the CLI can exit independently
+#[allow(dead_code)]
 #[cfg(feature = "ui")]
 fn open_viewer_if_available(change_id: &str, _project_root: &PathBuf) {
     println!("{}", "🖼️  Opening plan viewer...".cyan());
@@ -774,6 +585,7 @@ fn open_viewer_if_available(change_id: &str, _project_root: &PathBuf) {
     println!();
 }
 
+#[allow(dead_code)]
 #[cfg(not(feature = "ui"))]
 fn open_viewer_if_available(change_id: &str, project_root: &PathBuf) {
     let change_path = project_root.join("agentd/changes").join(change_id);
@@ -826,9 +638,9 @@ pub async fn run_proposal_step_sequential(
 
     println!("{}", "✅ proposal.md generated".green());
 
-    // Self-review loop for proposal (max 3 iterations, each with fresh session)
+    // Self-review loop for proposal (max 1 iteration - Codex challenge catches remaining issues)
     println!("{}", "🔍 Self-reviewing proposal.md...".cyan());
-    let max_review_iterations = 3;
+    let max_review_iterations = 1;
 
     for iteration in 0..max_review_iterations {
         let review_prompt = prompts::proposal_self_review_with_mcp_prompt(&resolved_change_id);
