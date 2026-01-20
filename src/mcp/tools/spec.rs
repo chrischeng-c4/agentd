@@ -3,6 +3,7 @@
 //! Creates a validated spec file with requirements and acceptance criteria.
 
 use super::{get_optional_string, get_required_array, get_required_string, ToolDefinition};
+use crate::models::spec_rules::SpecFormatRules;
 use crate::Result;
 use chrono::Utc;
 use serde_json::{json, Value};
@@ -233,8 +234,18 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
         content.push_str(&format!("{}\n\n", req_desc));
     }
 
-    // Scenarios section
-    content.push_str("## Scenarios\n\n");
+    // Acceptance Criteria section - use central format rules
+    let spec_rules = SpecFormatRules::spec_defaults();
+
+    // Find the "Acceptance Criteria" heading from required_headings
+    let ac_heading = spec_rules
+        .required_headings
+        .iter()
+        .find(|h| h.contains("Acceptance") || h.contains("Criteria"))
+        .map(|s| s.as_str())
+        .unwrap_or("Acceptance Criteria");
+
+    content.push_str(&format!("## {}\n\n", ac_heading));
 
     for scenario in &scenarios {
         let name = scenario
@@ -251,13 +262,16 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        content.push_str(&format!("### {}\n\n", name));
+        // Use scenario heading format from rules: ### {prefix} {name}
+        let heading_hashes = "#".repeat(spec_rules.scenario_heading_level as usize);
+        content.push_str(&format!("{} {} {}\n\n", heading_hashes, spec_rules.scenario_heading_prefix, name));
 
+        // Use WHEN/THEN keywords from rules
         if let Some(given_text) = given {
-            content.push_str(&format!("**GIVEN** {}\n\n", given_text));
+            content.push_str(&format!("- **GIVEN** {}\n", given_text));
         }
-        content.push_str(&format!("**WHEN** {}\n\n", when));
-        content.push_str(&format!("**THEN** {}\n\n", then));
+        content.push_str(&format!("- **{}** {}\n", spec_rules.when_keyword, when));
+        content.push_str(&format!("- **{}** {}\n\n", spec_rules.then_keyword, then));
     }
 
     // Flow diagram (optional)
@@ -353,7 +367,8 @@ mod tests {
         let content = std::fs::read_to_string(&spec_path).unwrap();
         assert!(content.contains("id: mcp-protocol"));
         assert!(content.contains("## Requirements"));
-        assert!(content.contains("## Scenarios"));
+        assert!(content.contains("## Acceptance Criteria"));
+        assert!(content.contains("### Scenario:"));
         assert!(content.contains("**WHEN**"));
         assert!(content.contains("**THEN**"));
         assert!(content.contains("```mermaid"));

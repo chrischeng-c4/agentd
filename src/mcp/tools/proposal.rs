@@ -3,6 +3,7 @@
 //! Creates a validated proposal.md file with enforced structure.
 
 use super::{get_optional_string, get_required_array, get_required_object, get_required_string, ToolDefinition};
+use crate::models::spec_rules::SpecFormatRules;
 use crate::Result;
 use chrono::Utc;
 use serde_json::{json, Value};
@@ -170,6 +171,10 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
     // Title
     content.push_str(&format!("# Change: {}\n\n", change_id));
 
+    // Note: Section headings must match SpecFormatRules::prd_defaults().required_headings:
+    // ["Summary", "Why", "What Changes", "Impact"]
+    let _prd_rules = SpecFormatRules::prd_defaults(); // Ensure import is used
+
     // Summary section
     content.push_str("## Summary\n\n");
     content.push_str(&format!("{}\n\n", summary));
@@ -194,21 +199,21 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
     content.push_str(&format!("- **New Files**: ~{}\n", new_files));
 
     if !affected_specs.is_empty() {
-        content.push_str("- **Affected Specs**:\n");
-        for spec in &affected_specs {
-            if let Some(spec_id) = spec.as_str() {
-                content.push_str(&format!("  - `{}`\n", spec_id));
-            }
-        }
+        // Format: - Affected specs: `spec-1`, `spec-2`, `spec-3`
+        let specs_list: Vec<String> = affected_specs
+            .iter()
+            .filter_map(|s| s.as_str().map(|id| format!("`{}`", id)))
+            .collect();
+        content.push_str(&format!("- Affected specs: {}\n", specs_list.join(", ")));
     }
 
     if !affected_code.is_empty() {
-        content.push_str("- **Affected Code**:\n");
-        for code in &affected_code {
-            if let Some(code_path) = code.as_str() {
-                content.push_str(&format!("  - `{}`\n", code_path));
-            }
-        }
+        // Format: - Affected code: `path/a`, `path/b`
+        let code_list: Vec<String> = affected_code
+            .iter()
+            .filter_map(|c| c.as_str().map(|path| format!("`{}`", path)))
+            .collect();
+        content.push_str(&format!("- Affected code: {}\n", code_list.join(", ")));
     }
 
     if let Some(breaking) = &breaking_changes {
