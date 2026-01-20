@@ -69,6 +69,7 @@ impl ToolRegistry {
             knowledge::read_definition(),
             knowledge::list_definition(),
             knowledge::write_definition(),
+            knowledge::write_main_spec_definition(),
             implementation::read_all_requirements_definition(),
             implementation::read_implementation_summary_definition(),
             implementation::list_changed_files_definition(),
@@ -119,17 +120,21 @@ impl ToolRegistry {
         ]
     }
 
-    /// Archive stage tools (6 tools)
+    /// Archive stage tools
     /// Used by: Gemini for merging specs to knowledge base
     fn archive_tools() -> Vec<ToolDefinition> {
-        vec![
+        let mut tools = vec![
             knowledge::read_definition(),
             knowledge::list_definition(),
             knowledge::write_definition(),
+            knowledge::write_main_spec_definition(),
             read::definition(),
             read::list_specs_definition(),
             spec::definition(),
-        ]
+        ];
+        // Add mermaid diagram tools for spec generation
+        tools.extend(mermaid::definitions());
+        tools
     }
 
     /// List all available tools in MCP format
@@ -165,6 +170,7 @@ impl ToolRegistry {
             "read_knowledge" => knowledge::execute_read(arguments, project_root),
             "list_knowledge" => knowledge::execute_list(arguments, project_root),
             "write_knowledge" => knowledge::execute_write(arguments, project_root),
+            "write_main_spec" => knowledge::execute_write_main_spec(arguments, project_root),
             "read_all_requirements" => {
                 implementation::execute_read_all_requirements(arguments, project_root)
             }

@@ -193,6 +193,66 @@ pub fn execute_write(args: &Value, project_root: &Path) -> Result<String> {
     Ok(result)
 }
 
+/// Get the tool definition for write_main_spec
+pub fn write_main_spec_definition() -> ToolDefinition {
+    ToolDefinition {
+        name: "write_main_spec".to_string(),
+        description: "Write or update a spec in the main agentd/specs/ directory (for archive merge)"
+            .to_string(),
+        input_schema: json!({
+            "type": "object",
+            "required": ["path", "content"],
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Path relative to agentd/specs/, e.g. 'math-utility.md'"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Full markdown content including frontmatter"
+                }
+            }
+        }),
+    }
+}
+
+/// Execute the write_main_spec tool
+pub fn execute_write_main_spec(args: &Value, project_root: &Path) -> Result<String> {
+    let path = get_required_string(args, "path")?;
+    let content = get_required_string(args, "content")?;
+
+    let specs_dir = project_root.join("agentd/specs");
+    if !specs_dir.exists() {
+        std::fs::create_dir_all(&specs_dir)?;
+    }
+
+    // Normalize path and prevent directory traversal
+    let normalized_path = path.trim_start_matches('/').trim_start_matches("./");
+    if normalized_path.contains("..") {
+        anyhow::bail!("Invalid path: directory traversal not allowed");
+    }
+
+    let file_path = specs_dir.join(normalized_path);
+
+    // Security: ensure path is within specs directory
+    if !file_path.starts_with(&specs_dir) {
+        anyhow::bail!("Invalid path: must be within agentd/specs/");
+    }
+
+    // Create parent directories if needed
+    if let Some(parent) = file_path.parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+
+    let is_update = file_path.exists();
+    std::fs::write(&file_path, content)?;
+
+    let action = if is_update { "updated" } else { "created" };
+    Ok(format!("✓ Spec {}: agentd/specs/{}", action, normalized_path))
+}
+
 /// Extract a field value from YAML frontmatter
 fn extract_frontmatter_field(path: &Path, field: &str) -> Option<String> {
     let content = std::fs::read_to_string(path).ok()?;

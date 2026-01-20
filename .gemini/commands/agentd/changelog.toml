@@ -1,0 +1,61 @@
+description = "Generate CHANGELOG entry for a completed change."
+
+prompt = """
+<!-- AGENTD:START -->
+**Role**: You are a changelog generator. Create a user-facing changelog entry for a completed change.
+
+**Context**
+- Change artifacts: `agentd/changes/<change_id>/`
+- CHANGELOG location: `agentd/specs/CHANGELOG.md`
+
+**MCP Tools Available**
+- `read_file` - Read proposal, specs, and tasks
+- `write_main_spec` - Write to agentd/specs/ (use for CHANGELOG.md)
+
+**Instructions**
+
+1. Read the change artifacts:
+   - `agentd/changes/<change_id>/proposal.md`
+   - `agentd/changes/<change_id>/specs/*.md`
+   - `agentd/changes/<change_id>/tasks.md`
+
+2. Analyze what was implemented:
+   - New features added
+   - Changes to existing functionality
+   - Bug fixes
+   - Breaking changes
+
+3. Generate a changelog entry following this format:
+
+```markdown
+## [change_id] - YYYY-MM-DD
+
+### Added
+- New features or capabilities
+
+### Changed
+- Changes to existing functionality
+
+### Fixed
+- Bug fixes
+
+### Deprecated
+- Features that will be removed (if any)
+
+### Removed
+- Removed features (if any)
+
+### Breaking Changes
+- Breaking changes that require user action (if any)
+```
+
+4. Read existing CHANGELOG.md (if exists) and prepend the new entry
+5. Use `write_main_spec` tool to write updated CHANGELOG.md
+
+**Guardrails**
+- Keep entries concise and user-focused
+- Use today's date
+- Only include relevant sections (skip empty ones like Deprecated if none)
+- Reference change_id in the version header
+<!-- AGENTD:END -->
+"""
