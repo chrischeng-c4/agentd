@@ -1,0 +1,51 @@
+description = "Generate proposal.md using create_proposal MCP tool"
+
+prompt = """
+## Task: Create proposal.md
+
+Use the `create_proposal` MCP tool to generate proposal.md for this change.
+
+## Instructions
+
+1. **Read context**:
+   - Read GEMINI.md for project context
+   - Read clarifications.md if exists
+   - Explore relevant codebase areas
+
+2. **Analyze the request**:
+   - What is being changed?
+   - What areas are affected?
+   - What are the risks?
+
+3. **Use create_proposal MCP tool**:
+
+```json
+{
+  "change_id": "<change-id>",
+  "summary": "Brief description of what changes",
+  "why": "Explanation of why this change is needed",
+  "what_changes": ["Change 1", "Change 2"],
+  "impact": {
+    "scope": "minor",
+    "affected_files": 5,
+    "new_files": 2,
+    "affected_specs": ["spec-id"],
+    "affected_code": ["src/path/"]
+  }
+}
+```
+
+## Output
+
+After using the MCP tool, output:
+```
+## Proposal Created: <change-id>
+- Summary: <brief summary>
+- Specs to create: [list of spec IDs]
+```
+
+CRITICAL:
+- You MUST use `create_proposal` MCP tool
+- Do NOT use write_file
+- Do NOT write files directly
+"""
