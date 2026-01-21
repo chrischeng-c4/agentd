@@ -244,6 +244,7 @@ impl<'a> GeminiOrchestrator<'a> {
     }
 
     /// Run reproposal (resume previous session for cached context)
+    #[allow(dead_code)]
     pub async fn run_reproposal(
         &self,
         change_id: &str,
@@ -253,6 +254,20 @@ impl<'a> GeminiOrchestrator<'a> {
         let env = self.build_env(change_id);
         // Resume previous session (Plan stage)
         let args = self.build_args("agentd:reproposal", complexity, true);
+
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
+    }
+
+    /// Run reproposal with fresh session (no resume - GEMINI.md provides all context)
+    pub async fn run_reproposal_fresh(
+        &self,
+        change_id: &str,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        let prompt = prompts::gemini_reproposal_prompt(change_id);
+        let env = self.build_env(change_id);
+        // Fresh session - documents in GEMINI.md provide all necessary context
+        let args = self.build_args("agentd:reproposal", complexity, false);
 
         self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, &prompt, true, Some(&self.project_root)).await
     }

@@ -1,6 +1,6 @@
 use crate::context::ContextPhase;
 use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, Complexity};
-use crate::orchestrator::{detect_self_review_marker, find_session_index, GeminiOrchestrator, CodexOrchestrator, SelfReviewResult, UsageMetrics};
+use crate::orchestrator::{detect_self_review_marker, GeminiOrchestrator, CodexOrchestrator, SelfReviewResult, UsageMetrics};
 use crate::parser::{parse_challenge_verdict, parse_affected_specs};
 use crate::orchestrator::prompts;
 use crate::state::StateManager;
@@ -240,14 +240,14 @@ async fn run_challenge_step(
     Ok(verdict)
 }
 
-/// Step 3: Run re-challenge with Codex (resumes session for cached context)
+/// Step 3: Run re-challenge with Codex (fresh session with existing documents as context)
 async fn run_rechallenge_step(
     change_id: &str,
     project_root: &PathBuf,
     config: &AgentdConfig,
 ) -> Result<ChallengeVerdict> {
     println!();
-    println!("{}", "🔍 [4/4] Re-challenging with Codex (cached session)...".cyan());
+    println!("{}", "🔍 [4/4] Re-challenging with Codex...".cyan());
 
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
@@ -261,9 +261,9 @@ async fn run_rechallenge_step(
     // Regenerate AGENTS.md context
     crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
 
-    // Run Codex rechallenge orchestrator (resumes session)
+    // Run Codex rechallenge orchestrator (fresh session - AGENTS.md provides context)
     let orchestrator = CodexOrchestrator::new(config, project_root);
-    let (_output, usage) = orchestrator.run_rechallenge(change_id, complexity).await?;
+    let (_output, usage) = orchestrator.run_rechallenge_fresh(change_id, complexity).await?;
     let model = config.codex.select_model(complexity).model.clone();
     record_usage(change_id, project_root, "rechallenge", &model, &usage, config, complexity);
 
@@ -285,7 +285,7 @@ async fn run_rechallenge_step(
     Ok(verdict)
 }
 
-/// Step 3 (loop): Run reproposal with Gemini (resumes session for cached context)
+/// Step 3 (loop): Run reproposal with Gemini (fresh session with existing documents as context)
 async fn run_reproposal_step(
     change_id: &str,
     project_root: &PathBuf,
@@ -300,43 +300,13 @@ async fn run_reproposal_step(
     let change = Change::new(change_id, "");
     let complexity = change.assess_complexity(project_root);
 
-    // Regenerate GEMINI.md context
+    // Regenerate GEMINI.md context (includes existing proposal, specs, and challenge feedback)
     crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
 
-    // Run Gemini reproposal orchestrator with retry
+    // Run Gemini reproposal orchestrator with retry (fresh session - documents provide context)
     let orchestrator = GeminiOrchestrator::new(config, project_root);
     let max_retries = config.workflow.script_retries;
     let retry_delay = std::time::Duration::from_secs(config.workflow.retry_delay_secs);
-
-    // Load session_id from STATE.yaml for resume-by-index - R2 requires strict enforcement
-    let state_path = project_root
-        .join("agentd/changes")
-        .join(change_id)
-        .join("STATE.yaml");
-
-    let session_index = match StateManager::load(&state_path) {
-        Ok(manager) => {
-            match manager.session_id() {
-                Some(sid) => {
-                    match find_session_index(sid, project_root).await {
-                        Ok(index) => index,
-                        Err(e) => {
-                            println!("{}", format!("❌ Session not found, please re-run proposal: {}", e).red().bold());
-                            std::process::exit(1);
-                        }
-                    }
-                }
-                None => {
-                    println!("{}", "❌ Failed to capture session ID".red().bold());
-                    std::process::exit(1);
-                }
-            }
-        }
-        Err(_) => {
-            println!("{}", "❌ Failed to load STATE.yaml".red().bold());
-            std::process::exit(1);
-        }
-    };
 
     let mut last_error = None;
     for attempt in 0..=max_retries {
@@ -348,8 +318,8 @@ async fn run_reproposal_step(
             tokio::time::sleep(retry_delay).await;
         }
 
-        // Use resume-by-index (R2 requires strict enforcement - no fallback to --resume latest)
-        let result = orchestrator.run_reproposal_with_session(change_id, session_index, complexity).await;
+        // Fresh session - GEMINI.md contains all necessary context (proposal, specs, review feedback)
+        let result = orchestrator.run_reproposal_fresh(change_id, complexity).await;
 
         match result {
             Ok((_output, usage)) => {

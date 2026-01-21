@@ -6,21 +6,25 @@
     }
   },
   "mcp": {
-    "allowed": ["agentd", "playwright"]
+    "allowed": [
+      "agentd",
+      "playwright"
+    ]
   },
   "mcpServers": {
     "agentd": {
-      "command": "/Users/chris.cheng/.local/bin/agentd",
-      "args": ["mcp-server"],
-      "cwd": "/Users/chris.cheng/chris-project/agentd",
-      "timeout": 30000,
-      "trust": true
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "X-Agentd-Project": "agentd",
+        "X-Agentd-Cwd": "/Users/chrischeng/projects/agentd"
+      },
+      "timeout": 30000
     },
     "playwright": {
-      "command": "npx",
       "args": [
         "@playwright/mcp@latest"
-      ]
+      ],
+      "command": "npx"
     }
   },
   "tools": {
