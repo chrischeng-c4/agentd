@@ -1,0 +1,74 @@
+{
+  "tasks": [
+    {
+      "layer": "data",
+      "number": 1,
+      "title": "Create OAuth provider model",
+      "file": {
+        "path": "src/models/oauth_provider.rs",
+        "action": "CREATE"
+      },
+      "spec_ref": "oauth-spec:R3",
+      "description": "Create data model for OAuth provider configuration including client credentials, URLs, and supported scopes."
+    },
+    {
+      "layer": "data",
+      "number": 2,
+      "title": "Create user OAuth model",
+      "file": {
+        "path": "src/models/user_oauth.rs",
+        "action": "CREATE"
+      },
+      "spec_ref": "oauth-spec:R2",
+      "description": "Create data model for storing user OAuth tokens and provider associations."
+    },
+    {
+      "layer": "logic",
+      "number": 1,
+      "title": "Implement OAuth flow handler",
+      "file": {
+        "path": "src/auth/oauth_flow.rs",
+        "action": "CREATE"
+      },
+      "spec_ref": "oauth-spec:R1",
+      "description": "Implement OAuth 2.0 authorization code flow including redirect handling and state validation.",
+      "depends": ["1.1"]
+    },
+    {
+      "layer": "logic",
+      "number": 2,
+      "title": "Implement token manager",
+      "file": {
+        "path": "src/auth/token_manager.rs",
+        "action": "CREATE"
+      },
+      "spec_ref": "oauth-spec:R2",
+      "description": "Implement secure token storage and automatic refresh mechanism.",
+      "depends": ["1.2"]
+    },
+    {
+      "layer": "integration",
+      "number": 1,
+      "title": "Add OAuth API endpoints",
+      "file": {
+        "path": "src/api/auth.rs",
+        "action": "MODIFY"
+      },
+      "spec_ref": "oauth-spec:R1",
+      "description": "Add API endpoints for OAuth initiation, callback handling, and provider management.",
+      "depends": ["2.1", "2.2"]
+    },
+    {
+      "layer": "testing",
+      "number": 1,
+      "title": "Add OAuth flow tests",
+      "file": {
+        "path": "tests/oauth_flow_test.rs",
+        "action": "CREATE"
+      },
+      "spec_ref": "oauth-spec:R1",
+      "description": "Add integration tests for complete OAuth flow including success and error scenarios.",
+      "depends": ["3.1"]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "title": "MCP Server Architecture",
+  "source": "https://spec.modelcontextprotocol.io/",
+  "content": "# MCP Server Architecture\n\n## Overview\n\nThe Model Context Protocol (MCP) defines a standardized interface for AI models to interact with external tools and data sources.\n\n## Key Components\n\n### 1. Server\n- Exposes tools via JSON-RPC protocol\n- Handles tool execution and result formatting\n- Manages connection lifecycle\n\n### 2. Client\n- Connects to MCP servers\n- Sends tool requests\n- Processes responses\n\n### 3. Tools\n- Defined with JSON Schema for parameters\n- Execute business logic\n- Return structured results\n\n## Implementation Notes\n\n- Use stdio transport for CLI integration\n- Define clear tool descriptions for AI models\n- Validate all inputs with JSON Schema\n"
+}

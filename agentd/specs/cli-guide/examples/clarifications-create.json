@@ -1,0 +1,22 @@
+{
+  "questions": [
+    {
+      "topic": "Authentication Method",
+      "question": "Which OAuth providers should be supported?",
+      "answer": "Google and GitHub initially, with extensible architecture for more",
+      "rationale": "These are the most commonly requested enterprise providers"
+    },
+    {
+      "topic": "Token Storage",
+      "question": "Where should OAuth tokens be stored?",
+      "answer": "Encrypted in database with per-user encryption keys",
+      "rationale": "Provides security while allowing token refresh"
+    },
+    {
+      "topic": "Session Management",
+      "question": "What should be the token expiration time?",
+      "answer": "Access tokens: 1 hour, Refresh tokens: 30 days",
+      "rationale": "Balance between security and user convenience"
+    }
+  ]
+}

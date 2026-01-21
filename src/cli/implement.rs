@@ -332,7 +332,86 @@ pub async fn run_sequential(change_id: &str) -> Result<ImplementEngineResult> {
     }
 }
 
+/// State-aware implementation workflow entry point
 pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<ImplementEngineResult> {
+    let project_root = env::current_dir()?;
+    let config = AgentdConfig::load(&project_root)?;
+    let change_dir = project_root.join("agentd/changes").join(change_id);
+
+    // Load current state
+    let state_manager = StateManager::load(&change_dir)?;
+    let phase = state_manager.phase();
+
+    println!("📊 Current state: phase={:?}", phase);
+
+    // Determine what to do based on current state
+    match phase {
+        StatePhase::Challenged => {
+            // Proposal was challenged and ready for implementation
+            println!("▶️  Starting implementation workflow...\n");
+            run_full_workflow(change_id, tasks).await
+        }
+        StatePhase::Implementing => {
+            println!("▶️  Resuming implementation workflow...\n");
+            // Check if there's a review already
+            let change = Change::new(change_id, "");
+            let review_path = change.review_path(&project_root);
+
+            if review_path.exists() {
+                // Review exists, check verdict and continue from there
+                let verdict = parse_review_verdict(&review_path)?;
+                match verdict {
+                    ReviewVerdict::Approved => {
+                        println!("✅ Implementation already approved!");
+                        println!("   Ready to archive:");
+                        println!("      agentd archive {}", change_id);
+
+                        Ok(ImplementEngineResult {
+                            change_id: change_id.to_string(),
+                            final_verdict: ReviewVerdict::Approved,
+                            iteration_count: 0,
+                            phase: StatePhase::Complete,
+                        })
+                    }
+                    ReviewVerdict::NeedsChanges | ReviewVerdict::MajorIssues => {
+                        println!("▶️  Resolving review issues...\n");
+                        run_resolve_and_review(change_id, &project_root, &config).await
+                    }
+                    ReviewVerdict::Unknown => {
+                        // Review incomplete, run from review step
+                        println!("▶️  Running review...\n");
+                        run_from_review(change_id, &project_root, &config).await
+                    }
+                }
+            } else {
+                // No review yet, run from review step
+                println!("▶️  Running review...\n");
+                run_from_review(change_id, &project_root, &config).await
+            }
+        }
+        StatePhase::Complete => {
+            println!("✅ Implementation already complete and approved!");
+            println!("   Ready to archive:");
+            println!("      agentd archive {}", change_id);
+
+            Ok(ImplementEngineResult {
+                change_id: change_id.to_string(),
+                final_verdict: ReviewVerdict::Approved,
+                iteration_count: 0,
+                phase: StatePhase::Complete,
+            })
+        }
+        StatePhase::Archived => {
+            anyhow::bail!("Change already archived");
+        }
+        other => {
+            anyhow::bail!("Cannot run impl workflow in phase {:?}. Run 'agentd plan' first.", other);
+        }
+    }
+}
+
+/// Run full implementation workflow (implement → review → resolve loop)
+async fn run_full_workflow(change_id: &str, tasks: Option<&str>) -> Result<ImplementEngineResult> {
     let project_root = env::current_dir()?;
     let config = AgentdConfig::load(&project_root)?;
 
@@ -621,4 +700,160 @@ fn format_verdict(verdict: &ReviewVerdict) -> colored::ColoredString {
         ReviewVerdict::MajorIssues => "MAJOR_ISSUES".red().bold(),
         ReviewVerdict::Unknown => "UNKNOWN".bright_black(),
     }
+}
+
+/// Run from review step only (implementation already done)
+async fn run_from_review(
+    change_id: &str,
+    project_root: &PathBuf,
+    config: &AgentdConfig,
+) -> Result<ImplementEngineResult> {
+    let change_dir = project_root.join("agentd/changes").join(change_id);
+
+    println!("{}", "🔍 Reviewing implementation with Codex...".cyan().bold());
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+    println!();
+
+    // Run first review (iteration 0)
+    let verdict = run_review_step(change_id, project_root, config, 0).await?;
+
+    // Implementation iteration loop
+    let max_iterations = config.workflow.implementation_iterations;
+    let mut current_verdict = verdict;
+    let mut iteration = 0;
+
+    loop {
+        match current_verdict {
+            ReviewVerdict::Approved => {
+                // Update STATE to Complete phase
+                let mut state_manager = StateManager::load(&change_dir)?;
+                state_manager.set_phase(StatePhase::Complete);
+                state_manager.save()?;
+
+                println!();
+                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                println!("{}", "✨ Implementation approved!".green().bold());
+
+                return Ok(ImplementEngineResult {
+                    change_id: change_id.to_string(),
+                    final_verdict: ReviewVerdict::Approved,
+                    iteration_count: iteration,
+                    phase: StatePhase::Complete,
+                });
+            }
+            ReviewVerdict::NeedsChanges => {
+                iteration += 1;
+                if iteration > max_iterations {
+                    println!();
+                    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                    println!(
+                        "{}",
+                        format!("⚠️  Automatic refinement limit reached ({} iterations)", max_iterations).yellow().bold()
+                    );
+                    display_remaining_issues(change_id, project_root)?;
+
+                    return Ok(ImplementEngineResult {
+                        change_id: change_id.to_string(),
+                        final_verdict: ReviewVerdict::NeedsChanges,
+                        iteration_count: iteration - 1,
+                        phase: StatePhase::Implementing,
+                    });
+                }
+
+                println!();
+                println!(
+                    "{}",
+                    format!("⚠️  NEEDS_CHANGES - Auto-fixing (iteration {})...", iteration).yellow()
+                );
+
+                // Resolve with Claude
+                println!();
+                println!("{}", format!("🔧 Resolving issues (iteration {})...", iteration).cyan());
+                run_resolve_step(change_id, project_root, config).await?;
+
+                // Re-review with Codex
+                println!();
+                println!("{}", format!("🔍 Re-reviewing (iteration {})...", iteration).cyan());
+                current_verdict = run_review_step(change_id, project_root, config, iteration).await?;
+            }
+            ReviewVerdict::MajorIssues => {
+                println!();
+                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+                println!("{}", "❌ Major issues found".red().bold());
+                display_remaining_issues(change_id, project_root)?;
+
+                return Ok(ImplementEngineResult {
+                    change_id: change_id.to_string(),
+                    final_verdict: ReviewVerdict::MajorIssues,
+                    iteration_count: iteration,
+                    phase: StatePhase::Implementing,
+                });
+            }
+            ReviewVerdict::Unknown => {
+                println!("{}", "⚠️  Could not parse review verdict".yellow());
+
+                return Ok(ImplementEngineResult {
+                    change_id: change_id.to_string(),
+                    final_verdict: ReviewVerdict::Unknown,
+                    iteration_count: iteration,
+                    phase: StatePhase::Implementing,
+                });
+            }
+        }
+    }
+}
+
+/// Run resolve and review loop (for when state is already Reviewed)
+async fn run_resolve_and_review(
+    change_id: &str,
+    project_root: &PathBuf,
+    config: &AgentdConfig,
+) -> Result<ImplementEngineResult> {
+    let change_dir = project_root.join("agentd/changes").join(change_id);
+
+    println!("{}", "🔧 Resolving review issues...".cyan().bold());
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+    println!();
+
+    // Resolve issues
+    run_resolve_step(change_id, project_root, config).await?;
+
+    println!();
+    println!("{}", "🔍 Re-reviewing after fixes...".cyan());
+
+    // Re-review
+    let verdict = run_review_step(change_id, project_root, config, 1).await?;
+
+    // Update state based on verdict
+    let mut state_manager = StateManager::load(&change_dir)?;
+    if verdict == ReviewVerdict::Approved {
+        state_manager.set_phase(StatePhase::Complete);
+    } else {
+        state_manager.set_phase(StatePhase::Implementing);
+    }
+    state_manager.save()?;
+
+    println!();
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".bright_black());
+
+    match verdict {
+        ReviewVerdict::Approved => {
+            println!("{}", "✨ Issues resolved and approved!".green().bold());
+        }
+        _ => {
+            println!("{}", "⚠️  Issues remain after resolution".yellow());
+            display_remaining_issues(change_id, project_root)?;
+        }
+    }
+
+    Ok(ImplementEngineResult {
+        change_id: change_id.to_string(),
+        final_verdict: verdict.clone(),
+        iteration_count: 1,
+        phase: if verdict == ReviewVerdict::Approved {
+            StatePhase::Complete
+        } else {
+            StatePhase::Implementing
+        },
+    })
 }

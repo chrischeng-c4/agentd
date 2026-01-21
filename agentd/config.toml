@@ -8,9 +8,7 @@ implementation_iterations = 2
 archive_iterations = 1
 script_retries = 3
 retry_delay_secs = 5
-# Spec-by-spec sequential implementation (default: true)
-# Set to false to use legacy all-at-once mode
-# sequential_implementation = false
+sequential_implementation = true
 
 [gemini]
 command = "gemini"
@@ -97,11 +95,11 @@ required_headings = [
     "Acceptance Criteria",
 ]
 requirement_pattern = ""
-scenario_pattern = 'WHEN\s.*THEN\s'
+scenario_pattern = '(?m)^###\s*Scenario:|^-\s*WHEN[^\n]*THEN'
 scenario_min_count = 1
 require_when_then = true
-when_pattern = 'WHEN\s'
-then_pattern = 'THEN\s'
+when_pattern = '\*\*WHEN\*\*|WHEN'
+then_pattern = '\*\*THEN\*\*|THEN'
 
 [validation.severity_map]
 missing_heading = "High"

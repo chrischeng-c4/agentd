@@ -73,14 +73,8 @@ impl McpServer {
     pub fn new_for_stage(stage: Option<&str>) -> Result<Self> {
         let project_root = std::env::current_dir()?;
         let tool_registry = match stage {
-            Some(s) => {
-                eprintln!("[agentd-mcp] Loading tools for stage: {}", s);
-                ToolRegistry::new_for_stage(s)
-            }
-            None => {
-                eprintln!("[agentd-mcp] Loading all tools (no stage filter)");
-                ToolRegistry::new()
-            }
+            Some(s) => ToolRegistry::new_for_stage(s),
+            None => ToolRegistry::new(),
         };
 
         Ok(Self {
@@ -95,15 +89,10 @@ impl McpServer {
         let mut stdout = std::io::stdout();
         let reader = BufReader::new(stdin.lock());
 
-        eprintln!("[agentd-mcp] Server started, waiting for requests...");
-
         for line in reader.lines() {
             let line = match line {
                 Ok(l) => l,
-                Err(e) => {
-                    eprintln!("[agentd-mcp] Read error: {}", e);
-                    break;
-                }
+                Err(_e) => break,
             };
 
             // Skip empty lines
@@ -120,7 +109,6 @@ impl McpServer {
             stdout.flush()?;
         }
 
-        eprintln!("[agentd-mcp] Server stopped");
         Ok(())
     }
 
@@ -165,10 +153,7 @@ impl McpServer {
             "initialized" => Ok(json!({})), // Notification, no response needed
             "tools/list" => self.handle_tools_list(),
             "tools/call" => self.handle_tools_call(&request.params).await,
-            "shutdown" => {
-                eprintln!("[agentd-mcp] Shutdown requested");
-                Ok(json!({}))
-            }
+            "shutdown" => Ok(json!({})),
             _ => Err((
                 METHOD_NOT_FOUND,
                 format!("Method not found: {}", request.method),
@@ -230,8 +215,6 @@ impl McpServer {
             .ok_or((INVALID_PARAMS, "Missing tool name".to_string()))?;
 
         let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
-
-        eprintln!("[agentd-mcp] Calling tool: {} with args: {}", name, arguments);
 
         // Execute the tool
         match self.tool_registry.call_tool(name, &arguments, &self.project_root).await {

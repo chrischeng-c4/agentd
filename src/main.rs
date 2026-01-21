@@ -30,75 +30,6 @@ enum Commands {
         skip_clarify: bool,
     },
 
-    /// Generate a new proposal with Gemini (2M context)
-    Proposal {
-        /// Change ID (e.g., "add-oauth")
-        change_id: String,
-
-        /// Description of the change
-        description: String,
-
-        /// Skip clarifications.md check (use when clarification is not needed)
-        #[arg(long)]
-        skip_clarify: bool,
-    },
-
-    /// Validate proposal format (local validation, no AI)
-    ValidateProposal {
-        /// Change ID to validate
-        change_id: String,
-
-        /// Treat warnings (MEDIUM/LOW) as errors
-        #[arg(short, long)]
-        strict: bool,
-
-        /// Show verbose output with additional details
-        #[arg(short, long)]
-        verbose: bool,
-
-        /// Output results as JSON
-        #[arg(long)]
-        json: bool,
-
-        /// Auto-fix fixable errors (missing headings, WHEN/THEN)
-        #[arg(short, long)]
-        fix: bool,
-    },
-
-    /// Challenge the proposal with Codex (code analysis)
-    Challenge {
-        /// Change ID to challenge
-        change_id: String,
-    },
-
-    /// Validate challenge format (local validation, no AI)
-    ValidateChallenge {
-        /// Change ID to validate
-        change_id: String,
-
-        /// Treat warnings (MEDIUM/LOW) as errors
-        #[arg(short, long)]
-        strict: bool,
-
-        /// Show verbose output with additional details
-        #[arg(short, long)]
-        verbose: bool,
-
-        /// Output results as JSON
-        #[arg(long)]
-        json: bool,
-
-        /// Auto-fix fixable errors (missing headings)
-        #[arg(short, long)]
-        fix: bool,
-    },
-
-    /// Regenerate proposal based on challenge feedback
-    Reproposal {
-        /// Change ID to regenerate
-        change_id: String,
-    },
-
     /// Refine proposal with additional requirements
     Refine {
         /// Change ID to refine
@@ -118,17 +49,7 @@ enum Commands {
         tasks: Option<String>,
     },
 
-    /// Review implementation with Codex (run tests and code review)
-    Review {
-        /// Change ID to review
-        change_id: String,
-    },
 
-    /// Resolve issues found during code review with Claude
-    ResolveReviews {
-        /// Change ID to resolve
-        change_id: String,
-    },
 
     /// Archive completed change
     Archive {
@@ -221,6 +142,33 @@ enum Commands {
         #[arg(long)]
         tools: Option<String>,
     },
+
+    /// Knowledge base operations
+    #[command(subcommand)]
+    Knowledge(agentd::cli::knowledge::KnowledgeCommands),
+
+    /// Spec operations
+    #[command(subcommand)]
+    Spec(agentd::cli::spec::SpecCommands),
+
+    /// File operations
+    #[command(subcommand)]
+    File(agentd::cli::file::FileCommands),
+
+    /// Proposal operations
+    #[command(subcommand)]
+    Proposal(agentd::cli::proposal::ProposalCommands),
+
+    /// Tasks operations
+    #[command(subcommand)]
+    Tasks(agentd::cli::tasks::TasksCommands),
+
+    /// Implementation workflow commands
+    #[command(subcommand)]
+    Implementation(agentd::cli::implementation::ImplementationCommands),
+
+    /// Create clarifications from Q&A
+    Clarifications(agentd::cli::clarifications::ClarificationsArgs),
 }
 
 fn main() {
@@ -247,10 +195,10 @@ fn main() {
 }
 
 async fn run_async(cli: Cli) -> Result<()> {
-    // Auto-upgrade check for all commands except init, completions, archived, and mcp-server
+    // Auto-upgrade check for all commands except init, completions, archived, mcp-server, and CLI utility commands
     let skip_upgrade = matches!(
         cli.command,
-        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived | Commands::McpServer { .. }
+        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived | Commands::McpServer { .. } | Commands::Knowledge(_) | Commands::Spec(_) | Commands::File(_) | Commands::Proposal(_) | Commands::Tasks(_) | Commands::Implementation(_) | Commands::Clarifications(_)
     );
 
     #[cfg(feature = "ui")]
@@ -274,49 +222,6 @@ async fn run_async(cli: Cli) -> Result<()> {
             agentd::cli::plan::run(&change_id, description, skip_clarify).await?;
         }
 
-        Commands::Proposal {
-            change_id,
-            description,
-            skip_clarify,
-        } => {
-            println!(
-                "{}",
-                "🤖 Generating proposal with Gemini (2M context)...".cyan()
-            );
-            agentd::cli::proposal::run(&change_id, &description, skip_clarify).await?;
-        }
-
-        Commands::ValidateProposal { change_id, strict, verbose, json, fix } => {
-            let options = agentd::models::ValidationOptions::new()
-                .with_strict(strict)
-                .with_verbose(verbose)
-                .with_json(json)
-                .with_fix(fix);
-            agentd::cli::validate_proposal::run(&change_id, &options).await?;
-        }
-
-        Commands::Challenge { change_id } => {
-            println!(
-                "{}",
-                format!("🔍 Challenging proposal: {}", change_id).cyan()
-            );
-            agentd::cli::challenge_proposal::run(&change_id).await?;
-        }
-
-        Commands::ValidateChallenge { change_id, strict, verbose, json, fix } => {
-            let options = agentd::models::ValidationOptions::new()
-                .with_strict(strict)
-                .with_verbose(verbose)
-                .with_json(json)
-                .with_fix(fix);
-            agentd::cli::validate_challenge::run(&change_id, &options).await?;
-        }
-
-        Commands::Reproposal { change_id } => {
-            println!("{}", format!("🤖 Reproposing: {}", change_id).cyan());
-            agentd::cli::reproposal::run(&change_id).await?;
-        }
-
         Commands::Refine {
             change_id,
             requirements,
@@ -329,16 +234,6 @@ async fn run_async(cli: Cli) -> Result<()> {
             // Implement command now includes automatic review loop
             let _result = agentd::cli::implement::run(&change_id, tasks.as_deref()).await?;
             // Result is used by skills for HITL decisions, CLI just needs success/error
-        }
-
-        Commands::Review { change_id } => {
-            println!("{}", format!("🔍 Reviewing: {}", change_id).cyan());
-            agentd::cli::review::run(&change_id).await?;
-        }
-
-        Commands::ResolveReviews { change_id } => {
-            println!("{}", format!("🔧 Resolving reviews: {}", change_id).cyan());
-            agentd::cli::resolve_reviews::run(&change_id).await?;
         }
 
         Commands::Archive { change_id } => {
@@ -400,6 +295,34 @@ async fn run_async(cli: Cli) -> Result<()> {
 
         Commands::McpServer { tools } => {
             agentd::cli::mcp_server::run(tools.as_deref()).await?;
+        }
+
+        Commands::Knowledge(cmd) => {
+            agentd::cli::knowledge::run(cmd)?;
+        }
+
+        Commands::Spec(cmd) => {
+            agentd::cli::spec::run(cmd)?;
+        }
+
+        Commands::File(cmd) => {
+            agentd::cli::file::run(cmd)?;
+        }
+
+        Commands::Proposal(cmd) => {
+            agentd::cli::proposal::run(cmd)?;
+        }
+
+        Commands::Tasks(cmd) => {
+            agentd::cli::tasks::run(cmd)?;
+        }
+
+        Commands::Implementation(cmd) => {
+            agentd::cli::implementation::run(cmd)?;
+        }
+
+        Commands::Clarifications(args) => {
+            agentd::cli::clarifications::run(args)?;
         }
     }
 

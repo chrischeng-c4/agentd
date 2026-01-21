@@ -5,12 +5,22 @@
       "write_file": true
     }
   },
+  "mcp": {
+    "allowed": ["agentd", "playwright"]
+  },
   "mcpServers": {
     "agentd": {
+      "command": "/Users/chris.cheng/.local/bin/agentd",
+      "args": ["mcp-server"],
+      "cwd": "/Users/chris.cheng/chris-project/agentd",
+      "timeout": 30000,
+      "trust": true
+    },
+    "playwright": {
+      "command": "npx",
       "args": [
-        "mcp-server"
-      ],
-      "command": "agentd"
+        "@playwright/mcp@latest"
+      ]
     }
   },
   "tools": {

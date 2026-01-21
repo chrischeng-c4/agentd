@@ -14,26 +14,39 @@ pub fn gemini_proposal_prompt(change_id: &str, description: &str) -> String {
 
 ## Instructions
 
-**IMPORTANT**: You MUST use the `create_proposal` MCP tool to generate files. Do NOT output markdown directly.
+**IMPORTANT**: You MUST use the CLI workflow to generate files. Do NOT output markdown directly.
 
 1. Analyze the codebase and understand the request
-2. Use the `create_proposal` MCP tool with:
-   - change_id: "{change_id}"
-   - summary, why, what_changes, impact fields
+2. Create proposal JSON with structure:
+   {{
+     "summary": "Brief 1-sentence description",
+     "why": "Detailed motivation (min 50 chars)",
+     "what_changes": ["Change 1", "Change 2"],
+     "impact": {{
+       "scope": "patch|minor|major",
+       "affected_files": <number>,
+       "affected_specs": ["spec-id"],
+       "affected_code": ["path/to/code/"],
+       "breaking_changes": null
+     }}
+   }}
+3. Write JSON to /tmp/proposal-{change_id}.json using heredoc
+4. Run: agentd proposal create {change_id} --json-file /tmp/proposal-{change_id}.json
+5. Verify success by checking command output
 
-Direct file creation or markdown output is NOT allowed. Use MCP tools only.
+Direct file creation or markdown output is NOT allowed. Use CLI workflow only.
 "#,
         change_id = change_id,
         description = description
     )
 }
 
-/// Generate Gemini proposal prompt using MCP create_proposal tool (sequential generation)
+/// Generate Gemini proposal prompt using CLI workflow (sequential generation)
 pub fn gemini_proposal_with_mcp_prompt(change_id: &str, description: &str) -> String {
     format!(
         r#"## Task: Create proposal.md
 
-Use the `create_proposal` MCP tool to generate proposal.md for this change.
+Use the CLI workflow to generate proposal.md for this change.
 
 ## Change ID
 {change_id}
@@ -53,10 +66,9 @@ Use the `create_proposal` MCP tool to generate proposal.md for this change.
    - List them in the `affected_specs` field
    - Use clear, descriptive IDs (e.g., `auth-flow`, `user-model`, `api-endpoints`)
 
-3. **Use create_proposal MCP tool** with this structure:
+3. **Create proposal JSON** with this structure:
    ```json
    {{
-     "change_id": "{change_id}",
      "summary": "Brief 1-sentence description",
      "why": "Detailed business/technical motivation (min 50 chars)",
      "what_changes": [
@@ -79,6 +91,20 @@ Use the `create_proposal` MCP tool to generate proposal.md for this change.
    }}
    ```
 
+4. **Write JSON to file** using heredoc:
+   ```bash
+   cat > /tmp/proposal-{change_id}.json <<'EOF'
+   {{ JSON content here }}
+   EOF
+   ```
+
+5. **Run CLI command**:
+   ```bash
+   agentd proposal create {change_id} --json-file /tmp/proposal-{change_id}.json
+   ```
+
+6. **Verify success** by checking command output
+
 IMPORTANT: The `affected_specs` list determines which specs will be generated next. Be thorough but focused.
 "#,
         change_id = change_id,
@@ -86,7 +112,7 @@ IMPORTANT: The `affected_specs` list determines which specs will be generated ne
     )
 }
 
-/// Generate Gemini spec prompt using MCP create_spec tool (sequential generation)
+/// Generate Gemini spec prompt using CLI workflow (sequential generation)
 pub fn gemini_spec_with_mcp_prompt(change_id: &str, spec_id: &str, context_files: &[String]) -> String {
     let context_list = if context_files.is_empty() {
         String::from("- agentd/changes/{change_id}/proposal.md")
@@ -97,7 +123,7 @@ pub fn gemini_spec_with_mcp_prompt(change_id: &str, spec_id: &str, context_files
     format!(
         r#"## Task: Create spec '{spec_id}'
 
-Use the `create_spec` MCP tool to generate specs/{spec_id}.md for this change.
+Use the CLI workflow to generate specs/{spec_id}.md for this change.
 
 ## Context Files (read these first):
 {context_list}
@@ -105,8 +131,9 @@ Use the `create_spec` MCP tool to generate specs/{spec_id}.md for this change.
 ## Instructions
 
 1. **Read context files**:
-   - Read proposal.md to understand the overall change
-   - Read existing specs (if any) to maintain consistency and avoid duplication
+   - Use: agentd file read {change_id} proposal
+   - Use: agentd spec list {change_id} (to see existing specs)
+   - Read existing specs to maintain consistency and avoid duplication
 
 2. **Design this spec**:
    - Define clear, testable requirements (R1, R2, ...)
@@ -117,11 +144,9 @@ Use the `create_spec` MCP tool to generate specs/{spec_id}.md for this change.
    - Write acceptance scenarios (WHEN/THEN format)
    - Ensure consistency with proposal.md and other specs
 
-3. **Use create_spec MCP tool** with this structure:
+3. **Create spec JSON** with this structure:
    ```json
    {{
-     "change_id": "{change_id}",
-     "spec_id": "{spec_id}",
      "title": "Human-readable title",
      "overview": "What this spec covers and why (min 50 chars)",
      "requirements": [
@@ -145,10 +170,24 @@ Use the `create_spec` MCP tool to generate specs/{spec_id}.md for this change.
          "then": "Error handling behavior"
        }}
      ],
-     "flow_diagram": "```mermaid\\nsequenceDiagram...```",
+     "flow_diagram": "sequenceDiagram\\n    ...",
      "data_model": {{ JSON Schema object }}
    }}
    ```
+
+4. **Write JSON to file** using heredoc:
+   ```bash
+   cat > /tmp/spec-{change_id}-{spec_id}.json <<'EOF'
+   {{ JSON content here }}
+   EOF
+   ```
+
+5. **Run CLI command**:
+   ```bash
+   agentd spec create {change_id} {spec_id} --json-file /tmp/spec-{change_id}-{spec_id}.json
+   ```
+
+6. **Verify success** by checking command output
 
 IMPORTANT:
 - Minimum 3 scenarios required (happy path + error cases + edge cases)
@@ -161,14 +200,14 @@ IMPORTANT:
     )
 }
 
-/// Generate Gemini tasks prompt using MCP create_tasks tool (sequential generation)
+/// Generate Gemini tasks prompt using CLI workflow (sequential generation)
 pub fn gemini_tasks_with_mcp_prompt(change_id: &str, all_files: &[String]) -> String {
     let context_list = all_files.iter().map(|f| format!("- {}", f)).collect::<Vec<_>>().join("\n");
 
     format!(
         r#"## Task: Create tasks.md
 
-Use the `create_tasks` MCP tool to generate tasks.md for this change.
+Use the CLI workflow to generate tasks.md for this change.
 
 ## Context Files (read all):
 {context_list}
@@ -176,7 +215,8 @@ Use the `create_tasks` MCP tool to generate tasks.md for this change.
 ## Instructions
 
 1. **Read all context files**:
-   - Read proposal.md for overall scope
+   - Use: agentd file read {change_id} proposal
+   - Use: agentd spec list {change_id} (to list all specs)
    - Read all specs/*.md for detailed requirements
 
 2. **Break down into tasks**:
@@ -187,12 +227,11 @@ Use the `create_tasks` MCP tool to generate tasks.md for this change.
      - **testing**: Unit tests, integration tests
    - Each task should reference a spec requirement (e.g., `auth-flow:R1`)
    - Define file actions: CREATE, MODIFY, or DELETE
-   - Set dependencies between tasks (e.g., task 2.1 depends on [1.1])
+   - Set dependencies between tasks (e.g., task 2.1 depends on ["1.1"])
 
-3. **Use create_tasks MCP tool** with this structure:
+3. **Create tasks JSON** with this structure:
    ```json
    {{
-     "change_id": "{change_id}",
      "tasks": [
        {{
          "layer": "data",
@@ -222,6 +261,20 @@ Use the `create_tasks` MCP tool to generate tasks.md for this change.
    }}
    ```
 
+4. **Write JSON to file** using heredoc:
+   ```bash
+   cat > /tmp/tasks-{change_id}.json <<'EOF'
+   {{ JSON content here }}
+   EOF
+   ```
+
+5. **Run CLI command**:
+   ```bash
+   agentd tasks create {change_id} --json-file /tmp/tasks-{change_id}.json
+   ```
+
+6. **Verify success** by checking command output
+
 IMPORTANT:
 - All spec requirements must be covered by tasks
 - Dependencies must be correct (no circular deps)
@@ -250,12 +303,18 @@ Read and review: agentd/changes/{change_id}/proposal.md
 
 ## Instructions
 
-1. Read the proposal.md file
+1. **Read the proposal file**:
+   ```bash
+   agentd file read {change_id} proposal
+   ```
+
 2. Check against quality criteria
 
 If issues found:
-  1. Use `create_proposal` MCP tool to update the file
-  2. Output: `<review>NEEDS_REVISION</review>`
+  1. Create updated proposal JSON
+  2. Write to /tmp/proposal-{change_id}.json using heredoc
+  3. Run: agentd proposal create {change_id} --json-file /tmp/proposal-{change_id}.json
+  4. Output: `<review>NEEDS_REVISION</review>`
 
 If no issues:
   1. Output: `<review>PASS</review>`
@@ -296,12 +355,20 @@ Read and review: agentd/changes/{change_id}/specs/{spec_id}.md
 
 ## Instructions
 
-1. Read the spec file and context files
+1. **Read the spec file and context**:
+   ```bash
+   agentd file read {change_id} {spec_id}
+   agentd file read {change_id} proposal
+   agentd spec list {change_id}
+   ```
+
 2. Check against quality criteria
 
 If issues found:
-  1. Use `create_spec` MCP tool to update the file
-  2. Output: `<review>NEEDS_REVISION</review>`
+  1. Create updated spec JSON
+  2. Write to /tmp/spec-{change_id}-{spec_id}.json using heredoc
+  3. Run: agentd spec create {change_id} {spec_id} --json-file /tmp/spec-{change_id}-{spec_id}.json
+  4. Output: `<review>NEEDS_REVISION</review>`
 
 If no issues:
   1. Output: `<review>PASS</review>`
@@ -337,12 +404,20 @@ Read and review: agentd/changes/{change_id}/tasks.md
 
 ## Instructions
 
-1. Read tasks.md and all context files
+1. **Read tasks.md and all context files**:
+   ```bash
+   agentd file read {change_id} tasks
+   agentd file read {change_id} proposal
+   agentd spec list {change_id}
+   ```
+
 2. Check against quality criteria
 
 If issues found:
-  1. Use `create_tasks` MCP tool to update the file
-  2. Output: `<review>NEEDS_REVISION</review>`
+  1. Create updated tasks JSON
+  2. Write to /tmp/tasks-{change_id}.json using heredoc
+  3. Run: agentd tasks create {change_id} --json-file /tmp/tasks-{change_id}.json
+  4. Output: `<review>NEEDS_REVISION</review>`
 
 If no issues:
   1. Output: `<review>PASS</review>`
@@ -362,15 +437,20 @@ pub fn gemini_reproposal_prompt(change_id: &str) -> String {
 
 ## Instructions
 
-**IMPORTANT**: You MUST use MCP tools to update files. Do NOT edit files directly.
+**IMPORTANT**: You MUST use CLI workflow to update files. Do NOT edit files directly.
 
-1. Read the review feedback in proposal.md (look for <review> blocks)
-2. Address each issue using the appropriate MCP tool:
-   - `create_proposal` - to update proposal.md
-   - `create_spec` - to update spec files
-   - `create_tasks` - to update tasks.md
+1. **Read the review feedback**:
+   ```bash
+   agentd file read {change_id} proposal
+   ```
+   Look for <review> blocks with issues to address
 
-Direct file editing is NOT allowed. Use MCP tools only.
+2. **Address each issue** using the appropriate CLI workflow:
+   - For proposal.md: Create JSON → Write to /tmp/proposal-{change_id}.json → Run: agentd proposal create {change_id} --json-file /tmp/proposal-{change_id}.json
+   - For spec files: Create JSON → Write to /tmp/spec-{change_id}-SPEC_ID.json → Run: agentd spec create {change_id} SPEC_ID --json-file /tmp/spec-{change_id}-SPEC_ID.json
+   - For tasks.md: Create JSON → Write to /tmp/tasks-{change_id}.json → Run: agentd tasks create {change_id} --json-file /tmp/tasks-{change_id}.json
+
+Direct file editing is NOT allowed. Use CLI workflow only.
 "#,
         change_id = change_id
     )
@@ -397,19 +477,26 @@ Review all generated proposal files in agentd/changes/{change_id}/:
 
 ## Instructions
 
-**IMPORTANT**: You MUST use MCP tools to fix any issues. Do NOT edit files directly.
+**IMPORTANT**: You MUST use CLI workflow to fix any issues. Do NOT edit files directly.
 
-1. Read each file and check against the quality criteria
-2. If ANY issues are found:
-   - Use MCP tools to fix them:
-     - `create_proposal` - to fix proposal.md
-     - `create_spec` - to fix spec files
-     - `create_tasks` - to fix tasks.md
+1. **Read all files**:
+   ```bash
+   agentd implementation read-all {change_id}
+   ```
+
+2. Check against the quality criteria
+
+3. If ANY issues are found:
+   - Use CLI workflow to fix them:
+     - For proposal.md: Create JSON → Write to /tmp/proposal-{change_id}.json → Run: agentd proposal create {change_id} --json-file /tmp/proposal-{change_id}.json
+     - For spec files: Create JSON → Write to /tmp/spec-{change_id}-SPEC_ID.json → Run: agentd spec create {change_id} SPEC_ID --json-file /tmp/spec-{change_id}-SPEC_ID.json
+     - For tasks.md: Create JSON → Write to /tmp/tasks-{change_id}.json → Run: agentd tasks create {change_id} --json-file /tmp/tasks-{change_id}.json
    - Output: `<review>NEEDS_REVISION</review>`
-3. If NO issues are found:
+
+4. If NO issues are found:
    - Output: `<review>PASS</review>`
 
-CRITICAL: Direct file editing is NOT allowed. Use MCP tools only.
+CRITICAL: Direct file editing is NOT allowed. Use CLI workflow only.
 IMPORTANT: You MUST output exactly one of the two markers above at the end of your response.
 "#,
         change_id = change_id
@@ -495,8 +582,11 @@ pub fn codex_challenge_prompt(change_id: &str) -> String {
 
 ## Instructions
 
-1. **Get Requirements**: Use the `read_all_requirements` MCP tool with change_id: "{change_id}"
-   - This will retrieve proposal.md, tasks.md, and all specs/*.md in one call
+1. **Get Requirements**:
+   ```bash
+   agentd implementation read-all {change_id}
+   ```
+   This will retrieve proposal.md, tasks.md, and all specs/*.md in one call
 
 2. **Review for Content/Logical Issues**:
    - **Completeness** - Are all requirements covered? Missing scenarios?
@@ -505,21 +595,36 @@ pub fn codex_challenge_prompt(change_id: &str) -> String {
    - **Clarity** - Are requirements specific and testable? Ambiguous language?
    - **Dependencies** - Are task dependencies correct? Missing prerequisites?
 
-3. **Submit Review**: Use the `append_review` MCP tool with your findings
+3. **Submit Review**: Use CLI workflow with your findings
 
 **IMPORTANT**:
-- DO NOT check format issues - MCP tools guarantee correct structure
+- DO NOT check format issues - CLI tools guarantee correct structure
 - Focus ONLY on content/logical issues
-- You MUST use MCP tools - direct file access is NOT allowed
+- You MUST use CLI workflow - direct file access is NOT allowed
 
-## MCP Tool Call Format
+## Review Submission
 
-Use append_review with these parameters:
-- change_id: "{change_id}"
-- status: "approved" | "needs_revision" | "rejected"
-- iteration: 1
-- reviewer: "codex"
-- content: (markdown string with your review)
+1. **Create review JSON** with this structure:
+   ```json
+   {{
+     "status": "approved|needs_revision|rejected",
+     "iteration": 1,
+     "reviewer": "codex",
+     "content": "Markdown string with:\n## Summary\n## Issues\n## Verdict\n## Next Steps"
+   }}
+   ```
+
+2. **Write JSON to file** using heredoc:
+   ```bash
+   cat > /tmp/review-{change_id}.json <<'EOF'
+   {{ JSON content here }}
+   EOF
+   ```
+
+3. **Run CLI command**:
+   ```bash
+   agentd proposal review {change_id} --json-file /tmp/review-{change_id}.json
+   ```
 
 Your review content MUST include these sections:
 - ## Summary - Overall assessment
@@ -544,16 +649,22 @@ pub fn codex_rechallenge_prompt(change_id: &str) -> String {
 
 ## Instructions
 
-1. **Get Requirements**: Use the `read_all_requirements` MCP tool with change_id: "{change_id}"
-   - This retrieves the updated proposal, tasks, and specs
+1. **Get Requirements**:
+   ```bash
+   agentd implementation read-all {change_id}
+   ```
+   This retrieves the updated proposal, tasks, and specs
 
 2. **Review Updates**: Focus ONLY on whether previous content issues have been addressed
-   - DO NOT check format issues - MCP tools guarantee correct structure
+   - DO NOT check format issues - CLI tools guarantee correct structure
    - Check if logical issues from previous review are resolved
 
-3. **Submit Follow-up Review**: Use the `append_review` MCP tool with your findings
+3. **Submit Follow-up Review**: Use CLI workflow with your findings
+   - Create review JSON (increment iteration number)
+   - Write to /tmp/review-{change_id}.json using heredoc
+   - Run: agentd proposal review {change_id} --json-file /tmp/review-{change_id}.json
 
-**IMPORTANT**: You MUST use MCP tools - direct file access is NOT allowed.
+**IMPORTANT**: You MUST use CLI workflow - direct file access is NOT allowed.
 "#,
         change_id = change_id
     )
@@ -595,11 +706,17 @@ Change ID: {change_id}
 
 ## Instructions
 
-1. **Get Requirements**: Use `read_all_requirements` MCP tool with change_id: "{change_id}"
-   - This retrieves proposal.md, tasks.md, and all specs/*.md
+1. **Get Requirements**:
+   ```bash
+   agentd implementation read-all {change_id}
+   ```
+   This retrieves proposal.md, tasks.md, and all specs/*.md
 
-2. **Get Implementation Summary**: Use `read_implementation_summary` MCP tool with change_id: "{change_id}"
-   - This provides git diff summary, changed files, and commit log
+2. **Get Implementation Summary**:
+   ```bash
+   agentd implementation list-files {change_id}
+   ```
+   This provides git diff summary, changed files, and commit log
    - For detailed code review, use the `Read` tool on specific files
 
 3. **Analyze Test Results** (embedded above):
@@ -656,12 +773,16 @@ pub fn codex_verify_prompt(change_id: &str) -> String {
 
 ## Instructions
 
-1. **Get Requirements**: Use `read_all_requirements` MCP tool with change_id: "{change_id}"
-   - This retrieves proposal.md, tasks.md, and all specs/*.md
+1. **Get Requirements**:
+   ```bash
+   agentd implementation read-all {change_id}
+   ```
+   This retrieves proposal.md, tasks.md, and all specs/*.md
 
 2. **Verify Implementation**: Ensure all tasks and requirements are complete
    - Check each requirement is satisfied
    - Verify all tasks are implemented
+   - Use: agentd implementation list-files {change_id} to see changed files
 
 3. **Write Verification Results**: Create VERIFY.md with findings
 "#,
@@ -680,8 +801,11 @@ pub fn codex_archive_review_prompt(change_id: &str, strategy: &str) -> String {
 
 ## Instructions
 
-1. **Get Requirements**: Use `read_all_requirements` MCP tool with change_id: "{change_id}"
-   - This retrieves proposal.md, tasks.md, and all specs/*.md
+1. **Get Requirements**:
+   ```bash
+   agentd implementation read-all {change_id}
+   ```
+   This retrieves proposal.md, tasks.md, and all specs/*.md
 
 2. **Review Archive Quality**:
    - Check completeness of documentation
@@ -849,8 +973,8 @@ mod tests {
         let prompt = gemini_proposal_prompt("test-change", "Add new feature");
         assert!(prompt.contains("test-change"));
         assert!(prompt.contains("Add new feature"));
-        assert!(prompt.contains("create_proposal"));
-        assert!(prompt.contains("MCP tool"));
+        assert!(prompt.contains("agentd proposal create"));
+        assert!(prompt.contains("CLI workflow"));
     }
 
     #[test]
@@ -927,8 +1051,8 @@ mod tests {
     fn test_gemini_reproposal_prompt_has_instructions() {
         let prompt = gemini_reproposal_prompt("test");
         assert!(prompt.contains("Instructions"));
-        assert!(prompt.contains("MCP tools"));
-        assert!(prompt.contains("create_proposal"));
+        assert!(prompt.contains("CLI workflow"));
+        assert!(prompt.contains("agentd proposal create"));
     }
 
     #[test]
@@ -953,8 +1077,8 @@ mod tests {
         assert!(prompt.contains("## Change ID"));
         assert!(prompt.contains("new-feature"));
         assert!(prompt.contains("## Instructions"));
-        assert!(prompt.contains("append_review"));
-        assert!(prompt.contains("MCP tool"));
+        assert!(prompt.contains("agentd proposal review"));
+        assert!(prompt.contains("CLI workflow"));
     }
 
     #[test]

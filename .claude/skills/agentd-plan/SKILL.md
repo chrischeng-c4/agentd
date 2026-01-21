@@ -13,7 +13,7 @@ Orchestrates the entire planning phase, automatically handling proposal generati
 **DO NOT explore the codebase yourself.** Your job is to:
 1. Clarify the user's requirements (structured Q&A)
 2. Write clarifications to `clarifications.md`
-3. Run the `agentd proposal` command
+3. Run the `agentd plan` command
 
 The actual codebase exploration and analysis is done by:
 - **Gemini** (proposal generation - 2M context window)
@@ -21,9 +21,16 @@ The actual codebase exploration and analysis is done by:
 
 You are a dispatcher, not an explorer.
 
+**Note**: `agentd plan` is state-aware and automatically runs the full workflow:
+- Proposal generation (Gemini)
+- Challenge analysis (Codex)
+- Reproposal loop (if NEEDS_REVISION, up to max iterations)
+
+There are NO separate `proposal`, `challenge`, or `reproposal` commands anymore.
+
 ## Clarification Phase (Before Proposal)
 
-For **NEW changes** (no existing `STATE.yaml`), clarify requirements before running `agentd proposal`:
+For **NEW changes** (no existing `STATE.yaml`), clarify requirements before running `agentd plan`:
 
 ### When to clarify
 - Always for new changes, unless user says "skip" or description is very detailed
@@ -163,7 +170,7 @@ AskUserQuestion:
 
 - **Proceed to implementation**: Suggest `/agentd:impl <change-id>`
 - **Open viewer**: Run `agentd view <change-id>`
-- **Continue fixing**: Run `agentd reproposal <change-id>` then `agentd challenge <change-id>`
+- **Continue fixing**: Run `agentd plan <change-id>` again (it will auto-repropose and re-challenge)
 
 #### When significant issues remain (not minor):
 
@@ -181,7 +188,7 @@ AskUserQuestion:
 ```
 
 - **Open viewer**: Run `agentd view <change-id>`
-- **Continue fixing**: Run `agentd reproposal <change-id>` then `agentd challenge <change-id>`
+- **Continue fixing**: Run `agentd plan <change-id>` again (it will auto-repropose and re-challenge)
 - **Proceed anyway**: Suggest `/agentd:impl <change-id>`
 
 ### If verdict is REJECTED

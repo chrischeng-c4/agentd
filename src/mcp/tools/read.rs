@@ -3,6 +3,7 @@
 //! Reads files from a change directory to support progressive workflows.
 
 use super::{get_optional_string, get_required_string, ToolDefinition};
+use crate::services::file_service::{list_specs, read_file};
 use crate::Result;
 use serde_json::{json, Value};
 use std::path::Path;
@@ -35,48 +36,7 @@ pub fn definition() -> ToolDefinition {
 pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
     let change_id = get_required_string(args, "change_id")?;
     let file = get_optional_string(args, "file").unwrap_or_else(|| "proposal".to_string());
-
-    // Check change directory exists
-    let change_dir = project_root.join("agentd/changes").join(&change_id);
-    if !change_dir.exists() {
-        anyhow::bail!("Change '{}' not found.", change_id);
-    }
-
-    // Determine which file to read
-    let file_path = match file.as_str() {
-        "proposal" => change_dir.join("proposal.md"),
-        "tasks" => change_dir.join("tasks.md"),
-        spec_name => {
-            // Try as a spec file
-            let spec_path = change_dir.join("specs").join(format!("{}.md", spec_name));
-            if spec_path.exists() {
-                spec_path
-            } else {
-                // Maybe they included .md already
-                let spec_path_with_ext = change_dir.join("specs").join(spec_name);
-                if spec_path_with_ext.exists() {
-                    spec_path_with_ext
-                } else {
-                    anyhow::bail!(
-                        "File not found: '{}'. Use 'proposal', 'tasks', or a spec name.",
-                        file
-                    );
-                }
-            }
-        }
-    };
-
-    if !file_path.exists() {
-        anyhow::bail!("File not found: {}", file_path.display());
-    }
-
-    let content = std::fs::read_to_string(&file_path)?;
-
-    Ok(format!(
-        "# File: {}\n\n{}",
-        file_path.strip_prefix(&change_dir).unwrap_or(&file_path).display(),
-        content
-    ))
+    read_file(&change_id, &file, project_root)
 }
 
 /// Get the tool definition for list_specs
@@ -100,46 +60,7 @@ pub fn list_specs_definition() -> ToolDefinition {
 /// Execute the list_specs tool
 pub fn execute_list_specs(args: &Value, project_root: &Path) -> Result<String> {
     let change_id = get_required_string(args, "change_id")?;
-
-    // Check change directory exists
-    let change_dir = project_root.join("agentd/changes").join(&change_id);
-    if !change_dir.exists() {
-        anyhow::bail!("Change '{}' not found.", change_id);
-    }
-
-    let specs_dir = change_dir.join("specs");
-    if !specs_dir.exists() {
-        return Ok("No specs directory found.".to_string());
-    }
-
-    let mut specs = Vec::new();
-    for entry in std::fs::read_dir(&specs_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "md") {
-            if let Some(name) = path.file_stem() {
-                let name_str = name.to_string_lossy();
-                // Skip skeleton files
-                if !name_str.starts_with('_') {
-                    specs.push(name_str.to_string());
-                }
-            }
-        }
-    }
-
-    if specs.is_empty() {
-        return Ok("No spec files found.".to_string());
-    }
-
-    specs.sort();
-
-    let mut result = format!("# Specs for change '{}'\n\n", change_id);
-    for spec in &specs {
-        result.push_str(&format!("- {}\n", spec));
-    }
-    result.push_str(&format!("\nTotal: {} spec(s)", specs.len()));
-
-    Ok(result)
+    list_specs(&change_id, project_root)
 }
 
 #[cfg(test)]

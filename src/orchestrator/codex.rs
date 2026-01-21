@@ -98,9 +98,6 @@ impl<'a> CodexOrchestrator<'a> {
 
     /// Run challenge (initial proposal review)
     pub async fn run_challenge(&self, change_id: &str, complexity: Complexity) -> Result<(String, UsageMetrics)> {
-        // Ensure Codex MCP config exists before running
-        crate::mcp::ensure_codex_mcp_config()?;
-
         let prompt = prompts::codex_challenge_prompt(change_id);
         let env = self.build_env(change_id);
         // First call in Plan stage, no resume

@@ -12,11 +12,18 @@ Orchestrates the implementation phase, handling code generation, review, and ite
 
 **DO NOT implement code yourself.** Your job is to:
 1. Check the current phase in `STATE.yaml`
-2. Run the `agentd implement` command
+2. Run the `agentd impl` command
 
 The actual implementation is done by a **separate Claude session** spawned by the command. This session has access to the proposal specs and implements according to `tasks.md`.
 
 You are a dispatcher, not an implementer. Run the command and let the subprocess handle the work.
+
+**Note**: `agentd impl` is state-aware and automatically runs the full workflow:
+- Implementation (Claude writes code + tests)
+- Review (Codex runs tests + security scan)
+- Resolve loop (if NEEDS_CHANGES, up to max iterations)
+
+There are NO separate `review` or `resolve-reviews` commands anymore.
 
 ## Usage
 
@@ -36,11 +43,18 @@ The skill determines readiness based on the `phase` field in `STATE.yaml`:
 
 | Phase | Action |
 |-------|--------|
-| `challenged` | ✅ Run `agentd implement` to start implementation |
-| `implementing` | ✅ Continue `agentd implement` (resume or retry) |
+| `challenged` | ✅ Run `agentd impl` - starts full workflow |
+| `implementing` | ✅ Run `agentd impl` - resumes from review step |
+| `complete` | ℹ️ Already done, ready to archive |
 | Other phases | ❌ **ChangeNotReady** error - not ready for implementation |
 
-**Note**: The `agentd implement` command internally handles code review and auto-fix loops. It will iterate until all tests pass and code review is approved (phase → `complete`).
+**Note**: The `agentd impl` command is **state-aware** and automatically determines what to do:
+- If `challenged`: Start implementation → review → resolve loop
+- If `implementing` with no REVIEW.md: Run review step
+- If `implementing` with REVIEW.md: Check verdict and resolve if needed
+- If `complete`: Display success message
+
+No manual intervention needed between steps!
 
 ## Prerequisites
 
@@ -57,7 +71,7 @@ Before implementation, the spawned session may consult `agentd/knowledge/` for:
 - Module-specific implementation details
 - Architecture constraints
 
-Use `read_knowledge` MCP tool to access documentation.
+Use `agentd knowledge read <path>` CLI command to access documentation.
 
 ## State transitions
 

@@ -3,6 +3,7 @@
 //! Tools for reading, writing, and listing knowledge documentation.
 
 use super::{get_optional_string, get_required_string, ToolDefinition};
+use crate::services::knowledge_service::{list_knowledge, read_knowledge};
 use crate::Result;
 use chrono::Local;
 use serde_json::{json, Value};
@@ -29,49 +30,7 @@ pub fn read_definition() -> ToolDefinition {
 /// Execute the read_knowledge tool
 pub fn execute_read(args: &Value, project_root: &Path) -> Result<String> {
     let path = get_optional_string(args, "path").unwrap_or_else(|| "index.md".to_string());
-
-    let knowledge_dir = project_root.join("agentd/knowledge");
-    if !knowledge_dir.exists() {
-        anyhow::bail!("Knowledge directory not found. Run 'agentd init' first.");
-    }
-
-    // Normalize path and prevent directory traversal
-    let normalized_path = path.trim_start_matches('/').trim_start_matches("./");
-    if normalized_path.contains("..") {
-        anyhow::bail!("Invalid path: directory traversal not allowed");
-    }
-
-    let file_path = knowledge_dir.join(normalized_path);
-
-    // Security: ensure path is within knowledge directory
-    if !file_path.starts_with(&knowledge_dir) {
-        anyhow::bail!("Invalid path: must be within agentd/knowledge/");
-    }
-
-    if !file_path.exists() {
-        anyhow::bail!("Knowledge file not found: {}", normalized_path);
-    }
-
-    if file_path.is_dir() {
-        // If directory, try to read index.md
-        let index_path = file_path.join("index.md");
-        if index_path.exists() {
-            let content = std::fs::read_to_string(&index_path)?;
-            return Ok(format!(
-                "# Knowledge: {}/index.md\n\n{}",
-                normalized_path, content
-            ));
-        } else {
-            anyhow::bail!(
-                "'{}' is a directory. Specify a file or ensure index.md exists.",
-                normalized_path
-            );
-        }
-    }
-
-    let content = std::fs::read_to_string(&file_path)?;
-
-    Ok(format!("# Knowledge: {}\n\n{}", normalized_path, content))
+    read_knowledge(&path, project_root)
 }
 
 /// Get the tool definition for list_knowledge
@@ -274,195 +233,10 @@ fn extract_frontmatter_field(path: &Path, field: &str) -> Option<String> {
     None
 }
 
-/// Knowledge file metadata
-struct KnowledgeMetadata {
-    path: String,
-    title: Option<String>,
-    source: Option<String>,
-    date: Option<String>,
-}
-
 /// Execute the list_knowledge tool
 pub fn execute_list(args: &Value, project_root: &Path) -> Result<String> {
     let subpath = get_optional_string(args, "path");
-
-    let knowledge_dir = project_root.join("agentd/knowledge");
-    if !knowledge_dir.exists() {
-        return Ok("No knowledge directory found. Run 'agentd init' first.".to_string());
-    }
-
-    let search_dir = match &subpath {
-        Some(p) => {
-            let normalized = p.trim_start_matches('/').trim_start_matches("./");
-            if normalized.contains("..") {
-                anyhow::bail!("Invalid path: directory traversal not allowed");
-            }
-            knowledge_dir.join(normalized)
-        }
-        None => knowledge_dir.clone(),
-    };
-
-    if !search_dir.exists() {
-        anyhow::bail!("Directory not found: {}", subpath.unwrap_or_default());
-    }
-
-    let mut entries = collect_knowledge_files(&search_dir, &knowledge_dir)?;
-    entries.sort_by(|a, b| a.path.cmp(&b.path));
-
-    if entries.is_empty() {
-        return Ok("No knowledge files found.".to_string());
-    }
-
-    let mut result = String::new();
-    if let Some(p) = &subpath {
-        result.push_str(&format!("# Knowledge: {}\n\n", p));
-    } else {
-        result.push_str("# Knowledge Base\n\n");
-    }
-
-    for entry in &entries {
-        // Format: - **path**: Title (date)
-        result.push_str(&format!("- **{}**", entry.path));
-
-        if let Some(title) = &entry.title {
-            if let Some(date) = &entry.date {
-                result.push_str(&format!(": {} ({})", title, date));
-            } else {
-                result.push_str(&format!(": {}", title));
-            }
-        }
-        result.push('\n');
-
-        // Add source on next line if available
-        if let Some(source) = &entry.source {
-            result.push_str(&format!("  Source: {}\n", source));
-        }
-    }
-
-    result.push_str(&format!("\nTotal: {} file(s)", entries.len()));
-
-    Ok(result)
-}
-
-/// Recursively collect knowledge files with their metadata
-fn collect_knowledge_files(
-    dir: &Path,
-    base_dir: &Path,
-) -> Result<Vec<KnowledgeMetadata>> {
-    let mut entries = Vec::new();
-
-    if !dir.is_dir() {
-        return Ok(entries);
-    }
-
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        if path.is_dir() {
-            // Recurse into subdirectories
-            let mut sub_entries = collect_knowledge_files(&path, base_dir)?;
-            entries.append(&mut sub_entries);
-        } else if path.extension().map_or(false, |ext| ext == "md") {
-            let relative_path = path
-                .strip_prefix(base_dir)
-                .unwrap_or(&path)
-                .to_string_lossy()
-                .to_string();
-
-            // Parse frontmatter to get metadata
-            let metadata = parse_knowledge_metadata(&path, relative_path);
-            entries.push(metadata);
-        }
-    }
-
-    Ok(entries)
-}
-
-/// Parse frontmatter from a knowledge file
-fn parse_knowledge_metadata(path: &Path, relative_path: String) -> KnowledgeMetadata {
-    let content = match std::fs::read_to_string(path) {
-        Ok(c) => c,
-        Err(_) => {
-            return KnowledgeMetadata {
-                path: relative_path,
-                title: None,
-                source: None,
-                date: None,
-            }
-        }
-    };
-
-    let lines: Vec<&str> = content.lines().collect();
-
-    // Check if file has frontmatter
-    if lines.first() != Some(&"---") {
-        // No frontmatter, try to get first heading as title
-        let title = get_first_heading_from_content(&content);
-        return KnowledgeMetadata {
-            path: relative_path,
-            title,
-            source: None,
-            date: None,
-        };
-    }
-
-    // Parse frontmatter
-    let mut title = None;
-    let mut source = None;
-    let mut date = None;
-
-    for line in lines.iter().skip(1) {
-        if *line == "---" {
-            break;
-        }
-        if let Some(value) = line.strip_prefix("title: ") {
-            title = Some(value.to_string());
-        } else if let Some(value) = line.strip_prefix("source: ") {
-            source = Some(value.to_string());
-        } else if let Some(value) = line.strip_prefix("date: ") {
-            date = Some(value.to_string());
-        } else if let Some(value) = line.strip_prefix("updated: ") {
-            // Use updated date if available
-            date = Some(value.to_string());
-        }
-    }
-
-    // If no title in frontmatter, try first heading
-    if title.is_none() {
-        title = get_first_heading_from_content(&content);
-    }
-
-    KnowledgeMetadata {
-        path: relative_path,
-        title,
-        source,
-        date,
-    }
-}
-
-/// Extract the first markdown heading from content
-fn get_first_heading_from_content(content: &str) -> Option<String> {
-    let mut in_frontmatter = false;
-
-    for line in content.lines() {
-        let trimmed = line.trim();
-
-        // Skip frontmatter
-        if trimmed == "---" {
-            in_frontmatter = !in_frontmatter;
-            continue;
-        }
-        if in_frontmatter {
-            continue;
-        }
-
-        if trimmed.starts_with('#') {
-            // Remove # symbols and trim
-            return Some(trimmed.trim_start_matches('#').trim().to_string());
-        }
-    }
-    None
+    list_knowledge(subpath.as_deref(), project_root)
 }
 
 #[cfg(test)]

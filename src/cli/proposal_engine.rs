@@ -1,7 +1,5 @@
-use crate::cli::validate_challenge::validate_challenge;
-use crate::cli::validate_proposal::validate_proposal;
 use crate::context::ContextPhase;
-use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, Complexity, ValidationOptions};
+use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, Complexity};
 use crate::orchestrator::{detect_self_review_marker, find_session_index, GeminiOrchestrator, CodexOrchestrator, SelfReviewResult, UsageMetrics};
 use crate::parser::{parse_challenge_verdict, parse_affected_specs};
 use crate::orchestrator::prompts;
@@ -43,27 +41,10 @@ pub async fn run_proposal_loop(config: ProposalEngineConfig) -> Result<ProposalE
     // Step 1: Generate proposal, specs, and tasks sequentially
     let resolved_change_id = run_proposal_step_sequential(&change_id, &description, &project_root, &agentd_config).await?;
 
-    // Step 2: Validate proposal format
-    let format_valid = run_validate_proposal_step(&resolved_change_id, &project_root)?;
-    if !format_valid {
-        println!("{}", "⚠️  Format validation failed after sequential generation".yellow());
-        println!("   Please manually review and fix: agentd/changes/{}/proposal.md", resolved_change_id);
-        let proposal_path = project_root.join("agentd/changes").join(&resolved_change_id).join("proposal.md");
-        return Ok(ProposalEngineResult {
-            resolved_change_id,
-            verdict: ChallengeVerdict::NeedsRevision,
-            iteration_count: 0,
-            has_only_minor_issues: check_only_minor_issues(&proposal_path).unwrap_or(false),
-        });
-    }
-
-    // Step 3: Challenge with Codex
+    // Step 2: Challenge with Codex
     let mut verdict = run_challenge_step(&resolved_change_id, &project_root, &agentd_config).await?;
 
-    // Step 4: Validate challenge format
-    let _challenge_valid = run_validate_challenge_step(&resolved_change_id, &project_root)?;
-
-    // Step 5: Reproposal loop (up to planning_iterations times)
+    // Step 3: Reproposal loop (up to planning_iterations times)
     let max_iterations = agentd_config.workflow.planning_iterations;
     let mut iteration: usize = 0;
 
@@ -176,38 +157,14 @@ fn record_usage(
     }
 }
 
-/// Step 2: Validate proposal format (local validation, no AI)
-fn run_validate_proposal_step(
-    change_id: &str,
-    project_root: &PathBuf,
-) -> Result<bool> {
-    println!();
-    println!("{}", "📋 [2/6] Validating proposal format...".cyan());
-
-    let options = ValidationOptions::default();
-    let summary = validate_proposal(change_id, project_root, &options)?;
-
-    if summary.is_valid() {
-        println!("{}", "✅ Proposal format validation passed".green());
-        Ok(true)
-    } else {
-        println!(
-            "{}",
-            format!("⚠️  {} HIGH severity format errors found", summary.high_count).yellow()
-        );
-        // Continue anyway - let Codex find more issues
-        Ok(false)
-    }
-}
-
-/// Step 3: Run challenge with Codex
+/// Step 2: Run challenge with Codex
 async fn run_challenge_step(
     change_id: &str,
     project_root: &PathBuf,
     config: &AgentdConfig,
 ) -> Result<ChallengeVerdict> {
     println!();
-    println!("{}", "🔍 [3/6] Challenging proposal with Codex...".cyan());
+    println!("{}", "🔍 [2/4] Challenging proposal with Codex...".cyan());
 
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
@@ -283,37 +240,14 @@ async fn run_challenge_step(
     Ok(verdict)
 }
 
-/// Step 4: Validate challenge format (local validation, no AI)
-fn run_validate_challenge_step(
-    change_id: &str,
-    project_root: &PathBuf,
-) -> Result<bool> {
-    println!();
-    println!("{}", "📋 [4/6] Validating challenge format...".cyan());
-
-    let options = ValidationOptions::default();
-    let result = validate_challenge(change_id, project_root, &options)?;
-
-    if result.is_valid() {
-        println!("{}", "✅ Challenge format validation passed".green());
-        Ok(true)
-    } else {
-        println!(
-            "{}",
-            format!("⚠️  Challenge format issues: {:?}", result.errors).yellow()
-        );
-        Ok(false)
-    }
-}
-
-/// Step 6: Run re-challenge with Codex (resumes session for cached context)
+/// Step 3: Run re-challenge with Codex (resumes session for cached context)
 async fn run_rechallenge_step(
     change_id: &str,
     project_root: &PathBuf,
     config: &AgentdConfig,
 ) -> Result<ChallengeVerdict> {
     println!();
-    println!("{}", "🔍 [6/6] Re-challenging with Codex (cached session)...".cyan());
+    println!("{}", "🔍 [4/4] Re-challenging with Codex (cached session)...".cyan());
 
     let change_dir = project_root.join("agentd/changes").join(change_id);
 
@@ -351,7 +285,7 @@ async fn run_rechallenge_step(
     Ok(verdict)
 }
 
-/// Step 5: Run reproposal with Gemini (resumes session for cached context)
+/// Step 3 (loop): Run reproposal with Gemini (resumes session for cached context)
 async fn run_reproposal_step(
     change_id: &str,
     project_root: &PathBuf,

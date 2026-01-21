@@ -139,8 +139,8 @@ fn migrate_challenge_to_review(proposal_path: &Path, challenge_path: &Path) -> R
         _ => "unknown",
     };
 
-    // Append as review block using the existing function
-    crate::mcp::tools::proposal::append_review(proposal_path, status, 1, "codex", &challenge_content)?;
+    // Append as review block using the service layer
+    crate::services::proposal_service::append_review(proposal_path, status, 1, "codex", &challenge_content)?;
 
     println!(
         "   {} CHALLENGE.md: migrated to <review> block",

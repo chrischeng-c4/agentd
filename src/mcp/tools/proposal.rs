@@ -4,8 +4,8 @@
 
 use super::{get_optional_string, get_required_array, get_required_object, get_required_string, ToolDefinition};
 use crate::models::spec_rules::SpecFormatRules;
+use crate::services::proposal_service::{create_proposal, CreateProposalInput, ImpactData};
 use crate::Result;
-use chrono::Utc;
 use serde_json::{json, Value};
 use std::path::Path;
 
@@ -87,21 +87,6 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
     let what_changes = get_required_array(args, "what_changes")?;
     let impact = get_required_object(args, "impact")?;
 
-    // Validate change_id format
-    if !change_id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
-        anyhow::bail!("change_id must be lowercase alphanumeric with hyphens only");
-    }
-
-    // Validate summary length
-    if summary.len() < 10 {
-        anyhow::bail!("summary must be at least 10 characters");
-    }
-
-    // Validate why length
-    if why.len() < 50 {
-        anyhow::bail!("why must be at least 50 characters");
-    }
-
     // Extract impact fields
     let scope = get_required_string(&impact, "scope")?;
     let affected_files = impact
@@ -112,208 +97,52 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
     let affected_specs = impact
         .get("affected_specs")
         .and_then(|v| v.as_array())
-        .cloned()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_default();
     let affected_code = impact
         .get("affected_code")
         .and_then(|v| v.as_array())
-        .cloned()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_default();
     let breaking_changes = get_optional_string(&impact, "breaking_changes");
 
-    // Validate scope
-    if !["patch", "minor", "major"].contains(&scope.as_str()) {
-        anyhow::bail!("impact.scope must be 'patch', 'minor', or 'major'");
-    }
+    // Convert what_changes array to Vec<String>
+    let what_changes_vec: Vec<String> = what_changes
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
 
-    // Create change directory
-    let change_dir = project_root.join("agentd/changes").join(&change_id);
-    std::fs::create_dir_all(&change_dir)?;
+    // Note: SpecFormatRules is used by the service layer indirectly
+    let _prd_rules = SpecFormatRules::prd_defaults();
 
-    // Generate proposal.md content
-    let now = Utc::now();
-    let mut content = String::new();
-
-    // Frontmatter
-    content.push_str("---\n");
-    content.push_str(&format!("id: {}\n", change_id));
-    content.push_str("type: proposal\n");
-    content.push_str("version: 1\n");
-    content.push_str(&format!("created_at: {}\n", now.to_rfc3339()));
-    content.push_str(&format!("updated_at: {}\n", now.to_rfc3339()));
-    content.push_str("author: mcp\n");
-    content.push_str("status: proposed\n");
-    content.push_str("iteration: 1\n");
-    content.push_str(&format!("summary: \"{}\"\n", summary.replace('"', "\\\"")));
-
-    // Impact section in frontmatter
-    content.push_str("impact:\n");
-    content.push_str(&format!("  scope: {}\n", scope));
-    content.push_str(&format!("  affected_files: {}\n", affected_files));
-    content.push_str(&format!("  new_files: {}\n", new_files));
-
-    // Affected specs
-    if !affected_specs.is_empty() {
-        content.push_str("affected_specs:\n");
-        for spec in &affected_specs {
-            if let Some(spec_id) = spec.as_str() {
-                content.push_str(&format!("  - id: {}\n", spec_id));
-                content.push_str(&format!("    path: specs/{}.md\n", spec_id));
-            }
-        }
-    }
-
-    content.push_str("---\n\n");
-
-    // Wrap proposal content in XML
-    content.push_str("<proposal>\n\n");
-
-    // Title
-    content.push_str(&format!("# Change: {}\n\n", change_id));
-
-    // Note: Section headings must match SpecFormatRules::prd_defaults().required_headings:
-    // ["Summary", "Why", "What Changes", "Impact"]
-    let _prd_rules = SpecFormatRules::prd_defaults(); // Ensure import is used
-
-    // Summary section
-    content.push_str("## Summary\n\n");
-    content.push_str(&format!("{}\n\n", summary));
-
-    // Why section
-    content.push_str("## Why\n\n");
-    content.push_str(&format!("{}\n\n", why));
-
-    // What Changes section
-    content.push_str("## What Changes\n\n");
-    for change in &what_changes {
-        if let Some(change_text) = change.as_str() {
-            content.push_str(&format!("- {}\n", change_text));
-        }
-    }
-    content.push('\n');
-
-    // Impact section in markdown
-    content.push_str("## Impact\n\n");
-    content.push_str(&format!("- **Scope**: {}\n", scope));
-    content.push_str(&format!("- **Affected Files**: ~{}\n", affected_files));
-    content.push_str(&format!("- **New Files**: ~{}\n", new_files));
-
-    if !affected_specs.is_empty() {
-        // Format: - Affected specs: `spec-1`, `spec-2`, `spec-3`
-        let specs_list: Vec<String> = affected_specs
-            .iter()
-            .filter_map(|s| s.as_str().map(|id| format!("`{}`", id)))
-            .collect();
-        content.push_str(&format!("- Affected specs: {}\n", specs_list.join(", ")));
-    }
-
-    if !affected_code.is_empty() {
-        // Format: - Affected code: `path/a`, `path/b`
-        let code_list: Vec<String> = affected_code
-            .iter()
-            .filter_map(|c| c.as_str().map(|path| format!("`{}`", path)))
-            .collect();
-        content.push_str(&format!("- Affected code: {}\n", code_list.join(", ")));
-    }
-
-    if let Some(breaking) = &breaking_changes {
-        content.push_str(&format!("- **Breaking Changes**: {}\n", breaking));
-    }
-    content.push('\n');
-
-    // Close proposal XML tag
-    content.push_str("</proposal>\n");
-
-    // Write the file
-    let proposal_path = change_dir.join("proposal.md");
-    std::fs::write(&proposal_path, &content)?;
-
-    // Create specs directory
-    let specs_dir = change_dir.join("specs");
-    std::fs::create_dir_all(&specs_dir)?;
-
-    // Initialize STATE.yaml
-    let state_content = format!(
-        r#"change_id: {}
-schema_version: "2.0"
-created_at: {}
-updated_at: {}
-phase: proposed
-iteration: 1
-last_action: create_proposal (mcp)
-checksums: {{}}
-validations: []
-"#,
+    // Create input struct and call service
+    let input = CreateProposalInput {
         change_id,
-        now.to_rfc3339(),
-        now.to_rfc3339()
-    );
-    std::fs::write(change_dir.join("STATE.yaml"), state_content)?;
-
-    Ok(format!(
-        "Created proposal.md for change '{}' at {}",
-        change_id,
-        proposal_path.display()
-    ))
-}
-
-/// Append review block to existing proposal.md
-///
-/// Smart iteration logic:
-/// - If iteration N already exists with status="resolved" → replace
-/// - If iteration N exists with status !="resolved" → append new iteration
-/// - If iteration N doesn't exist → append
-pub fn append_review(
-    proposal_path: &std::path::Path,
-    status: &str,
-    iteration: u32,
-    reviewer: &str,
-    review_content: &str,
-) -> Result<(), anyhow::Error> {
-    let content = std::fs::read_to_string(proposal_path)?;
-
-    // Create attributes map
-    let mut attrs = std::collections::HashMap::new();
-    attrs.insert("status".to_string(), status.to_string());
-    attrs.insert("iteration".to_string(), iteration.to_string());
-    attrs.insert("reviewer".to_string(), reviewer.to_string());
-
-    // Wrap review content in XML tags
-    let review_xml = crate::parser::wrap_in_xml("review", review_content, attrs);
-
-    // Check existing reviews
-    let existing_reviews = crate::parser::extract_xml_blocks(&content, "review")?;
-
-    // Check if this iteration exists and is resolved
-    let should_replace = existing_reviews.iter().any(|r| {
-        let iter = r
-            .attributes
-            .get("iteration")
-            .and_then(|i| i.parse::<u32>().ok())
-            .unwrap_or(0);
-        let r_status = r.attributes.get("status").map(|s| s.as_str()).unwrap_or("");
-        iter == iteration && r_status == "resolved"
-    });
-
-    let updated = if should_replace {
-        crate::parser::update_xml_blocks(
-            &content,
-            "review",
-            &review_xml,
-            crate::parser::UpdateMode::ReplaceLatest,
-        )?
-    } else {
-        crate::parser::update_xml_blocks(
-            &content,
-            "review",
-            &review_xml,
-            crate::parser::UpdateMode::Append,
-        )?
+        summary,
+        why,
+        what_changes: what_changes_vec,
+        impact: ImpactData {
+            scope,
+            affected_files,
+            new_files,
+            affected_specs,
+            affected_code,
+            breaking_changes,
+        },
     };
 
-    std::fs::write(proposal_path, updated)?;
-    Ok(())
+    create_proposal(input, project_root)
 }
+
+// Note: append_review function is now in the service layer (services::proposal_service::append_review)
 
 /// Get the tool definition for append_review
 pub fn append_review_definition() -> ToolDefinition {
@@ -355,6 +184,8 @@ pub fn append_review_definition() -> ToolDefinition {
 
 /// Execute the append_review tool
 pub fn execute_append_review(args: &Value, project_root: &Path) -> Result<String> {
+    use crate::services::proposal_service::append_review;
+
     // Extract required fields
     let change_id = get_required_string(args, "change_id")?;
     let status = get_required_string(args, "status")?;
@@ -393,7 +224,7 @@ pub fn execute_append_review(args: &Value, project_root: &Path) -> Result<String
         );
     }
 
-    // Append review block
+    // Append review block using service
     append_review(&proposal_path, &status, iteration, &reviewer, &content)?;
 
     Ok(format!(

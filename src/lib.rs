@@ -8,6 +8,7 @@ pub mod mcp;
 pub mod models;
 pub mod orchestrator;
 pub mod parser;
+pub mod services;
 pub mod state;
 pub mod ui;
 pub mod validator;
