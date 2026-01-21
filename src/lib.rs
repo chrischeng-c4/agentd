@@ -11,6 +11,7 @@ pub mod parser;
 pub mod services;
 pub mod state;
 pub mod ui;
+pub mod utils;
 pub mod validator;
 
 pub use anyhow::{Context, Result};

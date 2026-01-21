@@ -1,9 +1,12 @@
 {
   "mcpServers": {
     "agentd": {
-      "type": "stdio",
-      "command": "cargo",
-      "args": ["run", "--manifest-path", "/Users/chris.cheng/chris-project/agentd/Cargo.toml", "--", "mcp-server"]
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "X-Agentd-Project": "agentd",
+        "X-Agentd-Cwd": "/Users/chrischeng/projects/agentd"
+      }
     }
   }
 }

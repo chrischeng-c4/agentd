@@ -909,8 +909,8 @@ mod tests {
         let prompt = gemini_proposal_prompt("test-change", "Add new feature");
         assert!(prompt.contains("test-change"));
         assert!(prompt.contains("Add new feature"));
-        assert!(prompt.contains("agentd proposal create"));
-        assert!(prompt.contains("CLI workflow"));
+        assert!(prompt.contains("create_proposal"));
+        assert!(prompt.contains("MCP tool"));
     }
 
     #[test]
@@ -987,8 +987,8 @@ mod tests {
     fn test_gemini_reproposal_prompt_has_instructions() {
         let prompt = gemini_reproposal_prompt("test");
         assert!(prompt.contains("Instructions"));
-        assert!(prompt.contains("CLI workflow"));
-        assert!(prompt.contains("agentd proposal create"));
+        assert!(prompt.contains("MCP tool"));
+        assert!(prompt.contains("create_proposal"));
     }
 
     #[test]
@@ -1013,8 +1013,8 @@ mod tests {
         assert!(prompt.contains("## Change ID"));
         assert!(prompt.contains("new-feature"));
         assert!(prompt.contains("## Instructions"));
-        assert!(prompt.contains("agentd proposal review"));
-        assert!(prompt.contains("CLI workflow"));
+        assert!(prompt.contains("append_review"));
+        assert!(prompt.contains("MCP tool"));
     }
 
     #[test]

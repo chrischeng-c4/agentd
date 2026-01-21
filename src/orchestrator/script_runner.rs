@@ -401,12 +401,16 @@ mod tests {
         // This should fail because the command doesn't exist (or might work if gemini is installed)
         let result = runner.run_llm(LlmProvider::Gemini, args, env, prompt, false).await;
 
-        // We expect this to fail with "not found" error if gemini CLI is not installed
+        // We expect this to fail with either "not found" error or auth error
         if result.is_err() {
             let err = result.unwrap_err();
+            let err_str = err.to_string();
             assert!(
-                err.to_string().contains("not found") || err.to_string().contains("Please ensure it is installed"),
-                "Error should mention command not found: {}",
+                err_str.contains("not found")
+                    || err_str.contains("Please ensure it is installed")
+                    || err_str.contains("auth")
+                    || err_str.contains("API"),
+                "Error should mention command not found or auth issue: {}",
                 err
             );
         }
