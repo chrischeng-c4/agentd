@@ -345,7 +345,6 @@ fn update_gemini_config(project_name: &str, project_path: &std::path::Path, port
 
     settings["mcpServers"]["agentd"] = json!({
         "url": format!("http://localhost:{}/mcp", port),
-        "transport": "http",
         "headers": {
             "X-Agentd-Project": project_name,
             "X-Agentd-Cwd": project_path.to_str().unwrap()

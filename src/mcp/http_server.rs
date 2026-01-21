@@ -118,7 +118,11 @@ async fn handle_mcp_request(
 
     // Execute request in project context
     match execute_in_project_context(request, project_path).await {
-        Ok(response) => Json(response).into_response(),
+        Ok(Some(response)) => Json(response).into_response(),
+        Ok(None) => {
+            // Notification - return HTTP 202 Accepted with empty body
+            (axum::http::StatusCode::ACCEPTED, "").into_response()
+        }
         Err(e) => {
             eprintln!("Error executing request: {}", e);
             error_response(
@@ -146,10 +150,11 @@ fn extract_project_name(headers: &HeaderMap) -> Result<String> {
 }
 
 /// Execute MCP request in project context
+/// Returns None for notifications (requests without id) as per JSON-RPC 2.0 spec
 async fn execute_in_project_context(
     request: JsonRpcRequest,
     project_path: PathBuf,
-) -> Result<JsonRpcResponse> {
+) -> Result<Option<JsonRpcResponse>> {
     // Change to project directory
     let original_dir = std::env::current_dir()?;
     std::env::set_current_dir(&project_path)?;

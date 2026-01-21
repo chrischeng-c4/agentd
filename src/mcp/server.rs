@@ -103,22 +103,25 @@ impl McpServer {
             // Parse and handle request
             let response = self.handle_request(&line).await;
 
-            // Write response
-            let response_json = serde_json::to_string(&response)?;
-            writeln!(stdout, "{}", response_json)?;
-            stdout.flush()?;
+            // Write response only if not a notification
+            if let Some(response) = response {
+                let response_json = serde_json::to_string(&response)?;
+                writeln!(stdout, "{}", response_json)?;
+                stdout.flush()?;
+            }
         }
 
         Ok(())
     }
 
     /// Handle a single JSON-RPC request (stdio mode)
-    async fn handle_request(&self, line: &str) -> JsonRpcResponse {
+    /// Returns None for notifications (requests without id) as per JSON-RPC 2.0 spec
+    async fn handle_request(&self, line: &str) -> Option<JsonRpcResponse> {
         // Parse JSON
         let request: JsonRpcRequest = match serde_json::from_str(line) {
             Ok(r) => r,
             Err(e) => {
-                return JsonRpcResponse {
+                return Some(JsonRpcResponse {
                     jsonrpc: "2.0".to_string(),
                     id: Value::Null,
                     result: None,
@@ -127,7 +130,7 @@ impl McpServer {
                         message: format!("Parse error: {}", e),
                         data: None,
                     }),
-                };
+                });
             }
         };
 
@@ -135,10 +138,11 @@ impl McpServer {
     }
 
     /// Handle a JSON-RPC request object (HTTP mode)
-    pub async fn handle_request_json(&self, request: &JsonRpcRequest) -> JsonRpcResponse {
+    /// Returns None for notifications (requests without id) as per JSON-RPC 2.0 spec
+    pub async fn handle_request_json(&self, request: &JsonRpcRequest) -> Option<JsonRpcResponse> {
         // Validate jsonrpc version
         if request.jsonrpc != "2.0" {
-            return JsonRpcResponse {
+            return Some(JsonRpcResponse {
                 jsonrpc: "2.0".to_string(),
                 id: request.id.clone().unwrap_or(Value::Null),
                 result: None,
@@ -147,15 +151,31 @@ impl McpServer {
                     message: "Invalid JSON-RPC version".to_string(),
                     data: None,
                 }),
-            };
+            });
+        }
+
+        // Check if this is a notification (no id field)
+        let is_notification = request.id.is_none();
+
+        // Handle notifications - no response should be sent
+        if is_notification {
+            match request.method.as_str() {
+                "initialized" | "notifications/initialized" => {
+                    // Accept notification silently
+                    return None;
+                }
+                _ => {
+                    // Unknown notification - silently ignore per JSON-RPC spec
+                    return None;
+                }
+            }
         }
 
         let id = request.id.clone().unwrap_or(Value::Null);
 
-        // Route to handler
+        // Route to handler (only for requests with id)
         let result = match request.method.as_str() {
             "initialize" => self.handle_initialize(&request.params),
-            "initialized" => Ok(json!({})), // Notification, no response needed
             "tools/list" => self.handle_tools_list(),
             "tools/call" => self.handle_tools_call(&request.params).await,
             "shutdown" => Ok(json!({})),
@@ -165,7 +185,7 @@ impl McpServer {
             )),
         };
 
-        match result {
+        Some(match result {
             Ok(value) => JsonRpcResponse {
                 jsonrpc: "2.0".to_string(),
                 id,
@@ -182,7 +202,7 @@ impl McpServer {
                     data: None,
                 }),
             },
-        }
+        })
     }
 
     /// Handle `initialize` request
