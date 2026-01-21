@@ -136,12 +136,9 @@ enum Commands {
         change_id: String,
     },
 
-    /// Start MCP server for structured proposal generation
-    McpServer {
-        /// Filter tools by workflow stage (plan, challenge, implement, review, archive)
-        #[arg(long)]
-        tools: Option<String>,
-    },
+    /// MCP server management (HTTP mode with project registry)
+    #[command(subcommand)]
+    McpServer(agentd::cli::mcp_server_mgmt::McpServerCommands),
 
     /// Knowledge base operations
     #[command(subcommand)]
@@ -198,7 +195,7 @@ async fn run_async(cli: Cli) -> Result<()> {
     // Auto-upgrade check for all commands except init, completions, archived, mcp-server, and CLI utility commands
     let skip_upgrade = matches!(
         cli.command,
-        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived | Commands::McpServer { .. } | Commands::Knowledge(_) | Commands::Spec(_) | Commands::File(_) | Commands::Proposal(_) | Commands::Tasks(_) | Commands::Implementation(_) | Commands::Clarifications(_)
+        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived | Commands::McpServer(_) | Commands::Knowledge(_) | Commands::Spec(_) | Commands::File(_) | Commands::Proposal(_) | Commands::Tasks(_) | Commands::Implementation(_) | Commands::Clarifications(_)
     );
 
     #[cfg(feature = "ui")]
@@ -293,8 +290,8 @@ async fn run_async(cli: Cli) -> Result<()> {
             unreachable!("View command should be handled before runtime creation");
         }
 
-        Commands::McpServer { tools } => {
-            agentd::cli::mcp_server::run(tools.as_deref()).await?;
+        Commands::McpServer(cmd) => {
+            agentd::cli::mcp_server_mgmt::run(cmd).await?;
         }
 
         Commands::Knowledge(cmd) => {

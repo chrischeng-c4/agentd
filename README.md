@@ -68,6 +68,18 @@ agentd archive add-oauth
 | `agentd validate-challenge <id>` | Validate challenge format |
 | `agentd view <id>` | Open plan viewer UI (requires `ui` feature) |
 
+### MCP Server Commands
+
+| Command | Description |
+|---------|-------------|
+| `agentd mcp-server start` | Start HTTP MCP server and register current project |
+| `agentd mcp-server start --update-clients` | Start and auto-configure AI clients |
+| `agentd mcp-server stop [project]` | Unregister a project from the server |
+| `agentd mcp-server list` | List all registered projects |
+| `agentd mcp-server shutdown` | Shutdown the entire MCP server |
+
+The HTTP MCP server provides a global daemon for AI agents (Gemini, Codex) to access Agentd tools without stdio buffering issues. See [HTTP MCP Server docs](agentd/knowledge/40-mcp/http-server.md) for details.
+
 ## Workflow
 
 ```

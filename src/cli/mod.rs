@@ -8,6 +8,7 @@ pub mod init;
 pub mod knowledge;
 pub mod list;
 pub mod mcp_server;
+pub mod mcp_server_mgmt;
 pub mod migrate_xml;
 pub mod plan;
 pub mod proposal;

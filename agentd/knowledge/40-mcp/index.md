@@ -4,6 +4,7 @@ Model Context Protocol servers provide structured tools to LLMs. This section co
 
 ## Contents
 
+- [HTTP Server](http-server.md) - **Global HTTP MCP server with multi-project support**
 - [Dynamic Configuration](dynamic-config.md) - Runtime MCP configuration per workflow stage
 - [Claude Code MCP](claude-mcp.md) - Claude Code MCP configuration
 - [Codex MCP](codex-mcp.md) - OpenAI Codex MCP configuration

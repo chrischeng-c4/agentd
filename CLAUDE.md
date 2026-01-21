@@ -63,6 +63,18 @@ agentd knowledge write <path> --json-file knowledge.json
 2. Write JSON to temporary file
 3. Execute CLI command with `--json-file`
 4. Parse output to verify success
+
+### MCP Server (for AI Agents)
+
+HTTP MCP server provides Agentd tools to AI agents (Gemini, Codex) without file I/O:
+
+```bash
+agentd mcp-server start --update-clients    # Start and configure clients
+agentd mcp-server list                      # List registered projects
+agentd mcp-server shutdown                  # Stop server
+```
+
+See [HTTP MCP Server](agentd/knowledge/40-mcp/http-server.md) for details.
 <!-- agentd:end -->
 
 # Project Context

@@ -43,6 +43,7 @@ thiserror = "2"
 walkdir = "2"
 glob = "0.3"
 ignore = "0.4"
+dirs = "5"
 
 # AST parsing (tree-sitter)
 tree-sitter = "0.24"
@@ -56,8 +57,14 @@ tree-sitter-go = "0.23"
 git2 = { version = "0.20", features = ["vendored-openssl"] }
 
 # Process execution (for scripts)
-tokio = { version = "1", features = ["process", "io-util", "rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["process", "io-util", "rt-multi-thread", "macros", "net", "sync"] }
 async-trait = "0.1"
+
+# HTTP server for MCP
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+hyper = "1"
 
 # Terminal UI
 crossterm = "0.28"
@@ -68,16 +75,7 @@ reqwest = { version = "0.12", features = ["json"], optional = true }
 [features]
 default = []
 api-direct = ["reqwest"]
-ui = ["axum", "tower-http", "open"]
-
-[dependencies.axum]
-version = "0.7"
-optional = true
-
-[dependencies.tower-http]
-version = "0.5"
-features = ["fs", "cors"]
-optional = true
+ui = ["open"]
 
 [dependencies.open]
 version = "5"

@@ -20,32 +20,32 @@ pub struct McpServer {
 
 /// JSON-RPC 2.0 Request
 #[derive(Debug, Deserialize)]
-struct JsonRpcRequest {
-    jsonrpc: String,
-    id: Option<Value>,
-    method: String,
+pub struct JsonRpcRequest {
+    pub jsonrpc: String,
+    pub id: Option<Value>,
+    pub method: String,
     #[serde(default)]
-    params: Option<Value>,
+    pub params: Option<Value>,
 }
 
 /// JSON-RPC 2.0 Response
 #[derive(Debug, Serialize)]
-struct JsonRpcResponse {
-    jsonrpc: String,
-    id: Value,
+pub struct JsonRpcResponse {
+    pub jsonrpc: String,
+    pub id: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
-    result: Option<Value>,
+    pub result: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<JsonRpcError>,
+    pub error: Option<JsonRpcError>,
 }
 
 /// JSON-RPC 2.0 Error
 #[derive(Debug, Serialize)]
-struct JsonRpcError {
-    code: i32,
-    message: String,
+pub struct JsonRpcError {
+    pub code: i32,
+    pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<Value>,
+    pub data: Option<Value>,
 }
 
 // JSON-RPC error codes
@@ -112,7 +112,7 @@ impl McpServer {
         Ok(())
     }
 
-    /// Handle a single JSON-RPC request
+    /// Handle a single JSON-RPC request (stdio mode)
     async fn handle_request(&self, line: &str) -> JsonRpcResponse {
         // Parse JSON
         let request: JsonRpcRequest = match serde_json::from_str(line) {
@@ -131,11 +131,16 @@ impl McpServer {
             }
         };
 
+        self.handle_request_json(&request).await
+    }
+
+    /// Handle a JSON-RPC request object (HTTP mode)
+    pub async fn handle_request_json(&self, request: &JsonRpcRequest) -> JsonRpcResponse {
         // Validate jsonrpc version
         if request.jsonrpc != "2.0" {
             return JsonRpcResponse {
                 jsonrpc: "2.0".to_string(),
-                id: request.id.unwrap_or(Value::Null),
+                id: request.id.clone().unwrap_or(Value::Null),
                 result: None,
                 error: Some(JsonRpcError {
                     code: INVALID_REQUEST,

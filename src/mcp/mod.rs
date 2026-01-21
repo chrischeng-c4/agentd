@@ -10,8 +10,12 @@
 //! - `validate_change` - Validate all proposal files
 
 pub mod config;
+pub mod http_server;
+pub mod registry;
 pub mod server;
 pub mod tools;
 
 pub use config::{ensure_codex_mcp_config, ensure_gemini_mcp_config};
+pub use http_server::start_server;
+pub use registry::Registry;
 pub use server::McpServer;
