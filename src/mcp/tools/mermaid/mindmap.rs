@@ -168,7 +168,7 @@ fn format_node(label: &str, shape: &str, icon: Option<&str>) -> Result<String> {
         "circle" => format!("(({}))", display_label),
         "bang" => format!(")){}((", display_label),
         "cloud" => format!("){}(", display_label),
-        "hexagon" => format!("{{{{{}}}}}", display_label),
+        "hexagon" => format!("{{{{{{{{{}}}}}}}}}",display_label),
         _ => anyhow::bail!("Invalid node shape: {}", shape),
     };
 

@@ -34,9 +34,14 @@ pub enum UpdateMode {
 ///
 /// # Example
 /// ```
+/// use agentd::parser::extract_xml_blocks;
+///
+/// # fn main() -> anyhow::Result<()> {
 /// let content = r#"<review status="approved">Content</review>"#;
 /// let blocks = extract_xml_blocks(content, "review")?;
 /// assert_eq!(blocks[0].attributes.get("status"), Some(&"approved".to_string()));
+/// # Ok(())
+/// # }
 /// ```
 pub fn extract_xml_blocks(content: &str, tag: &str) -> Result<Vec<XmlBlock>> {
     // Pattern: <tag attr="value" ...>content</tag>
@@ -91,9 +96,14 @@ pub fn extract_xml_block(content: &str, tag: &str) -> Result<Option<XmlBlock>> {
 ///
 /// # Example
 /// ```
+/// use agentd::parser::parse_xml_attributes;
+///
+/// # fn main() -> anyhow::Result<()> {
 /// let attrs = parse_xml_attributes(r#" status="approved" iteration="1" "#)?;
 /// assert_eq!(attrs.get("status"), Some(&"approved".to_string()));
 /// assert_eq!(attrs.get("iteration"), Some(&"1".to_string()));
+/// # Ok(())
+/// # }
 /// ```
 pub fn parse_xml_attributes(tag_line: &str) -> Result<HashMap<String, String>> {
     let mut attributes = HashMap::new();
@@ -122,6 +132,9 @@ pub fn parse_xml_attributes(tag_line: &str) -> Result<HashMap<String, String>> {
 ///
 /// # Example
 /// ```
+/// use std::collections::HashMap;
+/// use agentd::parser::wrap_in_xml;
+///
 /// let mut attrs = HashMap::new();
 /// attrs.insert("status".to_string(), "approved".to_string());
 /// let xml = wrap_in_xml("review", "Content here", attrs);
@@ -158,11 +171,16 @@ pub fn wrap_in_xml(tag: &str, content: &str, attrs: HashMap<String, String>) -> 
 ///
 /// # Example
 /// ```
+/// use agentd::parser::{update_xml_blocks, UpdateMode};
+///
+/// # fn main() -> anyhow::Result<()> {
 /// let content = "<review>Old</review>";
 /// let new_block = "<review>New</review>";
 /// let updated = update_xml_blocks(content, "review", new_block, UpdateMode::Replace)?;
 /// assert!(updated.contains("New"));
 /// assert!(!updated.contains("Old"));
+/// # Ok(())
+/// # }
 /// ```
 pub fn update_xml_blocks(
     content: &str,

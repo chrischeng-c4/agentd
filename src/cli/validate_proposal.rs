@@ -271,7 +271,7 @@ pub fn validate_proposal(
     options: &ValidationOptions,
 ) -> Result<ValidationSummary> {
     // Load config for validation rules
-    let config = AgentdConfig::load(project_root)?;
+    let _config = AgentdConfig::load(project_root)?;
 
     // Check if change exists
     let change_dir = project_root.join("agentd/changes").join(change_id);
