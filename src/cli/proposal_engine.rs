@@ -2,7 +2,6 @@ use crate::context::ContextPhase;
 use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, Complexity, StatePhase};
 use crate::orchestrator::{detect_self_review_marker, GeminiOrchestrator, CodexOrchestrator, SelfReviewResult, UsageMetrics};
 use crate::parser::{parse_challenge_verdict, parse_affected_specs};
-use crate::orchestrator::prompts;
 use crate::state::StateManager;
 use crate::Result;
 use colored::Colorize;
@@ -60,7 +59,7 @@ pub async fn run_proposal_loop(config: ProposalEngineConfig) -> Result<ProposalE
         run_reproposal_step(&resolved_change_id, &project_root, &agentd_config).await?;
 
         // Re-challenge with Codex
-        verdict = run_rechallenge_step(&resolved_change_id, &project_root, &agentd_config).await?;
+        verdict = run_rechallenge_step(&resolved_change_id, iteration, &project_root, &agentd_config).await?;
     }
 
     // Get proposal path for issue severity check
@@ -219,7 +218,8 @@ async fn run_challenge_step(
             tokio::time::sleep(retry_delay).await;
         }
 
-        match orchestrator.run_challenge(change_id, complexity).await {
+        // Run MCP-based challenge (agent calls get_task with task_type=challenge)
+        match orchestrator.run_challenge_mcp(change_id, 1, complexity).await {
             Ok((_output, usage)) => {
                 let model = config.codex.select_model(complexity).model.clone();
                 record_usage(change_id, project_root, "challenge", &model, &usage, config, complexity);
@@ -268,6 +268,7 @@ async fn run_challenge_step(
 /// Step 3: Run re-challenge with Codex (fresh session with existing documents as context)
 async fn run_rechallenge_step(
     change_id: &str,
+    iteration: usize,
     project_root: &PathBuf,
     config: &AgentdConfig,
 ) -> Result<ChallengeVerdict> {
@@ -286,9 +287,10 @@ async fn run_rechallenge_step(
     // Regenerate AGENTS.md context
     crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
 
-    // Run Codex rechallenge orchestrator (fresh session - AGENTS.md provides context)
+    // Run MCP-based challenge (agent calls get_task with task_type=challenge)
+    // Iteration is 1-indexed for the MCP tool, so add 1 to the loop iteration
     let orchestrator = CodexOrchestrator::new(config, project_root);
-    let (_output, usage) = orchestrator.run_rechallenge_fresh(change_id, complexity).await?;
+    let (_output, usage) = orchestrator.run_challenge_mcp(change_id, (iteration + 1) as u32, complexity).await?;
     let model = config.codex.select_model(complexity).model.clone();
     record_usage(change_id, project_root, "rechallenge", &model, &usage, config, complexity);
 
@@ -343,8 +345,8 @@ async fn run_reproposal_step(
             tokio::time::sleep(retry_delay).await;
         }
 
-        // Fresh session - GEMINI.md contains all necessary context (proposal, specs, review feedback)
-        let result = orchestrator.run_reproposal_fresh(change_id, complexity).await;
+        // Run MCP-based reproposal (agent calls get_task with task_type=reproposal)
+        let result = orchestrator.run_reproposal_mcp(change_id, complexity).await;
 
         match result {
             Ok((_output, usage)) => {
@@ -558,10 +560,8 @@ pub async fn run_proposal_step_sequential(
     // Generate GEMINI.md context for proposal phase
     crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
 
-    let proposal_prompt = prompts::gemini_proposal_with_mcp_prompt(&resolved_change_id, description);
-
-    // Run one-shot generation (fresh session)
-    let (_output, usage) = orchestrator.run_one_shot(&resolved_change_id, &proposal_prompt, complexity).await?;
+    // Run MCP-based proposal creation (agent calls get_task to get full instructions)
+    let (_output, usage) = orchestrator.run_create_proposal_mcp(&resolved_change_id, description, complexity).await?;
     let model = config.gemini.select_model(complexity).model.clone();
     record_usage(&resolved_change_id, project_root, "proposal-gen", &model, &usage, config, complexity);
 
@@ -572,9 +572,8 @@ pub async fn run_proposal_step_sequential(
     let max_review_iterations = 1;
 
     for iteration in 0..max_review_iterations {
-        let review_prompt = prompts::proposal_self_review_with_mcp_prompt(&resolved_change_id);
-
-        match orchestrator.run_one_shot(&resolved_change_id, &review_prompt, complexity).await {
+        // Run MCP-based proposal review (agent calls get_task to get review instructions)
+        match orchestrator.run_review_proposal_mcp(&resolved_change_id, complexity).await {
             Ok((review_output, review_usage)) => {
                 let model = config.gemini.select_model(complexity).model.clone();
                 record_usage(&resolved_change_id, project_root, "proposal-review", &model, &review_usage, config, complexity);
@@ -622,20 +621,8 @@ pub async fn run_proposal_step_sequential(
             println!();
             println!("{}", format!("  📄 Spec {}/{}: {}", idx + 1, affected_specs.len(), spec_id).cyan());
 
-            // Prepare context: proposal.md + previously generated specs
-            let mut context_specs = vec![];
-            for prev_spec_id in &affected_specs[..idx] {
-                context_specs.push(prev_spec_id.clone());
-            }
-
-            let spec_prompt = prompts::gemini_spec_with_mcp_prompt(
-                &resolved_change_id,
-                spec_id,
-                &context_specs,
-            );
-
-            // Run one-shot generation (fresh session)
-            let (_spec_output, spec_usage) = orchestrator.run_one_shot(&resolved_change_id, &spec_prompt, complexity).await?;
+            // Run MCP-based spec creation (agent calls get_task to get full instructions)
+            let (_spec_output, spec_usage) = orchestrator.run_create_spec_mcp(&resolved_change_id, spec_id, complexity).await?;
             let model = config.gemini.select_model(complexity).model.clone();
             record_usage(&resolved_change_id, project_root, &format!("spec-gen-{}", spec_id), &model, &spec_usage, config, complexity);
 
@@ -645,9 +632,8 @@ pub async fn run_proposal_step_sequential(
             println!("{}", format!("     🔍 Self-reviewing {}...", spec_id).cyan());
 
             for review_iter in 0..max_review_iterations {
-                let spec_review_prompt = prompts::spec_self_review_with_mcp_prompt(&resolved_change_id, spec_id, &context_specs);
-
-                match orchestrator.run_one_shot(&resolved_change_id, &spec_review_prompt, complexity).await {
+                // Run MCP-based spec review (agent calls get_task to get review instructions)
+                match orchestrator.run_review_spec_mcp(&resolved_change_id, spec_id, complexity).await {
                     Ok((spec_review_output, spec_review_usage)) => {
                         let model = config.gemini.select_model(complexity).model.clone();
                         record_usage(&resolved_change_id, project_root, &format!("spec-review-{}", spec_id), &model, &spec_review_usage, config, complexity);
@@ -681,10 +667,8 @@ pub async fn run_proposal_step_sequential(
     println!();
     println!("{}", "📝 Phase 3/3: Generating tasks.md...".cyan().bold());
 
-    let tasks_prompt = prompts::gemini_tasks_with_mcp_prompt(&resolved_change_id, &affected_specs);
-
-    // Run one-shot generation (fresh session)
-    let (_tasks_output, tasks_usage) = orchestrator.run_one_shot(&resolved_change_id, &tasks_prompt, complexity).await?;
+    // Run MCP-based tasks creation (agent calls get_task to get full instructions)
+    let (_tasks_output, tasks_usage) = orchestrator.run_create_tasks_mcp(&resolved_change_id, complexity).await?;
     let model = config.gemini.select_model(complexity).model.clone();
     record_usage(&resolved_change_id, project_root, "tasks-gen", &model, &tasks_usage, config, complexity);
 
@@ -693,16 +677,9 @@ pub async fn run_proposal_step_sequential(
     // Self-review loop for tasks
     println!("{}", "🔍 Self-reviewing tasks.md...".cyan());
 
-    // Prepare all files for tasks review (proposal.md + all specs)
-    let mut all_files = vec!["proposal.md".to_string()];
-    for spec_id in &affected_specs {
-        all_files.push(format!("specs/{}.md", spec_id));
-    }
-
     for iteration in 0..max_review_iterations {
-        let tasks_review_prompt = prompts::tasks_self_review_with_mcp_prompt(&resolved_change_id, &all_files);
-
-        match orchestrator.run_one_shot(&resolved_change_id, &tasks_review_prompt, complexity).await {
+        // Run MCP-based tasks review (agent calls get_task to get review instructions)
+        match orchestrator.run_review_tasks_mcp(&resolved_change_id, complexity).await {
             Ok((tasks_review_output, tasks_review_usage)) => {
                 let model = config.gemini.select_model(complexity).model.clone();
                 record_usage(&resolved_change_id, project_root, "tasks-review", &model, &tasks_review_usage, config, complexity);
