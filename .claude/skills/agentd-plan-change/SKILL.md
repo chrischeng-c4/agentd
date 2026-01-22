@@ -1,10 +1,10 @@
 ---
-name: agentd:plan
+name: agentd:plan-change
 description: Planning workflow (proposal and challenge)
 user-invocable: true
 ---
 
-# /agentd:plan
+# /agentd:plan-change
 
 Orchestrates the entire planning phase, automatically handling proposal generation, challenge analysis, and refinement based on the current state.
 
@@ -13,7 +13,7 @@ Orchestrates the entire planning phase, automatically handling proposal generati
 **DO NOT explore the codebase yourself.** Your job is to:
 1. Clarify the user's requirements (structured Q&A)
 2. Write clarifications to `clarifications.md`
-3. Run the `agentd plan` command
+3. Run the `agentd plan-change` command
 
 The actual codebase exploration and analysis is done by:
 - **Gemini** (proposal generation - 2M context window)
@@ -21,7 +21,7 @@ The actual codebase exploration and analysis is done by:
 
 You are a dispatcher, not an explorer.
 
-**Note**: `agentd plan` is state-aware and automatically runs the full workflow:
+**Note**: `agentd plan-change` is state-aware and automatically runs the full workflow:
 - Proposal generation (Gemini)
 - Challenge analysis (Codex)
 - Reproposal loop (if NEEDS_REVISION, up to max iterations)
@@ -30,7 +30,7 @@ There are NO separate `proposal`, `challenge`, or `reproposal` commands anymore.
 
 ## Clarification Phase (Before Proposal)
 
-For **NEW changes** (no existing `STATE.yaml`), clarify requirements before running `agentd plan`:
+For **NEW changes** (no existing `STATE.yaml`), clarify requirements before running `agentd plan-change`:
 
 ### When to clarify
 - Always for new changes, unless user says "skip" or description is very detailed
@@ -54,11 +54,12 @@ AskUserQuestion with questions array:
 
 **Important**: Always use the AskUserQuestion tool for interactive clarification, not text-based questions.
 
-3. After user answers, use the **create_clarifications MCP tool**:
+3. After user answers, create clarifications using **CLI command**:
 
-```json
+```bash
+# 1. Create JSON file
+cat > /tmp/clarifications-<change-id>.json <<'EOF'
 {
-  "change_id": "<change-id>",
   "questions": [
     {
       "topic": "Short Label",
@@ -68,14 +69,18 @@ AskUserQuestion with questions array:
     }
   ]
 }
+EOF
+
+# 2. Run CLI command
+agentd clarifications create <change-id> --json-file /tmp/clarifications-<change-id>.json
 ```
 
-The tool will:
+This will:
 - Create `agentd/changes/<change-id>/` directory if needed
 - Write `clarifications.md` with proper frontmatter
 - Return success message
 
-4. Then run `agentd plan` with the clarified context
+4. Then run `agentd plan-change` with the clarified context
 
 ### Skip clarification if
 - User explicitly says "skip" or uses `--skip-clarify`
@@ -96,20 +101,20 @@ Skip if change already exists.
 
 ```bash
 # New change (description required)
-/agentd:plan <change-id> "<description>"
+/agentd:plan-change <change-id> "<description>"
 
 # Existing change (description optional)
-/agentd:plan <change-id>
+/agentd:plan-change <change-id>
 ```
 
 ## Examples
 
 ```bash
 # Start new planning cycle
-/agentd:plan add-oauth "Add OAuth authentication with Google and GitHub"
+/agentd:plan-change add-oauth "Add OAuth authentication with Google and GitHub"
 
 # Continue planning for existing change
-/agentd:plan add-oauth
+/agentd:plan-change add-oauth
 ```
 
 ## How it works
@@ -118,13 +123,13 @@ The skill determines the next action based on the `phase` field in `STATE.yaml`:
 
 | Phase | Action |
 |-------|--------|
-| No STATE.yaml | **Clarify** → write `clarifications.md` → run `agentd plan` |
-| `proposed` | Run `agentd plan` to continue planning cycle |
-| `challenged` | ✅ Planning complete, suggest `/agentd:impl` |
+| No STATE.yaml | **Clarify** → write `clarifications.md` → run `agentd plan-change` |
+| `proposed` | Run `agentd plan-change` to continue planning cycle |
+| `challenged` | ✅ Planning complete, suggest `/agentd:impl-change` |
 | `rejected` | ⛔ Rejected, suggest reviewing CHALLENGE.md |
 | Other phases | ℹ️ Beyond planning phase |
 
-## After `agentd plan` completes
+## After `agentd plan-change` completes
 
 The proposal engine returns a result with:
 - `verdict`: APPROVED, NEEDS_REVISION, or REJECTED
@@ -141,12 +146,12 @@ AskUserQuestion:
   header: "Next Action"
   options:
     - label: "Proceed to implementation (Recommended)"
-      description: "Run /agentd:impl to start implementing the change"
+      description: "Run /agentd:impl-change to start implementing the change"
     - label: "Open viewer"
       description: "Review the approved plan in the UI viewer"
 ```
 
-- **Proceed to implementation**: Suggest `/agentd:impl <change-id>`
+- **Proceed to implementation**: Suggest `/agentd:impl-change <change-id>`
 - **Open viewer**: Run `agentd view <change-id>`
 
 ### If verdict is NEEDS_REVISION
@@ -168,9 +173,9 @@ AskUserQuestion:
       description: "Run another reproposal cycle to address issues"
 ```
 
-- **Proceed to implementation**: Suggest `/agentd:impl <change-id>`
+- **Proceed to implementation**: Suggest `/agentd:impl-change <change-id>`
 - **Open viewer**: Run `agentd view <change-id>`
-- **Continue fixing**: Run `agentd plan <change-id>` again (it will auto-repropose and re-challenge)
+- **Continue fixing**: Run `agentd plan-change <change-id>` again (it will auto-repropose and re-challenge)
 
 #### When significant issues remain (not minor):
 
@@ -188,8 +193,8 @@ AskUserQuestion:
 ```
 
 - **Open viewer**: Run `agentd view <change-id>`
-- **Continue fixing**: Run `agentd plan <change-id>` again (it will auto-repropose and re-challenge)
-- **Proceed anyway**: Suggest `/agentd:impl <change-id>`
+- **Continue fixing**: Run `agentd plan-change <change-id>` again (it will auto-repropose and re-challenge)
+- **Proceed anyway**: Suggest `/agentd:impl-change <change-id>`
 
 ### If verdict is REJECTED
 

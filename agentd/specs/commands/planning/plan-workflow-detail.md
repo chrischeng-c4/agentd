@@ -98,7 +98,7 @@ Creates: `agentd/changes/<change-id>/clarifications.md`
 
 ```mermaid
 flowchart TD
-    Start[agentd plan command] --> CreateDir[Create change directory]
+    Start[agentd plan-change command] --> CreateDir[Create change directory]
     CreateDir --> GenContext[Generate GEMINI.md context]
     GenContext --> AssessComplexity[Assess complexity]
 
@@ -393,7 +393,7 @@ retry_delay_secs = 5       # Delay between retries
 
 ## Summary
 
-**agentd plan workflow**:
+**agentd plan-change workflow**:
 1. **Clarification** - AskUserQuestion (3-5 questions)
 2. **Git Setup** - AskUserQuestion (branch/worktree/in-place)
 3. **Sequential Generation** - Fresh sessions per phase

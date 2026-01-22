@@ -31,14 +31,14 @@ export ANTHROPIC_API_KEY="your-anthropic-key"
 cd your-project
 agentd init
 
-# 2. Plan the change (Proposal → Challenge → Refine)
-agentd plan add-oauth "Add OAuth authentication with Google"
+# 2. Plan the change (Proposal → Review → Revise)
+agentd plan-change add-oauth "Add OAuth authentication with Google"
 
 # 3. Implement (opens Claude Code)
-agentd implement add-oauth
+agentd impl-change add-oauth
 
-# 4. Archive when done
-agentd archive add-oauth
+# 4. Merge when done
+agentd merge-change add-oauth
 ```
 
 ## Commands
@@ -48,9 +48,9 @@ agentd archive add-oauth
 | Command | Description |
 |---------|-------------|
 | `agentd init` | Initialize Agentd in current project |
-| `agentd plan <id> "<description>"` | Plan a change (Proposal → Challenge loop) |
-| `agentd implement <id>` | Implement the change (requires Claude Code) |
-| `agentd archive <id>` | Archive completed change |
+| `agentd plan-change <id> "<description>"` | Plan a change (Proposal → Review → Revise loop) |
+| `agentd impl-change <id>` | Implement the change (requires Claude Code) |
+| `agentd merge-change <id>` | Merge completed change to main specs |
 | `agentd list` | List active changes |
 | `agentd list --archived` | List archived changes |
 | `agentd status <id>` | Show change status |
@@ -136,9 +136,9 @@ After initialization, use these skills in Claude Code:
 
 | Skill | CLI Equivalent | Description |
 |-------|----------------|-------------|
-| `/agentd:plan` | `agentd plan` | Plan a change (Proposal → Challenge) |
-| `/agentd:impl` | `agentd implement` | Implement and verify change |
-| `/agentd:archive` | `agentd archive` | Archive completed change |
+| `/agentd:plan-change` | `agentd plan-change` | Plan a change (Proposal → Review → Revise) |
+| `/agentd:impl-change` | `agentd impl-change` | Implement and verify change |
+| `/agentd:merge-change` | `agentd merge-change` | Merge completed change |
 
 ### Deprecated Skills
 Granular skills (e.g., `/agentd:proposal`, `/agentd:challenge`) are available but deprecated.

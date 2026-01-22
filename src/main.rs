@@ -17,8 +17,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Orchestrate the entire planning phase (proposal → challenge → reproposal loop)
-    Plan {
+    /// Orchestrate the entire planning phase (proposal → review → revise loop)
+    #[command(name = "plan-change")]
+    PlanChange {
         /// Change ID
         change_id: String,
 
@@ -40,7 +41,8 @@ enum Commands {
     },
 
     /// Implement the proposal with Claude (includes automatic review loop)
-    Implement {
+    #[command(name = "impl-change")]
+    ImplChange {
         /// Change ID to implement
         change_id: String,
 
@@ -49,11 +51,10 @@ enum Commands {
         tasks: Option<String>,
     },
 
-
-
-    /// Archive completed change
-    Archive {
-        /// Change ID to archive
+    /// Merge completed change specs to main agentd/specs/
+    #[command(name = "merge-change")]
+    MergeChange {
+        /// Change ID to merge
         change_id: String,
     },
 
@@ -136,8 +137,12 @@ enum Commands {
         change_id: String,
     },
 
-    /// MCP server management (HTTP mode with project registry)
+    /// Unified server management (dashboard + MCP + viewer)
     #[command(subcommand)]
+    Server(agentd::cli::server::ServerCommands),
+
+    /// [DEPRECATED] Use 'server' instead. MCP server management.
+    #[command(subcommand, hide = true)]
     McpServer(agentd::cli::mcp_server_mgmt::McpServerCommands),
 
     /// Knowledge base operations
@@ -192,10 +197,10 @@ fn main() {
 }
 
 async fn run_async(cli: Cli) -> Result<()> {
-    // Auto-upgrade check for all commands except init, completions, archived, mcp-server, and CLI utility commands
+    // Auto-upgrade check for all commands except init, completions, archived, server, and CLI utility commands
     let skip_upgrade = matches!(
         cli.command,
-        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived | Commands::McpServer(_) | Commands::Knowledge(_) | Commands::Spec(_) | Commands::File(_) | Commands::Proposal(_) | Commands::Tasks(_) | Commands::Implementation(_) | Commands::Clarifications(_)
+        Commands::Init { .. } | Commands::Completions { .. } | Commands::Archived | Commands::Server(_) | Commands::McpServer(_) | Commands::Knowledge(_) | Commands::Spec(_) | Commands::File(_) | Commands::Proposal(_) | Commands::Tasks(_) | Commands::Implementation(_) | Commands::Clarifications(_)
     );
 
     #[cfg(feature = "ui")]
@@ -207,7 +212,7 @@ async fn run_async(cli: Cli) -> Result<()> {
     }
 
     match cli.command {
-        Commands::Plan {
+        Commands::PlanChange {
             change_id,
             description,
             skip_clarify,
@@ -227,14 +232,14 @@ async fn run_async(cli: Cli) -> Result<()> {
             agentd::cli::refine::run(&change_id, &requirements).await?;
         }
 
-        Commands::Implement { change_id, tasks } => {
+        Commands::ImplChange { change_id, tasks } => {
             // Implement command now includes automatic review loop
             let _result = agentd::cli::implement::run(&change_id, tasks.as_deref()).await?;
             // Result is used by skills for HITL decisions, CLI just needs success/error
         }
 
-        Commands::Archive { change_id } => {
-            println!("{}", format!("📦 Archiving: {}", change_id).cyan());
+        Commands::MergeChange { change_id } => {
+            println!("{}", format!("📦 Merging change: {}", change_id).cyan());
             agentd::cli::archive::run(&change_id).await?;
         }
 
@@ -290,7 +295,12 @@ async fn run_async(cli: Cli) -> Result<()> {
             unreachable!("View command should be handled before runtime creation");
         }
 
+        Commands::Server(cmd) => {
+            agentd::cli::server::run(cmd).await?;
+        }
+
         Commands::McpServer(cmd) => {
+            eprintln!("{}", "⚠ 'mcp-server' is deprecated. Use 'server' instead.".yellow());
             agentd::cli::mcp_server_mgmt::run(cmd).await?;
         }
 

@@ -239,6 +239,208 @@ pub fn list_changed_files(
     Ok(output)
 }
 
+// ============================================================================
+// Review Creation
+// ============================================================================
+
+/// Issue severity level
+#[derive(Debug, Clone, PartialEq)]
+pub enum Severity {
+    High,
+    Medium,
+    Low,
+}
+
+impl std::fmt::Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Severity::High => write!(f, "HIGH"),
+            Severity::Medium => write!(f, "MEDIUM"),
+            Severity::Low => write!(f, "LOW"),
+        }
+    }
+}
+
+/// Review verdict
+#[derive(Debug, Clone, PartialEq)]
+pub enum ReviewVerdict {
+    Approved,
+    NeedsChanges,
+    MajorIssues,
+}
+
+impl std::fmt::Display for ReviewVerdict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReviewVerdict::Approved => write!(f, "APPROVED"),
+            ReviewVerdict::NeedsChanges => write!(f, "NEEDS_CHANGES"),
+            ReviewVerdict::MajorIssues => write!(f, "MAJOR_ISSUES"),
+        }
+    }
+}
+
+/// A single review issue
+#[derive(Debug, Clone)]
+pub struct ReviewIssue {
+    pub severity: Severity,
+    pub title: String,
+    pub description: String,
+    pub file_path: Option<String>,
+    pub line_number: Option<u32>,
+    pub recommendation: Option<String>,
+}
+
+/// Test results summary
+#[derive(Debug, Clone, Default)]
+pub struct TestResults {
+    pub status: String, // "PASS", "FAIL", "PARTIAL", "UNKNOWN"
+    pub total: u32,
+    pub passed: u32,
+    pub failed: u32,
+    pub skipped: u32,
+}
+
+/// Input for creating a review
+#[derive(Debug, Clone)]
+pub struct CreateReviewInput {
+    pub change_id: String,
+    pub iteration: u32,
+    pub test_results: TestResults,
+    pub security_status: String, // "CLEAN", "WARNINGS", "VULNERABILITIES"
+    pub issues: Vec<ReviewIssue>,
+    pub verdict: ReviewVerdict,
+    pub next_steps: Option<String>,
+}
+
+/// Create REVIEW.md for a change
+pub fn create_review(input: CreateReviewInput, project_root: &Path) -> Result<String> {
+    validate_change_id(&input.change_id)?;
+
+    let change_dir = project_root.join("agentd/changes").join(&input.change_id);
+    if !change_dir.exists() {
+        anyhow::bail!("Change '{}' not found", input.change_id);
+    }
+
+    // Count issues by severity
+    let high_count = input.issues.iter().filter(|i| i.severity == Severity::High).count();
+    let medium_count = input.issues.iter().filter(|i| i.severity == Severity::Medium).count();
+    let low_count = input.issues.iter().filter(|i| i.severity == Severity::Low).count();
+
+    // Build REVIEW.md content
+    let mut content = String::new();
+
+    // Header
+    content.push_str(&format!("# Code Review (Iteration {})\n\n", input.iteration));
+
+    // Test Results
+    content.push_str("## Test Results\n");
+    content.push_str(&format!("- **Status**: {}\n", input.test_results.status));
+    if input.test_results.total > 0 {
+        content.push_str(&format!("- Total: {}, Passed: {}, Failed: {}, Skipped: {}\n",
+            input.test_results.total,
+            input.test_results.passed,
+            input.test_results.failed,
+            input.test_results.skipped
+        ));
+    }
+    content.push('\n');
+
+    // Security
+    content.push_str("## Security\n");
+    content.push_str(&format!("- **Status**: {}\n\n", input.security_status));
+
+    // Issues
+    content.push_str("## Issues\n\n");
+
+    if input.issues.is_empty() {
+        content.push_str("No issues found.\n\n");
+    } else {
+        // HIGH issues
+        let high_issues: Vec<_> = input.issues.iter().filter(|i| i.severity == Severity::High).collect();
+        if !high_issues.is_empty() {
+            content.push_str("### HIGH\n");
+            for (i, issue) in high_issues.iter().enumerate() {
+                content.push_str(&format!("{}. **{}**\n", i + 1, issue.title));
+                content.push_str(&format!("   - {}\n", issue.description));
+                if let Some(ref path) = issue.file_path {
+                    if let Some(line) = issue.line_number {
+                        content.push_str(&format!("   - Location: `{}:{}`\n", path, line));
+                    } else {
+                        content.push_str(&format!("   - Location: `{}`\n", path));
+                    }
+                }
+                if let Some(ref rec) = issue.recommendation {
+                    content.push_str(&format!("   - Recommendation: {}\n", rec));
+                }
+                content.push('\n');
+            }
+        }
+
+        // MEDIUM issues
+        let medium_issues: Vec<_> = input.issues.iter().filter(|i| i.severity == Severity::Medium).collect();
+        if !medium_issues.is_empty() {
+            content.push_str("### MEDIUM\n");
+            for (i, issue) in medium_issues.iter().enumerate() {
+                content.push_str(&format!("{}. **{}**\n", i + 1, issue.title));
+                content.push_str(&format!("   - {}\n", issue.description));
+                if let Some(ref path) = issue.file_path {
+                    if let Some(line) = issue.line_number {
+                        content.push_str(&format!("   - Location: `{}:{}`\n", path, line));
+                    } else {
+                        content.push_str(&format!("   - Location: `{}`\n", path));
+                    }
+                }
+                if let Some(ref rec) = issue.recommendation {
+                    content.push_str(&format!("   - Recommendation: {}\n", rec));
+                }
+                content.push('\n');
+            }
+        }
+
+        // LOW issues
+        let low_issues: Vec<_> = input.issues.iter().filter(|i| i.severity == Severity::Low).collect();
+        if !low_issues.is_empty() {
+            content.push_str("### LOW\n");
+            for (i, issue) in low_issues.iter().enumerate() {
+                content.push_str(&format!("{}. **{}**\n", i + 1, issue.title));
+                content.push_str(&format!("   - {}\n", issue.description));
+                if let Some(ref path) = issue.file_path {
+                    if let Some(line) = issue.line_number {
+                        content.push_str(&format!("   - Location: `{}:{}`\n", path, line));
+                    } else {
+                        content.push_str(&format!("   - Location: `{}`\n", path));
+                    }
+                }
+                if let Some(ref rec) = issue.recommendation {
+                    content.push_str(&format!("   - Recommendation: {}\n", rec));
+                }
+                content.push('\n');
+            }
+        }
+    }
+
+    // Verdict
+    content.push_str("## Verdict\n");
+    content.push_str(&format!("{}\n", input.verdict));
+
+    if let Some(ref next) = input.next_steps {
+        content.push_str(&format!("\n**Next Steps**: {}\n", next));
+    }
+
+    // Write the file
+    let review_path = change_dir.join("REVIEW.md");
+    std::fs::write(&review_path, &content)?;
+
+    Ok(format!(
+        "✓ REVIEW.md written: {}\n  Verdict: {}\n  Issues: {} high, {} medium, {} low",
+        review_path.display(),
+        input.verdict,
+        high_count,
+        medium_count,
+        low_count
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

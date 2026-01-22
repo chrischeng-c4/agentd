@@ -142,7 +142,7 @@ stateDiagram-v2
     [*] --> Planning: agentd plan
     Planning --> Planning: agentd refine (add requirements)
     Planning --> Planning: agentd revise (update sections)
-    Planning --> Implementing: agentd implement
+    Planning --> Implementing: agentd impl-change
 
     note right of Planning
         Refine stays in Planning phase
@@ -225,7 +225,7 @@ $ agentd refine feat-auth "Add OAuth 2.0 support for Google and GitHub"
       agentd challenge feat-auth
 
    3. Or proceed to implement:
-      agentd implement feat-auth
+      agentd impl-change feat-auth
 ```
 
 ### Example 2: Multiple requirements
@@ -253,7 +253,7 @@ $ agentd refine feat-api "Add rate limiting. Add API versioning. Add request log
       agentd view feat-api
 
    2. Proceed to implement:
-      agentd implement feat-api
+      agentd impl-change feat-api
 ```
 
 ### Example 3: Proposal not found
@@ -261,7 +261,7 @@ $ agentd refine feat-api "Add rate limiting. Add API versioning. Add request log
 ```bash
 $ agentd refine nonexistent "Add feature"
 ✨ Refining proposal: nonexistent
-Error: No proposal found for 'nonexistent'. Run 'agentd plan nonexistent "description"' first.
+Error: No proposal found for 'nonexistent'. Run 'agentd plan-change nonexistent "description"' first.
 $ echo $?
 1
 ```
@@ -285,7 +285,7 @@ $ agentd refine feat-auth "Add OAuth"
 **Next in workflow:**
 - `agentd view` - View refined proposal
 - `agentd challenge` - Challenge again if needed
-- `agentd implement` - Implement refined proposal
+- `agentd impl-change` - Implement refined proposal
 
 **Alternative commands:**
 - `agentd revise` - Revision based on annotations (different from refinement)

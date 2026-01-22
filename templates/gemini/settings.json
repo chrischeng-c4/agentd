@@ -4,15 +4,13 @@
       "list_directory",
       "read_file",
       "search_file_content",
-      "glob",
-      "write_file",
-      "replace"
+      "glob"
     ]
   },
-  "approvals": {
-    "autoApprove": {
-      "write_file": true,
-      "replace": true
+  "mcpServers": {
+    "agentd": {
+      "command": "agentd",
+      "args": ["mcp-server"]
     }
   }
 }

@@ -51,12 +51,12 @@ Project setup and maintenance.
 **Starting a new project:**
 ```bash
 agentd init                          # Initialize Agentd
-agentd plan feat-auth "Add auth"     # Create proposal (documented separately)
+agentd plan-change feat-auth "Add auth"     # Create proposal (documented separately)
 ```
 
 **Implementing a change:**
 ```bash
-agentd implement feat-auth           # Auto: implement + review + fix loop
+agentd impl-change feat-auth           # Auto: implement + review + fix loop
 # Or manually:
 agentd review feat-auth              # Review code
 agentd resolve-reviews feat-auth     # Fix issues
@@ -99,7 +99,7 @@ graph TD
     plan --> revise[agentd revise]
     revise --> plan
 
-    plan --> implement[agentd implement]
+    plan --> implement[agentd impl-change]
 
     implement --> review_loop{Auto Review Loop}
     review_loop -->|APPROVED| archive[agentd archive]

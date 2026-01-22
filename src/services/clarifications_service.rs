@@ -2,6 +2,8 @@
 //!
 //! Provides structured Q&A capture from user interactions during planning.
 
+use crate::models::frontmatter::StatePhase;
+use crate::state::StateManager;
 use crate::Result;
 use chrono::Local;
 use serde::{Deserialize, Serialize};
@@ -53,6 +55,15 @@ pub fn create_clarifications(input: CreateClarificationsInput, project_root: &Pa
 
     std::fs::write(&clarifications_path, content)?;
 
+    // Initialize STATE.yaml if it doesn't exist
+    let state_path = change_dir.join("STATE.yaml");
+    if !state_path.exists() {
+        let mut state_manager = StateManager::load(&change_dir)?;
+        state_manager.set_phase(StatePhase::Proposed);
+        state_manager.set_last_action("clarifications created");
+        state_manager.save()?;
+    }
+
     Ok(format!(
         "✓ Clarifications written: agentd/changes/{}/clarifications.md\n  Questions: {}",
         change_id,
@@ -91,6 +102,13 @@ mod tests {
         assert!(content.contains("change: add-oauth"));
         assert!(content.contains("## Q1: Auth Method"));
         assert!(content.contains("**Question**: Which OAuth providers?"));
+
+        // Verify STATE.yaml was created
+        let state_path = project_root.join("agentd/changes/add-oauth/STATE.yaml");
+        assert!(state_path.exists(), "STATE.yaml should be created");
+        let state_content = std::fs::read_to_string(&state_path).unwrap();
+        assert!(state_content.contains("phase: proposed"));
+        assert!(state_content.contains("last_action: clarifications created"));
     }
 
     #[test]

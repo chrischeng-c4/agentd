@@ -305,9 +305,9 @@ Both MCP and CLI interfaces share the same **service layer**, providing:
 **Use existing workflow commands**:
 
 ```bash
-agentd plan <id> "<description>"   # Planning workflow
-agentd implement <id>               # Implementation workflow
-agentd archive <id>                 # Archive workflow
+agentd plan-change <id> "<description>"   # Planning workflow
+agentd impl-change <id>               # Implementation workflow
+agentd merge-change <id>                 # Archive workflow
 ```
 
 Use CLI utility commands only when:

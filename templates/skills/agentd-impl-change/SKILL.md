@@ -1,10 +1,10 @@
 ---
-name: agentd:impl
+name: agentd:impl-change
 description: Implementation workflow
 user-invocable: true
 ---
 
-# /agentd:impl
+# /agentd:impl-change
 
 Orchestrates the implementation phase, handling code generation, review, and iterative fixes based on the current state.
 
@@ -12,13 +12,13 @@ Orchestrates the implementation phase, handling code generation, review, and ite
 
 **DO NOT implement code yourself.** Your job is to:
 1. Check the current phase in `STATE.yaml`
-2. Run the `agentd impl` command
+2. Run the `agentd impl-change` command
 
 The actual implementation is done by a **separate Claude session** spawned by the command. This session has access to the proposal specs and implements according to `tasks.md`.
 
 You are a dispatcher, not an implementer. Run the command and let the subprocess handle the work.
 
-**Note**: `agentd impl` is state-aware and automatically runs the full workflow:
+**Note**: `agentd impl-change` is state-aware and automatically runs the full workflow:
 - Implementation (Claude writes code + tests)
 - Review (Codex runs tests + security scan)
 - Resolve loop (if NEEDS_CHANGES, up to max iterations)
@@ -28,13 +28,13 @@ There are NO separate `review` or `resolve-reviews` commands anymore.
 ## Usage
 
 ```bash
-/agentd:impl <change-id>
+/agentd:impl-change <change-id>
 ```
 
 ## Example
 
 ```bash
-/agentd:impl add-oauth
+/agentd:impl-change add-oauth
 ```
 
 ## How it works
@@ -43,12 +43,12 @@ The skill determines readiness based on the `phase` field in `STATE.yaml`:
 
 | Phase | Action |
 |-------|--------|
-| `challenged` | ✅ Run `agentd impl` - starts full workflow |
-| `implementing` | ✅ Run `agentd impl` - resumes from review step |
+| `challenged` | ✅ Run `agentd impl-change` - starts full workflow |
+| `implementing` | ✅ Run `agentd impl-change` - resumes from review step |
 | `complete` | ℹ️ Already done, ready to archive |
 | Other phases | ❌ **ChangeNotReady** error - not ready for implementation |
 
-**Note**: The `agentd impl` command is **state-aware** and automatically determines what to do:
+**Note**: The `agentd impl-change` command is **state-aware** and automatically determines what to do:
 - If `challenged`: Start implementation → review → resolve loop
 - If `implementing` with no REVIEW.md: Run review step
 - If `implementing` with REVIEW.md: Check verdict and resolve if needed
@@ -82,7 +82,7 @@ challenged → implementing → complete
 
 ## Next steps
 
-- **If complete**: Run `/agentd:archive <change-id>` to archive the change
+- **If complete**: Run `/agentd:merge-change <change-id>` to archive the change
 - **If failed**: Review `IMPLEMENTATION.md` and `REVIEW.md` for errors
 
 ## Error: ChangeNotReady
@@ -93,7 +93,7 @@ This error occurs when trying to implement before the proposal is approved:
 ❌ ChangeNotReady: Change must be in 'challenged' or 'implementing' phase
 
 Current phase: proposed
-Action required: Complete planning first with /agentd:plan <change-id>
+Action required: Complete planning first with /agentd:plan-change <change-id>
 ```
 
-**Resolution**: Complete the planning workflow first using `/agentd:plan`.
+**Resolution**: Complete the planning workflow first using `/agentd:plan-change`.

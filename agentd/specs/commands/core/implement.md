@@ -68,7 +68,7 @@ The command must track LLM usage for cost analysis:
 ## Command Signature
 
 ```bash
-agentd implement <change_id> [--tasks <task_filter>]
+agentd impl-change <change_id> [--tasks <task_filter>]
 ```
 
 **Arguments:**
@@ -101,7 +101,7 @@ sequenceDiagram
     participant Codex as CodexOrchestrator
     participant FS as File System
 
-    U->>CLI: agentd implement feat-auth
+    U->>CLI: agentd impl-change feat-auth
     CLI->>SM: Load STATE.yaml
     SM-->>CLI: Current state
     CLI->>SM: Set phase = Implementing
@@ -163,7 +163,7 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Implementing: agentd implement
+    [*] --> Implementing: agentd impl-change
     Implementing --> Complete: Review APPROVED (iteration 0)
     Implementing --> ReviewLoop: Review NEEDS_CHANGES
     ReviewLoop --> Resolving: Auto-fix with Claude
@@ -179,15 +179,15 @@ stateDiagram-v2
 
 ### Scenario: Happy path - First review approves
 
-- **WHEN** I run `agentd implement feat-auth` and Codex approves on iteration 0
+- **WHEN** I run `agentd impl-change feat-auth` and Codex approves on iteration 0
 - **THEN** STATE.yaml phase is set to `Complete`
 - **THEN** I see "✨ Implementation approved!"
-- **THEN** I see "⏭️ Next: agentd archive feat-auth"
+- **THEN** I see "⏭️ Next: agentd merge-change feat-auth"
 - **THEN** Exit code is 0
 
 ### Scenario: Auto-fix cycle resolves issues
 
-- **WHEN** I run `agentd implement feat-login` and Codex returns `NEEDS_CHANGES` on iteration 0
+- **WHEN** I run `agentd impl-change feat-login` and Codex returns `NEEDS_CHANGES` on iteration 0
 - **THEN** Claude automatically resolves issues
 - **THEN** Codex re-reviews at iteration 1
 - **THEN** If approved at iteration 1, STATE.yaml phase is set to `Complete`
@@ -196,14 +196,14 @@ stateDiagram-v2
 
 ### Scenario: Task filtering - Implement specific tasks only
 
-- **WHEN** I run `agentd implement feat-api --tasks 1.1,1.2`
+- **WHEN** I run `agentd impl-change feat-api --tasks 1.1,1.2`
 - **THEN** Only tasks 1.1 and 1.2 are implemented
 - **THEN** Review and auto-fix loop proceeds normally
 - **THEN** Exit code is 0 when approved
 
 ### Scenario: Max iterations exceeded
 
-- **WHEN** I run `agentd implement feat-complex` and review fails after 3 iterations
+- **WHEN** I run `agentd impl-change feat-complex` and review fails after 3 iterations
 - **THEN** I see "⚠️ Automatic refinement limit reached (3 iterations)"
 - **THEN** I see remaining issue counts (high and medium severity)
 - **THEN** I see suggested next steps (manual review, manual fix, resolve-reviews command)
@@ -212,7 +212,7 @@ stateDiagram-v2
 
 ### Scenario: Major issues found
 
-- **WHEN** I run `agentd implement feat-broken` and Codex returns `MAJOR_ISSUES`
+- **WHEN** I run `agentd impl-change feat-broken` and Codex returns `MAJOR_ISSUES`
 - **THEN** I see "❌ Major issues found"
 - **THEN** I see issue summary with high/medium counts
 - **THEN** I see suggested next steps for manual intervention
@@ -221,13 +221,13 @@ stateDiagram-v2
 
 ### Scenario: Change not found
 
-- **WHEN** I run `agentd implement nonexistent-change`
+- **WHEN** I run `agentd impl-change nonexistent-change`
 - **THEN** I see an error "Change directory not found" or similar
 - **THEN** Exit code is 1
 
 ### Scenario: Invalid STATE phase
 
-- **WHEN** I run `agentd implement feat-archived` and the change is already in `Complete` or `Archived` phase
+- **WHEN** I run `agentd impl-change feat-archived` and the change is already in `Complete` or `Archived` phase
 - **THEN** The command should proceed (overwrites phase to Implementing)
 - **THEN** Warning or info message may be displayed
 
@@ -236,7 +236,7 @@ stateDiagram-v2
 ### Example 1: Basic usage
 
 ```bash
-$ agentd implement feat-auth
+$ agentd impl-change feat-auth
 🎨 Agentd Implementation Workflow
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -253,13 +253,13 @@ $ agentd implement feat-auth
 ✨ Implementation approved!
 
 ⏭️  Next:
-   agentd archive feat-auth
+   agentd merge-change feat-auth
 ```
 
 ### Example 2: With task filtering
 
 ```bash
-$ agentd implement feat-api --tasks 1.1,2.1
+$ agentd impl-change feat-api --tasks 1.1,2.1
 🎨 Agentd Implementation Workflow
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -274,7 +274,7 @@ $ agentd implement feat-api --tasks 1.1,2.1
 ### Example 3: Auto-fix iteration
 
 ```bash
-$ agentd implement feat-validation
+$ agentd impl-change feat-validation
 🎨 Agentd Implementation Workflow
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -302,13 +302,13 @@ $ agentd implement feat-validation
 ✨ Fixed and approved (iteration 1)!
 
 ⏭️  Next:
-   agentd archive feat-validation
+   agentd merge-change feat-validation
 ```
 
 ### Example 4: Max iterations exceeded
 
 ```bash
-$ agentd implement feat-complex
+$ agentd impl-change feat-complex
 ...
 ⚠️  NEEDS_CHANGES - Auto-fixing (iteration 3)...
 
@@ -342,7 +342,7 @@ $ agentd implement feat-complex
 ### Example 5: Major issues
 
 ```bash
-$ agentd implement feat-broken
+$ agentd impl-change feat-broken
 ...
 🔍 [2/N] Reviewing with Codex (iteration 0)...
 
@@ -371,11 +371,11 @@ $ agentd implement feat-broken
 ## Related Commands
 
 **Previous in workflow:**
-- `agentd plan` - Creates the proposal and tasks to be implemented
+- `agentd plan-change` - Creates the proposal and tasks to be implemented
 - `agentd refine` - Refines proposal before implementation
 
 **Next in workflow:**
-- `agentd archive` - Archives the completed change (when approved)
+- `agentd merge-change` - Archives the completed change (when approved)
 
 **Alternative/Supporting commands:**
 - `agentd review` - Manually trigger review (if you fix code manually)

@@ -223,7 +223,7 @@ sequenceDiagram
 - `agentd reproposal` - Fixes issues from previous challenge
 
 **Next in workflow**:
-- `agentd implement` - If APPROVED
+- `agentd impl-change` - If APPROVED
 - `agentd reproposal` - If NEEDS_REVISION
 - Manual review - If REJECTED
 

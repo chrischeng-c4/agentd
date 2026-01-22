@@ -8,13 +8,14 @@ pub mod init;
 pub mod knowledge;
 pub mod list;
 pub mod mcp_server;
-pub mod mcp_server_mgmt;
+pub mod mcp_server_mgmt; // Deprecated: use server instead
 pub mod migrate_xml;
 pub mod plan;
 pub mod proposal;
 pub mod proposal_engine;
 pub mod refine;
 pub mod revise;
+pub mod server; // Unified server commands (R1)
 pub mod spec;
 pub mod status;
 pub mod tasks;

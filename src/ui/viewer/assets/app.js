@@ -1,11 +1,34 @@
 /**
  * Agentd Plan Viewer Application
  * Uses REST API for backend communication
+ *
+ * Configuration Injection (R5):
+ * When served from the unified server at /view/:project/:change/,
+ * the HTML includes a <script id="agentd-config"> tag with base_path.
+ * This allows the viewer to work both standalone and within the unified server.
  */
+
+// Load injected configuration (R5)
+function loadConfig() {
+    const configEl = document.getElementById('agentd-config');
+    if (configEl) {
+        try {
+            return JSON.parse(configEl.textContent);
+        } catch (e) {
+            console.warn('Failed to parse agentd-config:', e);
+        }
+    }
+    // Default config for standalone mode
+    return { base_path: '/api', project: null, change_id: null };
+}
+
+const config = loadConfig();
 
 // Global state
 const state = {
-    changeId: 'unknown',
+    changeId: config.change_id || 'unknown',
+    project: config.project || null,
+    basePath: config.base_path || '/api',
     files: [],
     currentFile: null,
     annotations: [],
@@ -15,26 +38,30 @@ const state = {
 };
 
 // ============================================================================
-// API Communication (using fetch)
+// API Communication (using fetch with base_path from config)
 // ============================================================================
 
 async function apiGet(endpoint) {
+    // Prepend base_path if endpoint doesn't start with /
+    const url = endpoint.startsWith('/') ? endpoint : `${state.basePath}/${endpoint}`;
     try {
-        const response = await fetch(endpoint);
+        const response = await fetch(url);
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || `HTTP ${response.status}`);
         }
         return await response.json();
     } catch (e) {
-        console.error(`API GET ${endpoint} failed:`, e);
+        console.error(`API GET ${url} failed:`, e);
         throw e;
     }
 }
 
 async function apiPost(endpoint, data = {}) {
+    // Prepend base_path if endpoint doesn't start with /
+    const url = endpoint.startsWith('/') ? endpoint : `${state.basePath}/${endpoint}`;
     try {
-        const response = await fetch(endpoint, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -45,7 +72,7 @@ async function apiPost(endpoint, data = {}) {
         }
         return await response.json();
     } catch (e) {
-        console.error(`API POST ${endpoint} failed:`, e);
+        console.error(`API POST ${url} failed:`, e);
         throw e;
     }
 }
@@ -122,7 +149,7 @@ async function loadFile(filename) {
     body.innerHTML = '<div class="placeholder"><p>Loading...</p></div>';
 
     try {
-        const response = await apiGet(`/api/files/${filename}`);
+        const response = await apiGet(`files/${filename}`);
         updateContent(response.content, response.annotations || []);
     } catch (e) {
         body.innerHTML = `<div class="placeholder"><p>Error loading file: ${e.message}</p></div>`;
@@ -254,7 +281,7 @@ async function resolveAnnotation(id) {
     }
 
     try {
-        await apiPost(`/api/annotations/${encodeURIComponent(id)}/resolve`);
+        await apiPost(`annotations/${encodeURIComponent(id)}/resolve`);
         showToast('Annotation resolved', 'success');
     } catch (e) {
         // Rollback on failure
@@ -347,7 +374,7 @@ async function saveAnnotation() {
     saveBtn.disabled = true;
 
     try {
-        const annotation = await apiPost('/api/annotations', {
+        const annotation = await apiPost('annotations', {
             file: state.currentFile,
             section_id: sectionId,
             content
@@ -422,11 +449,11 @@ function initReviewActions() {
         approveBtn.innerHTML = '<span class="btn-icon">⏳</span> Approving...';
 
         try {
-            await apiPost('/api/review/approve');
+            await apiPost('review/approve');
             showToast('Proposal approved!', 'success');
             // Close server and browser
             setTimeout(async () => {
-                await apiPost('/api/close').catch(() => {});
+                await apiPost('close').catch(() => {});
                 window.close();
             }, 1000);
         } catch (e) {
@@ -456,11 +483,11 @@ function initReviewActions() {
         requestChangesBtn.innerHTML = '<span class="btn-icon">⏳</span> Submitting...';
 
         try {
-            await apiPost('/api/review/request-changes');
+            await apiPost('review/request-changes');
             showToast('Changes requested!', 'success');
             // Close server and browser
             setTimeout(async () => {
-                await apiPost('/api/close').catch(() => {});
+                await apiPost('close').catch(() => {});
                 window.close();
             }, 1000);
         } catch (e) {
@@ -485,7 +512,7 @@ function initReviewActions() {
 async function init() {
     try {
         // Fetch initial info from server
-        const info = await apiGet('/api/info');
+        const info = await apiGet('info');
         state.changeId = info.change_id;
         state.files = info.files;
 

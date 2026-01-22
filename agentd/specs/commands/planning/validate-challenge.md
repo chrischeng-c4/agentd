@@ -270,7 +270,7 @@ $ agentd validate-challenge feat-auth
    Issues: 0 total (0 HIGH, 0 MEDIUM, 0 LOW)
 
 ⏭️  Next steps:
-   agentd implement feat-auth
+   agentd impl-change feat-auth
 ```
 
 ### Example 2: NEEDS_REVISION with issues
@@ -421,7 +421,7 @@ $ agentd validate-challenge feat-xml
    Issues: 0 total (0 HIGH, 0 MEDIUM, 0 LOW)
 
 ⏭️  Next steps:
-   agentd implement feat-xml
+   agentd impl-change feat-xml
 ```
 
 ## Related Commands
@@ -430,7 +430,7 @@ $ agentd validate-challenge feat-xml
 - `agentd challenge` - Generates CHALLENGE.md or review in proposal.md
 
 **Next in workflow (based on verdict):**
-- `agentd implement` - If APPROVED
+- `agentd impl-change` - If APPROVED
 - `agentd reproposal` - If NEEDS_REVISION
 - `agentd challenge` - Re-run if validation fails or REJECTED
 

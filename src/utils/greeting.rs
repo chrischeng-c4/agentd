@@ -10,6 +10,7 @@
 ///
 /// # Examples
 /// ```
+/// use agentd::utils::greeting::greet;
 /// let greeting = greet("World");
 /// assert_eq!(greeting, "Hello, World!");
 /// ```

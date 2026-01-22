@@ -98,9 +98,10 @@ pub fn create_tasks(input: CreateTasksInput, project_root: &Path) -> Result<Stri
     let now = Utc::now();
     let mut content = String::new();
 
-    // Frontmatter
+    // Frontmatter (emit both id and change_id for compatibility)
     content.push_str("---\n");
     content.push_str(&format!("id: {}\n", input.change_id));
+    content.push_str(&format!("change_id: {}\n", input.change_id));
     content.push_str("type: tasks\n");
     content.push_str("version: 1\n");
     content.push_str(&format!("created_at: {}\n", now.to_rfc3339()));

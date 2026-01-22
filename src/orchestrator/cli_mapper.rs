@@ -39,6 +39,11 @@ pub enum LlmArg {
     Verbose,
     /// MCP config file path (Claude --mcp-config)
     McpConfig(String),
+    /// Prompt text to pass as CLI argument (not stdin)
+    /// - Gemini: positional arg at end
+    /// - Codex: positional arg after exec
+    /// - Claude: -p flag value
+    Prompt(String),
 }
 
 /// LLM provider type
@@ -238,6 +243,31 @@ impl LlmProvider {
                     }
                     // TODO: Add Gemini/Codex MCP config support when available
                 }
+                LlmArg::Prompt(_) => {
+                    // Handled separately at the end
+                }
+            }
+        }
+
+        // Add prompt at the end (must be last for positional args)
+        for arg in args {
+            if let LlmArg::Prompt(prompt) = arg {
+                match self {
+                    LlmProvider::Gemini => {
+                        // Gemini: positional arg at end
+                        cli_args.push(prompt.clone());
+                    }
+                    LlmProvider::Codex => {
+                        // Codex: positional arg after exec/resume
+                        cli_args.push(prompt.clone());
+                    }
+                    LlmProvider::Claude => {
+                        // Claude: -p flag with prompt value
+                        cli_args.push("-p".to_string());
+                        cli_args.push(prompt.clone());
+                    }
+                }
+                break; // Only one prompt
             }
         }
 
@@ -439,5 +469,57 @@ mod tests {
         let result3 = LlmProvider::Gemini.build_args(&args, true);
         let result4 = LlmProvider::Gemini.build_args_with_resume(&args, ResumeMode::Latest);
         assert_eq!(result3, result4);
+    }
+
+    // =========================================================================
+    // Prompt argument tests
+    // =========================================================================
+
+    #[test]
+    fn test_gemini_args_with_prompt() {
+        let args = vec![
+            LlmArg::Model("gemini-2.5-flash".to_string()),
+            LlmArg::OutputFormat("stream-json".to_string()),
+            LlmArg::Prompt("Call get_task MCP tool".to_string()),
+        ];
+        let cli_args = LlmProvider::Gemini.build_args(&args, false);
+        assert_eq!(cli_args, vec![
+            "-m", "gemini-2.5-flash",
+            "--output-format", "stream-json",
+            "Call get_task MCP tool"  // Prompt at end
+        ]);
+    }
+
+    #[test]
+    fn test_codex_args_with_prompt() {
+        let args = vec![
+            LlmArg::Model("gpt-5.2-codex".to_string()),
+            LlmArg::FullAuto,
+            LlmArg::Json,
+            LlmArg::Prompt("Call get_task MCP tool".to_string()),
+        ];
+        let cli_args = LlmProvider::Codex.build_args(&args, false);
+        assert_eq!(cli_args, vec![
+            "exec",
+            "--model", "gpt-5.2-codex",
+            "--full-auto",
+            "--json",
+            "Call get_task MCP tool"  // Prompt after exec and flags
+        ]);
+    }
+
+    #[test]
+    fn test_claude_args_with_prompt() {
+        let args = vec![
+            LlmArg::Model("sonnet".to_string()),
+            LlmArg::FullAuto,
+            LlmArg::Prompt("Call get_task MCP tool".to_string()),
+        ];
+        let cli_args = LlmProvider::Claude.build_args(&args, false);
+        assert_eq!(cli_args, vec![
+            "--model", "sonnet",
+            "--dangerously-skip-permissions",
+            "-p", "Call get_task MCP tool"  // -p flag with prompt
+        ]);
     }
 }

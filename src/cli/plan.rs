@@ -28,10 +28,10 @@ pub async fn run(change_id: &str, description: Option<String>, skip_clarify: boo
                 println!("{}", "❌ Error: Description required for new changes".red().bold());
                 println!();
                 println!("   Usage:");
-                println!("     agentd plan {} \"<description>\"", change_id);
+                println!("     agentd plan-change {} \"<description>\"", change_id);
                 println!();
                 println!("   For existing changes, description is optional:");
-                println!("     agentd plan {}", change_id);
+                println!("     agentd plan-change {}", change_id);
                 return Ok(());
             }
         }
@@ -53,7 +53,7 @@ pub async fn run(change_id: &str, description: Option<String>, skip_clarify: boo
             println!("     /agentd:plan {} \"{}\"", change_id, description);
             println!();
             println!("   Or skip clarifications with:");
-            println!("     agentd plan {} \"{}\" --skip-clarify", change_id, description);
+            println!("     agentd plan-change {} \"{}\" --skip-clarify", change_id, description);
             return Ok(());
         }
         println!("{}", "✅ clarifications.md found".green());

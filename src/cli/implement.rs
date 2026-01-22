@@ -52,43 +52,53 @@ async fn run_spec_implementation(
     Ok(())
 }
 
-/// Run self-review for a single spec
-async fn run_spec_self_review(
+/// Run Codex review for a single spec
+async fn run_spec_review(
     change_id: &str,
     spec_group: &SpecGroup,
     project_root: &PathBuf,
     config: &AgentdConfig,
-) -> Result<bool> {
+    iteration: u32,
+) -> Result<ReviewVerdict> {
     let change = Change::new(change_id, "");
     let complexity = change.assess_complexity(project_root);
 
-    let orchestrator = ClaudeOrchestrator::new(config, project_root);
+    let orchestrator = CodexOrchestrator::new(config, project_root);
     let (output, usage) = orchestrator
-        .run_self_review_spec(change_id, &spec_group.spec_id, complexity)
+        .run_review_spec_mcp(change_id, &spec_group.spec_id, iteration, complexity)
         .await?;
 
-    let model = config.claude.select_model(complexity).model.clone();
+    let model = config.codex.select_model(complexity).model.clone();
     record_usage(
         change_id,
         project_root,
-        &format!("self_review_spec_{}", spec_group.spec_id),
+        &format!("review_spec_{}", spec_group.spec_id),
         &model,
         &usage,
         config,
         complexity,
-        "claude",
+        "codex",
     );
 
-    // Parse self-review verdict - look for markers
-    let is_ok = output.contains("✅") || output.to_lowercase().contains("pass");
-
-    if is_ok {
-        println!("   ✅ Self-review passed");
+    // Parse review verdict from output
+    let verdict = if output.to_lowercase().contains("approved") {
+        ReviewVerdict::Approved
+    } else if output.to_lowercase().contains("major") {
+        ReviewVerdict::MajorIssues
+    } else if output.to_lowercase().contains("needs") || output.to_lowercase().contains("revision") {
+        ReviewVerdict::NeedsChanges
     } else {
-        println!("   ⚠️  Self-review found issues");
+        ReviewVerdict::Unknown
+    };
+
+    match &verdict {
+        ReviewVerdict::Approved => println!("   ✅ Spec review passed"),
+        ReviewVerdict::NeedsChanges => println!("   ⚠️  Spec review found issues"),
+        ReviewVerdict::MajorIssues => println!("   ❌ Spec review found major issues"),
+        ReviewVerdict::Unknown => println!("   ❓ Could not parse spec review verdict"),
     }
 
-    Ok(is_ok)
+    Ok(verdict)
 }
 
 /// Fix issues found in spec self-review
@@ -210,13 +220,21 @@ pub async fn run_sequential(change_id: &str) -> Result<ImplementEngineResult> {
         // Implement this spec's tasks
         run_spec_implementation(change_id, spec_group, &project_root, &config).await?;
 
-        // Self-review
-        let review_ok = run_spec_self_review(change_id, spec_group, &project_root, &config).await?;
+        // Codex review for this spec
+        let spec_verdict = run_spec_review(change_id, spec_group, &project_root, &config, 0).await?;
 
-        if !review_ok {
-            // Auto-fix issues
+        if spec_verdict == ReviewVerdict::NeedsChanges {
+            // Auto-fix issues with Claude
             println!("   🔧 Auto-fixing issues...");
             run_spec_fix(change_id, spec_group, &project_root, &config).await?;
+
+            // Re-review after fix
+            let retry_verdict = run_spec_review(change_id, spec_group, &project_root, &config, 1).await?;
+            if retry_verdict != ReviewVerdict::Approved {
+                println!("   ⚠️  Issues remain after fix, continuing to next spec");
+            }
+        } else if spec_verdict == ReviewVerdict::MajorIssues {
+            println!("   ❌ Major issues found, may need manual intervention");
         }
 
         // Mark complete
@@ -364,7 +382,7 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<ImplementEngine
                     ReviewVerdict::Approved => {
                         println!("✅ Implementation already approved!");
                         println!("   Ready to archive:");
-                        println!("      agentd archive {}", change_id);
+                        println!("      agentd merge-change {}", change_id);
 
                         Ok(ImplementEngineResult {
                             change_id: change_id.to_string(),
@@ -392,7 +410,7 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<ImplementEngine
         StatePhase::Complete => {
             println!("✅ Implementation already complete and approved!");
             println!("   Ready to archive:");
-            println!("      agentd archive {}", change_id);
+            println!("      agentd merge-change {}", change_id);
 
             Ok(ImplementEngineResult {
                 change_id: change_id.to_string(),
@@ -405,7 +423,7 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<ImplementEngine
             anyhow::bail!("Change already archived");
         }
         other => {
-            anyhow::bail!("Cannot run impl workflow in phase {:?}. Run 'agentd plan' first.", other);
+            anyhow::bail!("Cannot run impl workflow in phase {:?}. Run 'agentd plan-change' first.", other);
         }
     }
 }

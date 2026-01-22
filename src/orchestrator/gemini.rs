@@ -364,6 +364,133 @@ impl<'a> GeminiOrchestrator<'a> {
 
         self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, prompt, true, Some(&self.project_root)).await
     }
+
+    // =========================================================================
+    // MCP-based Task Delivery (Agent-Agnostic)
+    // =========================================================================
+
+    /// Generate a short prompt instructing agent to call get_task MCP tool
+    fn mcp_task_prompt(change_id: &str, task_type: &str, extra_params: &str) -> String {
+        format!(
+            r#"Call the `get_task` MCP tool to get your task instructions.
+
+Parameters:
+- change_id: "{}"
+- task_type: "{}"
+{}"#,
+            change_id, task_type, extra_params
+        )
+    }
+
+    /// Build args with prompt included (for headless mode, no stdin)
+    fn build_args_with_mcp_prompt(&self, complexity: Complexity, prompt: &str) -> Vec<String> {
+        let model = self.model_selector.select_gemini(complexity);
+        let args = vec![
+            LlmArg::Model(model.to_cli_arg()),
+            LlmArg::OutputFormat("stream-json".to_string()),
+            LlmArg::Prompt(prompt.to_string()),
+        ];
+        LlmProvider::Gemini.build_args_with_resume(&args, ResumeMode::None)
+    }
+
+    /// Run a task using MCP-based delivery (agent-agnostic)
+    ///
+    /// This method passes a short prompt via CLI args instead of stdin,
+    /// and the agent retrieves full task instructions via the get_task MCP tool.
+    ///
+    /// # Arguments
+    /// * `change_id` - The change ID to work on
+    /// * `task_type` - Task type (e.g., "create_proposal", "create_spec")
+    /// * `extra_params` - Extra parameters for the task (e.g., "- spec_id: \"auth-flow\"")
+    /// * `complexity` - Complexity level for model selection
+    pub async fn run_task_mcp(
+        &self,
+        change_id: &str,
+        task_type: &str,
+        extra_params: &str,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        let prompt = Self::mcp_task_prompt(change_id, task_type, extra_params);
+        let env = self.build_env(change_id);
+        let args = self.build_args_with_mcp_prompt(complexity, &prompt);
+
+        // Empty string for stdin prompt - we're using CLI args instead
+        self.runner.run_llm_with_cwd(LlmProvider::Gemini, args, env, "", true, Some(&self.project_root)).await
+    }
+
+    /// Run create_proposal task via MCP
+    pub async fn run_create_proposal_mcp(
+        &self,
+        change_id: &str,
+        description: &str,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        let extra = format!("- description: \"{}\"", description.replace('"', "\\\""));
+        self.run_task_mcp(change_id, "create_proposal", &extra, complexity).await
+    }
+
+    /// Run review_proposal task via MCP
+    pub async fn run_review_proposal_mcp(
+        &self,
+        change_id: &str,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        self.run_task_mcp(change_id, "review_proposal", "", complexity).await
+    }
+
+    /// Run create_spec task via MCP with optional dependencies
+    pub async fn run_create_spec_mcp(
+        &self,
+        change_id: &str,
+        spec_id: &str,
+        dependencies: &[String],
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        let mut extra = format!("- spec_id: \"{}\"", spec_id);
+        if !dependencies.is_empty() {
+            let deps_json: Vec<String> = dependencies.iter().map(|d| format!("\"{}\"", d)).collect();
+            extra.push_str(&format!("\n- dependencies: [{}]", deps_json.join(", ")));
+        }
+        self.run_task_mcp(change_id, "create_spec", &extra, complexity).await
+    }
+
+    /// Run create_tasks task via MCP
+    pub async fn run_create_tasks_mcp(
+        &self,
+        change_id: &str,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        self.run_task_mcp(change_id, "create_tasks", "", complexity).await
+    }
+
+    /// Run revise_proposal task via MCP (fix proposal based on review feedback)
+    pub async fn run_revise_proposal_mcp(
+        &self,
+        change_id: &str,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        self.run_task_mcp(change_id, "revise_proposal", "", complexity).await
+    }
+
+    /// Run revise_spec task via MCP (fix spec based on review feedback)
+    pub async fn run_revise_spec_mcp(
+        &self,
+        change_id: &str,
+        spec_id: &str,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        let extra = format!("- spec_id: \"{}\"", spec_id);
+        self.run_task_mcp(change_id, "revise_spec", &extra, complexity).await
+    }
+
+    /// Run revise_tasks task via MCP (fix tasks based on review feedback)
+    pub async fn run_revise_tasks_mcp(
+        &self,
+        change_id: &str,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        self.run_task_mcp(change_id, "revise_tasks", "", complexity).await
+    }
 }
 
 #[cfg(test)]

@@ -1,0 +1,5 @@
+change_id: merge-viewer-to-mcp
+schema_version: "2.0"
+phase: complete
+iteration: 2
+last_action: implementation verified

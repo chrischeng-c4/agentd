@@ -96,7 +96,7 @@ Create `changes/<change-id>/VERIFICATION.md` with this structure:
 
 ### Next Steps
 
-1. If **READY_TO_MERGE**: Run `agentd archive <change-id>` to complete
+1. If **READY_TO_MERGE**: Run `agentd merge-change <change-id>` to complete
 2. If **NEEDS_FIXES**: Fix failing tests and run `agentd verify <change-id>` again
 3. Review failed scenarios and update implementation accordingly
 ```
