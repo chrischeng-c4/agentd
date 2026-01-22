@@ -1,5 +1,5 @@
 use crate::context::ContextPhase;
-use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, Complexity};
+use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, Complexity, StatePhase};
 use crate::orchestrator::{detect_self_review_marker, GeminiOrchestrator, CodexOrchestrator, SelfReviewResult, UsageMetrics};
 use crate::parser::{parse_challenge_verdict, parse_affected_specs};
 use crate::orchestrator::prompts;
@@ -66,6 +66,31 @@ pub async fn run_proposal_loop(config: ProposalEngineConfig) -> Result<ProposalE
     // Get proposal path for issue severity check
     let proposal_path = project_root.join("agentd/changes").join(&resolved_change_id).join("proposal.md");
     let has_only_minor_issues = check_only_minor_issues(&proposal_path).unwrap_or(false);
+
+    // Update state based on final verdict
+    let state_path = project_root
+        .join("agentd/changes")
+        .join(&resolved_change_id)
+        .join("STATE.yaml");
+    if let Ok(mut manager) = StateManager::load(&state_path) {
+        let new_phase = match &verdict {
+            ChallengeVerdict::Approved => StatePhase::Challenged,
+            ChallengeVerdict::NeedsRevision => {
+                // Allow proceeding if max iterations reached or only minor issues
+                if iteration >= max_iterations as usize || has_only_minor_issues {
+                    StatePhase::Challenged
+                } else {
+                    StatePhase::Proposed
+                }
+            }
+            ChallengeVerdict::Rejected => StatePhase::Rejected,
+            ChallengeVerdict::Unknown => StatePhase::Proposed,
+        };
+
+        manager.set_phase(new_phase);
+        manager.set_last_action("challenge (codex)");
+        let _ = manager.save();
+    }
 
     // Display final result
     println!();
