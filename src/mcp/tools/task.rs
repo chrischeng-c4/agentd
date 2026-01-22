@@ -2,13 +2,16 @@
 //!
 //! Returns task instructions for agents based on task type.
 //! This enables agent-agnostic task delivery through MCP.
+//!
+//! Templates are stored in templates/prompts/*.md with frontmatter metadata.
 
 use super::{get_optional_string, get_required_string, ToolDefinition};
 use crate::Result;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::path::Path;
 
-/// Task types for the plan workflow
+/// Task types for workflows
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskType {
     // Plan workflow tasks
@@ -44,6 +47,24 @@ impl TaskType {
             "code_review" => Ok(TaskType::CodeReview),
             "resolve" => Ok(TaskType::Resolve),
             _ => anyhow::bail!("Unknown task_type: {}", s),
+        }
+    }
+
+    /// Get the template filename for this task type
+    fn template_name(&self) -> &'static str {
+        match self {
+            TaskType::CreateProposal => "create_proposal.md",
+            TaskType::ReviewProposal => "review_proposal.md",
+            TaskType::CreateSpec => "create_spec.md",
+            TaskType::ReviewSpec => "review_spec.md",
+            TaskType::CreateTasks => "create_tasks.md",
+            TaskType::ReviewTasks => "review_tasks.md",
+            TaskType::Challenge => "challenge.md",
+            TaskType::Reproposal => "reproposal.md",
+            TaskType::Implement => "implement.md",
+            TaskType::ReviewImpl => "review_impl.md",
+            TaskType::CodeReview => "code_review.md",
+            TaskType::Resolve => "resolve.md",
         }
     }
 }
@@ -89,7 +110,7 @@ pub fn definition() -> ToolDefinition {
                 },
                 "iteration": {
                     "type": "integer",
-                    "description": "Current iteration number (for review tasks)"
+                    "description": "Current iteration number (for challenge and code_review tasks)"
                 }
             }
         }),
@@ -97,444 +118,218 @@ pub fn definition() -> ToolDefinition {
 }
 
 /// Execute the get_task tool
-pub fn execute(args: &Value, _project_root: &Path) -> Result<String> {
+pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
     let change_id = get_required_string(args, "change_id")?;
     let task_type_str = get_required_string(args, "task_type")?;
     let task_type = TaskType::from_str(&task_type_str)?;
 
     let spec_id = get_optional_string(args, "spec_id");
     let description = get_optional_string(args, "description");
-    let iteration = args.get("iteration").and_then(|v| v.as_i64()).unwrap_or(1) as u32;
+    let iteration = args.get("iteration").and_then(|v| v.as_i64()).unwrap_or(1);
 
-    let task = match task_type {
+    // Build variables map
+    let mut vars = HashMap::new();
+    vars.insert("change_id".to_string(), change_id.clone());
+    vars.insert("iteration".to_string(), iteration.to_string());
+
+    if let Some(sid) = &spec_id {
+        vars.insert("spec_id".to_string(), sid.clone());
+    }
+    if let Some(desc) = &description {
+        vars.insert("description".to_string(), desc.clone());
+    }
+
+    // Validate required variables for specific task types
+    match task_type {
+        TaskType::CreateSpec | TaskType::ReviewSpec => {
+            if spec_id.is_none() {
+                anyhow::bail!("spec_id is required for {} task", task_type_str);
+            }
+        }
         TaskType::CreateProposal => {
-            let desc = description.unwrap_or_else(|| "No description provided".to_string());
-            create_proposal_task(&change_id, &desc)
+            if description.is_none() {
+                vars.insert("description".to_string(), "No description provided".to_string());
+            }
         }
-        TaskType::ReviewProposal => review_proposal_task(&change_id),
-        TaskType::CreateSpec => {
-            let sid = spec_id.ok_or_else(|| anyhow::anyhow!("spec_id required for create_spec"))?;
-            create_spec_task(&change_id, &sid)
-        }
-        TaskType::ReviewSpec => {
-            let sid = spec_id.ok_or_else(|| anyhow::anyhow!("spec_id required for review_spec"))?;
-            review_spec_task(&change_id, &sid)
-        }
-        TaskType::CreateTasks => create_tasks_task(&change_id),
-        TaskType::ReviewTasks => review_tasks_task(&change_id),
-        TaskType::Challenge => challenge_task(&change_id, iteration),
-        TaskType::Reproposal => reproposal_task(&change_id),
-        TaskType::Implement => implement_task(&change_id),
-        TaskType::ReviewImpl => review_impl_task(&change_id),
-        TaskType::CodeReview => code_review_task(&change_id, iteration),
-        TaskType::Resolve => resolve_task(&change_id),
-    };
+        _ => {}
+    }
 
-    Ok(task)
+    // Load and render template
+    let template = load_template(project_root, task_type)?;
+    let rendered = render_template(&template, &vars);
+
+    Ok(rendered)
 }
 
-// =============================================================================
-// Plan Workflow Tasks
-// =============================================================================
+/// Load a template file from templates/prompts/
+fn load_template(project_root: &Path, task_type: TaskType) -> Result<String> {
+    let template_path = project_root
+        .join("templates")
+        .join("prompts")
+        .join(task_type.template_name());
 
-fn create_proposal_task(change_id: &str, description: &str) -> String {
-    format!(r#"# Task: Create Proposal
+    if template_path.exists() {
+        let content = std::fs::read_to_string(&template_path)?;
+        // Strip frontmatter (between --- delimiters)
+        Ok(strip_frontmatter(&content))
+    } else {
+        // Fallback to embedded templates if file doesn't exist
+        Ok(embedded_template(task_type))
+    }
+}
+
+/// Strip YAML frontmatter from template content
+fn strip_frontmatter(content: &str) -> String {
+    if content.starts_with("---") {
+        if let Some(end_idx) = content[3..].find("---") {
+            return content[end_idx + 6..].trim_start().to_string();
+        }
+    }
+    content.to_string()
+}
+
+/// Render template by replacing {{variable}} placeholders
+fn render_template(template: &str, vars: &HashMap<String, String>) -> String {
+    let mut result = template.to_string();
+    for (key, value) in vars {
+        let placeholder = format!("{{{{{}}}}}", key);
+        result = result.replace(&placeholder, value);
+    }
+    result
+}
+
+/// Embedded fallback templates (used when template files don't exist)
+fn embedded_template(task_type: TaskType) -> String {
+    match task_type {
+        TaskType::CreateProposal => r#"# Task: Create Proposal
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## User Request
-{description}
+{{description}}
 
 ## Instructions
-
-1. **Analyze the codebase** using your context window:
-   - Read project structure, existing code, patterns
-   - Understand the technical landscape
-   - Identify affected areas
-
-2. **Determine required specs**:
-   - What major components/features need detailed design?
-   - Use clear, descriptive IDs (e.g., `auth-flow`, `user-model`, `api-endpoints`)
-
-3. **Call the `create_proposal` MCP tool** with:
-   - `change_id`: "{change_id}"
-   - `summary`: Brief 1-sentence description
-   - `why`: Detailed business/technical motivation (min 50 chars)
-   - `what_changes`: Array of high-level changes
-   - `impact`: Object with scope, affected_files, affected_specs, affected_code, breaking_changes
-
-## Expected Output
-- proposal.md created via `create_proposal` MCP tool
+1. Analyze the codebase
+2. Call `create_proposal` MCP tool with change details
 
 ## Tools to Use
 - `create_proposal` (required)
-- `read_file`, `list_specs` (for context)
-"#)
-}
+"#.to_string(),
 
-fn review_proposal_task(change_id: &str) -> String {
-    format!(r#"# Task: Review Proposal
+        TaskType::ReviewProposal => r#"# Task: Review Proposal
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
+1. Read proposal with `read_file`
+2. Check quality criteria
+3. Output `<review>PASS</review>` or `<review>NEEDS_REVISION</review>`
+"#.to_string(),
 
-1. **Read the proposal**:
-   - Use: `read_file` with change_id="{change_id}" and file="proposal"
-
-2. **Check quality criteria**:
-   - Summary is clear and specific (not vague)
-   - Why section has compelling business/technical value
-   - affected_specs list is complete and well-scoped
-   - Impact analysis covers all affected areas
-
-3. **If issues found**:
-   - Call `create_proposal` MCP tool with updated data
-   - Output: `<review>NEEDS_REVISION</review>`
-
-4. **If no issues**:
-   - Output: `<review>PASS</review>`
-
-## Expected Output
-- Either `<review>PASS</review>` or `<review>NEEDS_REVISION</review>`
-
-## Tools to Use
-- `read_file` (required)
-- `create_proposal` (if fixes needed)
-"#)
-}
-
-fn create_spec_task(change_id: &str, spec_id: &str) -> String {
-    format!(r#"# Task: Create Spec '{spec_id}'
+        TaskType::CreateSpec => r#"# Task: Create Spec '{{spec_id}}'
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
+1. Read context with `read_file` and `list_specs`
+2. Call `create_spec` MCP tool
+"#.to_string(),
 
-1. **Read context files**:
-   - Use: `read_file` with change_id="{change_id}" and file="proposal"
-   - Use: `list_specs` to see existing specs
-   - Read existing specs to maintain consistency
-
-2. **Design this spec**:
-   - Define clear, testable requirements (R1, R2, ...)
-   - Add Mermaid diagrams if helpful (use generate_mermaid_* tools)
-   - Write acceptance scenarios (WHEN/THEN format, min 3)
-   - Ensure consistency with proposal.md and other specs
-
-3. **Call the `create_spec` MCP tool** with:
-   - `change_id`: "{change_id}"
-   - `spec_id`: "{spec_id}"
-   - `title`: Human-readable title
-   - `overview`: What this spec covers (min 50 chars)
-   - `requirements`: Array of requirement objects
-   - `scenarios`: Array of scenario objects (min 3)
-   - `flow_diagram`: Optional Mermaid diagram
-   - `data_model`: Optional JSON Schema
-
-## Expected Output
-- specs/{spec_id}.md created via `create_spec` MCP tool
-
-## Tools to Use
-- `read_file`, `list_specs` (for context)
-- `create_spec` (required)
-- `generate_mermaid_*` (optional, for diagrams)
-"#)
-}
-
-fn review_spec_task(change_id: &str, spec_id: &str) -> String {
-    format!(r#"# Task: Review Spec '{spec_id}'
+        TaskType::ReviewSpec => r#"# Task: Review Spec '{{spec_id}}'
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
+1. Read spec and proposal
+2. Output `<review>PASS</review>` or `<review>NEEDS_REVISION</review>`
+"#.to_string(),
 
-1. **Read the spec and context**:
-   - Use: `read_file` with change_id="{change_id}" and file="{spec_id}"
-   - Use: `read_file` with change_id="{change_id}" and file="proposal"
-
-2. **Check quality criteria**:
-   - Requirements are testable and clear
-   - Scenarios cover happy path, errors, edge cases (min 3)
-   - Consistent with proposal.md and other specs
-   - Mermaid diagrams are correct (if present)
-
-3. **If issues found**:
-   - Call `create_spec` MCP tool with updated data
-   - Output: `<review>NEEDS_REVISION</review>`
-
-4. **If no issues**:
-   - Output: `<review>PASS</review>`
-
-## Expected Output
-- Either `<review>PASS</review>` or `<review>NEEDS_REVISION</review>`
-
-## Tools to Use
-- `read_file`, `list_specs` (required)
-- `create_spec` (if fixes needed)
-"#)
-}
-
-fn create_tasks_task(change_id: &str) -> String {
-    format!(r#"# Task: Create Tasks
+        TaskType::CreateTasks => r#"# Task: Create Tasks
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
+1. Read proposal and specs
+2. Call `create_tasks` MCP tool
+"#.to_string(),
 
-1. **Read all context files**:
-   - Use: `read_file` with change_id="{change_id}" and file="proposal"
-   - Use: `list_specs` to list all specs
-   - Read all specs for detailed requirements
-
-2. **Break down into tasks by layer**:
-   - **data**: Database schemas, models, data structures
-   - **logic**: Business logic, algorithms, core functionality
-   - **integration**: API endpoints, external integrations
-   - **testing**: Unit tests, integration tests
-
-3. **Call the `create_tasks` MCP tool** with:
-   - `change_id`: "{change_id}"
-   - `tasks`: Array of task objects with layer, number, title, file, spec_ref, description, depends
-
-## Expected Output
-- tasks.md created via `create_tasks` MCP tool
-
-## Tools to Use
-- `read_file`, `list_specs` (required)
-- `create_tasks` (required)
-"#)
-}
-
-fn review_tasks_task(change_id: &str) -> String {
-    format!(r#"# Task: Review Tasks
+        TaskType::ReviewTasks => r#"# Task: Review Tasks
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
+1. Read tasks and specs
+2. Output `<review>PASS</review>` or `<review>NEEDS_REVISION</review>`
+"#.to_string(),
 
-1. **Read tasks and context**:
-   - Use: `read_file` with change_id="{change_id}" and file="tasks"
-   - Use: `read_file` with change_id="{change_id}" and file="proposal"
-   - Use: `list_specs` to verify coverage
-
-2. **Check quality criteria**:
-   - All spec requirements are covered by tasks
-   - Dependencies are correct (no circular deps)
-   - Layer organization is logical (data → logic → integration → testing)
-   - File paths are accurate and specific
-
-3. **If issues found**:
-   - Call `create_tasks` MCP tool with updated data
-   - Output: `<review>NEEDS_REVISION</review>`
-
-4. **If no issues**:
-   - Output: `<review>PASS</review>`
-
-## Expected Output
-- Either `<review>PASS</review>` or `<review>NEEDS_REVISION</review>`
-
-## Tools to Use
-- `read_file`, `list_specs` (required)
-- `create_tasks` (if fixes needed)
-"#)
-}
-
-fn challenge_task(change_id: &str, iteration: u32) -> String {
-    format!(r#"# Task: Challenge Proposal (Iteration {iteration})
+        TaskType::Challenge => r#"# Task: Challenge Proposal (Iteration {{iteration}})
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
+1. Use `read_all_requirements` to get all files
+2. Review for content/logical issues
+3. Call `append_review` MCP tool with verdict
+"#.to_string(),
 
-1. **Get all requirements**:
-   - Use: `read_all_requirements` with change_id="{change_id}"
-   - This retrieves proposal.md, tasks.md, and all specs/*.md
-
-2. **Review for content/logical issues**:
-   - **Completeness**: Are all requirements covered? Missing scenarios?
-   - **Consistency**: Do specs align with proposal? Do tasks cover all requirements?
-   - **Technical feasibility**: Is the design implementable? Any blockers?
-   - **Clarity**: Are requirements specific and testable?
-   - **Dependencies**: Are task dependencies correct?
-
-3. **Submit review**:
-   - Use: `append_review` MCP tool with your findings
-
-## Review Submission
-
-Call `append_review` with:
-- `change_id`: "{change_id}"
-- `status`: "approved" | "needs_revision" | "rejected"
-- `iteration`: {iteration}
-- `reviewer`: "codex"
-- `content`: Markdown with ## Summary, ## Issues, ## Verdict, ## Next Steps
-
-## Verdict Guidelines
-- **approved**: Complete, consistent, ready for implementation
-- **needs_revision**: Has logical issues (missing requirements, inconsistencies)
-- **rejected**: Fundamental design problems
-
-**IMPORTANT**: Focus ONLY on content/logical issues. MCP tools guarantee correct format.
-"#)
-}
-
-fn reproposal_task(change_id: &str) -> String {
-    format!(r#"# Task: Revise Proposal Based on Feedback
+        TaskType::Reproposal => r#"# Task: Revise Proposal
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
+1. Read review feedback
+2. Use MCP tools to fix issues
+"#.to_string(),
 
-1. **Read the review feedback**:
-   - Use: `read_file` with change_id="{change_id}" and file="proposal"
-   - Look for review blocks with issues to address
-
-2. **Address each issue** using MCP tools:
-   - For proposal.md: Use `create_proposal` MCP tool
-   - For spec files: Use `create_spec` MCP tool
-   - For tasks.md: Use `create_tasks` MCP tool
-
-## Expected Output
-- Updated files via MCP tools addressing all review feedback
-
-## Tools to Use
-- `read_file`, `list_specs` (for context)
-- `create_proposal`, `create_spec`, `create_tasks` (for updates)
-"#)
-}
-
-// =============================================================================
-// Implement Workflow Tasks
-// =============================================================================
-
-fn implement_task(change_id: &str) -> String {
-    format!(r#"# Task: Implement Code
+        TaskType::Implement => r#"# Task: Implement Code
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
+1. Read requirements with `read_all_requirements`
+2. Implement all tasks
+3. Write tests
+"#.to_string(),
 
-1. **Read requirements**:
-   - Use: `read_all_requirements` with change_id="{change_id}"
-
-2. **Implement ALL tasks in tasks.md**:
-   - Follow the layer order (data → logic → integration → testing)
-   - Create/modify files as specified
-   - Write tests for all implemented features
-
-3. **Code quality**:
-   - Follow existing code style and patterns
-   - Add proper error handling
-   - Include documentation comments
-
-## Expected Output
-- All code files created/modified per tasks.md
-- Tests written for all features
-
-## Tools to Use
-- `read_all_requirements` (required)
-- Standard code editing tools
-"#)
-}
-
-fn review_impl_task(change_id: &str) -> String {
-    format!(r#"# Task: Self-Review Implementation
+        TaskType::ReviewImpl => r#"# Task: Self-Review Implementation
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
+1. Review implementation
+2. Output PASS or describe issues
+"#.to_string(),
 
-1. **Read requirements and implementation**:
-   - Use: `read_all_requirements` with change_id="{change_id}"
-   - Review the code you implemented
-
-2. **Check quality**:
-   - All tasks completed
-   - Tests cover all scenarios
-   - Code follows patterns
-   - No obvious bugs
-
-3. **Output result**:
-   - If issues: describe them and fix
-   - If good: output message containing "✅" or "PASS"
-
-## Expected Output
-- Self-review result
-"#)
-}
-
-fn code_review_task(change_id: &str, iteration: u32) -> String {
-    format!(r#"# Task: Code Review (Iteration {iteration})
+        TaskType::CodeReview => r#"# Task: Code Review (Iteration {{iteration}})
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
+1. Read requirements and changed files
+2. Write REVIEW.md with verdict
+"#.to_string(),
 
-1. **Get requirements**:
-   - Use: `read_all_requirements` with change_id="{change_id}"
-
-2. **Get implementation summary**:
-   - Use: `list_changed_files` with change_id="{change_id}"
-
-3. **Review focus**:
-   - Test results (are all tests passing?)
-   - Security (any vulnerabilities?)
-   - Best practices (performance, error handling)
-   - Requirement compliance (does code match specs?)
-
-4. **Write REVIEW.md** with findings
-
-## Severity Guidelines
-- **HIGH**: Failing tests, security issues, missing features
-- **MEDIUM**: Style issues, missing tests, minor improvements
-- **LOW**: Suggestions, nice-to-haves
-
-## Verdict Guidelines
-- **APPROVED**: All tests pass, no HIGH issues
-- **NEEDS_CHANGES**: Some issues exist (fixable)
-- **MAJOR_ISSUES**: Critical problems
-
-## Tools to Use
-- `read_all_requirements`, `list_changed_files` (required)
-"#)
-}
-
-fn resolve_task(change_id: &str) -> String {
-    format!(r#"# Task: Fix Review Issues
+        TaskType::Resolve => r#"# Task: Fix Review Issues
 
 ## Change ID
-{change_id}
+{{change_id}}
 
 ## Instructions
-
-1. **Read REVIEW.md** to understand issues
-
-2. **Fix all issues**:
-   - Fix all HIGH severity issues
-   - Fix MEDIUM issues if feasible
-   - Update IMPLEMENTATION.md with notes
-
-3. **Ensure tests pass** after fixes
-
-## Expected Output
-- Issues fixed
-- Tests passing
-
-## Tools to Use
-- Standard code editing tools
-"#)
+1. Read REVIEW.md
+2. Fix all HIGH severity issues
+"#.to_string(),
+    }
 }
 
 #[cfg(test)]
@@ -543,66 +338,98 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn test_get_task_create_proposal() {
+    fn test_strip_frontmatter() {
+        let content = r#"---
+task_type: test
+agent: gemini
+---
+# Task Content
+
+Instructions here."#;
+
+        let stripped = strip_frontmatter(content);
+        assert!(stripped.starts_with("# Task Content"));
+        assert!(!stripped.contains("task_type"));
+    }
+
+    #[test]
+    fn test_render_template() {
+        let template = "Change: {{change_id}}, Spec: {{spec_id}}";
+        let mut vars = HashMap::new();
+        vars.insert("change_id".to_string(), "my-feature".to_string());
+        vars.insert("spec_id".to_string(), "auth-flow".to_string());
+
+        let rendered = render_template(template, &vars);
+        assert_eq!(rendered, "Change: my-feature, Spec: auth-flow");
+    }
+
+    #[test]
+    fn test_get_task_with_template_file() {
         let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+
+        // Create templates directory and file
+        let templates_dir = project_root.join("templates/prompts");
+        std::fs::create_dir_all(&templates_dir).unwrap();
+        std::fs::write(
+            templates_dir.join("create_proposal.md"),
+            r#"---
+task_type: create_proposal
+agent: gemini
+---
+# Custom Template
+
+Change: {{change_id}}
+Description: {{description}}"#,
+        )
+        .unwrap();
+
         let args = json!({
-            "change_id": "my-feature",
+            "change_id": "test-change",
             "task_type": "create_proposal",
-            "description": "Add user authentication"
+            "description": "Add feature X"
         });
 
-        let result = execute(&args, temp_dir.path()).unwrap();
+        let result = execute(&args, project_root).unwrap();
+        assert!(result.contains("# Custom Template"));
+        assert!(result.contains("Change: test-change"));
+        assert!(result.contains("Description: Add feature X"));
+        assert!(!result.contains("task_type:")); // Frontmatter stripped
+    }
+
+    #[test]
+    fn test_get_task_fallback_embedded() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+        // No templates directory - should use embedded fallback
+
+        let args = json!({
+            "change_id": "test-change",
+            "task_type": "create_proposal",
+            "description": "Test"
+        });
+
+        let result = execute(&args, project_root).unwrap();
         assert!(result.contains("# Task: Create Proposal"));
-        assert!(result.contains("my-feature"));
-        assert!(result.contains("Add user authentication"));
-        assert!(result.contains("create_proposal"));
     }
 
     #[test]
-    fn test_get_task_create_spec() {
+    fn test_get_task_spec_requires_spec_id() {
         let temp_dir = TempDir::new().unwrap();
         let args = json!({
-            "change_id": "my-feature",
-            "task_type": "create_spec",
-            "spec_id": "auth-flow"
-        });
-
-        let result = execute(&args, temp_dir.path()).unwrap();
-        assert!(result.contains("# Task: Create Spec 'auth-flow'"));
-        assert!(result.contains("create_spec"));
-    }
-
-    #[test]
-    fn test_get_task_challenge() {
-        let temp_dir = TempDir::new().unwrap();
-        let args = json!({
-            "change_id": "my-feature",
-            "task_type": "challenge",
-            "iteration": 2
-        });
-
-        let result = execute(&args, temp_dir.path()).unwrap();
-        assert!(result.contains("# Task: Challenge Proposal (Iteration 2)"));
-        assert!(result.contains("append_review"));
-    }
-
-    #[test]
-    fn test_get_task_missing_spec_id() {
-        let temp_dir = TempDir::new().unwrap();
-        let args = json!({
-            "change_id": "my-feature",
+            "change_id": "test",
             "task_type": "create_spec"
         });
 
         let result = execute(&args, temp_dir.path());
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("spec_id required"));
+        assert!(result.unwrap_err().to_string().contains("spec_id is required"));
     }
 
     #[test]
-    fn test_task_type_from_str() {
-        assert_eq!(TaskType::from_str("create_proposal").unwrap(), TaskType::CreateProposal);
-        assert_eq!(TaskType::from_str("challenge").unwrap(), TaskType::Challenge);
-        assert!(TaskType::from_str("invalid").is_err());
+    fn test_task_type_template_names() {
+        assert_eq!(TaskType::CreateProposal.template_name(), "create_proposal.md");
+        assert_eq!(TaskType::Challenge.template_name(), "challenge.md");
+        assert_eq!(TaskType::CodeReview.template_name(), "code_review.md");
     }
 }
