@@ -10,6 +10,7 @@ pub mod mermaid;
 pub mod proposal;
 pub mod read;
 pub mod spec;
+pub mod task;
 pub mod tasks;
 pub mod validate;
 
@@ -49,7 +50,7 @@ impl ToolRegistry {
         Self { tools }
     }
 
-    /// All tools (22 total)
+    /// All tools (23 total, including get_task)
     fn all_tools() -> Self {
         Self {
             tools: Self::all_tools_vec(),
@@ -58,6 +59,9 @@ impl ToolRegistry {
 
     fn all_tools_vec() -> Vec<ToolDefinition> {
         let mut tools = vec![
+            // Task delivery (agent-agnostic)
+            task::definition(),
+            // Core tools
             clarifications::definition(),
             proposal::definition(),
             proposal::append_review_definition(),
@@ -159,6 +163,7 @@ impl ToolRegistry {
         project_root: &Path,
     ) -> Result<String> {
         match name {
+            "get_task" => task::execute(arguments, project_root),
             "create_clarifications" => clarifications::execute(arguments, project_root),
             "create_proposal" => proposal::execute(arguments, project_root),
             "append_review" => proposal::execute_append_review(arguments, project_root),

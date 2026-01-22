@@ -252,8 +252,13 @@ impl ScriptRunner {
         cwd: Option<&std::path::Path>,
     ) -> Result<String> {
         let mut cmd = Command::new(command_name);
+
+        // Only use stdin if prompt is provided (backward compatibility)
+        // When prompt is in CLI args, pass empty string and skip stdin
+        let use_stdin = !prompt.is_empty();
+
         cmd.args(args)
-            .stdin(Stdio::piped())
+            .stdin(if use_stdin { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -291,14 +296,16 @@ impl ScriptRunner {
                 )
             })?;
 
-        // Write prompt to stdin
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(prompt.as_bytes())
-                .await
-                .context("Failed to write to stdin")?;
-            stdin.flush().await.context("Failed to flush stdin")?;
-            drop(stdin);
+        // Write prompt to stdin only if provided
+        if use_stdin {
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin
+                    .write_all(prompt.as_bytes())
+                    .await
+                    .context("Failed to write to stdin")?;
+                stdin.flush().await.context("Failed to flush stdin")?;
+                drop(stdin);
+            }
         }
 
         // Stream stdout and stderr concurrently to avoid backpressure deadlock
