@@ -77,6 +77,7 @@ impl ToolRegistry {
             implementation::read_all_requirements_definition(),
             implementation::read_implementation_summary_definition(),
             implementation::list_changed_files_definition(),
+            implementation::create_review_definition(),
         ];
 
         // Add all Mermaid diagram tools
@@ -114,13 +115,14 @@ impl ToolRegistry {
         ]
     }
 
-    /// Review stage tools (3 tools)
+    /// Review stage tools (4 tools)
     /// Used by: Codex for code review
     fn review_tools() -> Vec<ToolDefinition> {
         vec![
             validate::definition(),
             proposal::append_review_definition(),
             read::definition(),
+            implementation::create_review_definition(),
         ]
     }
 
@@ -185,6 +187,7 @@ impl ToolRegistry {
             "list_changed_files" => {
                 implementation::execute_list_changed_files(arguments, project_root)
             }
+            "create_review" => implementation::execute_create_review(arguments, project_root),
             // Mermaid diagram tools
             name if name.starts_with("generate_mermaid_") => mermaid::call_tool(name, arguments),
             _ => anyhow::bail!("Unknown tool: {}", name),

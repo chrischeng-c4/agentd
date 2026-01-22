@@ -230,7 +230,7 @@ $ agentd review feat-bugs
 ⏭️  Next steps:
    ✅ Implementation approved!
    Ready to archive:
-      agentd archive feat-bugs
+      agentd merge-change feat-bugs
 ```
 
 ### Example 4: Multiple resolution cycles
@@ -255,7 +255,7 @@ $ agentd review feat-complex
 ### Example 5: Used in automatic loop (via implement command)
 
 ```bash
-$ agentd implement feat-auto
+$ agentd impl-change feat-auto
 🎨 Agentd Implementation Workflow
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -292,7 +292,7 @@ $ agentd implement feat-auto
 - `agentd archive` - Archive if re-review approves
 
 **Integration points:**
-- Called automatically by `agentd implement` in the review loop
+- Called automatically by `agentd impl-change` in the review loop
 - Can be called manually for fine-grained control over fix-review cycles
 - Works iteratively with `review` command
 

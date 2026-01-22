@@ -51,14 +51,14 @@ stateDiagram-v2
     state "Archived" as archived
     archived: Merged to agentd/specs/
     end --> [*]
-    init --> proposed: agentd plan <id> "desc"
+    init --> proposed: agentd plan-change <id> "desc"
     proposed --> challenged: Challenge: APPROVED
     proposed --> rejected: Challenge: REJECTED
     proposed --> proposed: Reproposal loop (auto)
     challenged --> implementing: agentd impl <id>
     implementing --> complete: Review: APPROVED
     implementing --> implementing: Resolve loop (auto)
-    complete --> archived: agentd archive <id>
+    complete --> archived: agentd merge-change <id>
     archived --> end: Done
     rejected --> end: Manual fix needed
     note right of proposed
@@ -97,7 +97,7 @@ stateDiagram-v2
     state "Manual Fix Required" as manual_fix
     manual_fix: Max iterations reached
     end --> [*]
-    start --> proposed: agentd plan <id> "desc"
+    start --> proposed: agentd plan-change <id> "desc"
     proposed --> validating: Gemini generates proposal
     validating --> challenging: Format OK
     validating --> manual_fix: Format invalid

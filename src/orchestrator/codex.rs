@@ -53,8 +53,9 @@ impl<'a> CodexOrchestrator<'a> {
         env
     }
 
-    /// Build common Codex args
-    fn build_args(&self, complexity: Complexity, resume: bool) -> Vec<String> {
+    /// Build common Codex args with prompt
+    /// Note: Codex exec doesn't accept stdin, prompt must be passed as CLI positional arg
+    fn build_args_with_prompt(&self, prompt: &str, complexity: Complexity, resume: bool) -> Vec<String> {
         let model = self.model_selector.select_codex(complexity);
         let mut args = vec![
             LlmArg::FullAuto,
@@ -67,6 +68,11 @@ impl<'a> CodexOrchestrator<'a> {
             if let Some(level) = reasoning {
                 args.push(LlmArg::Reasoning(level.clone()));
             }
+        }
+
+        // Add prompt as CLI arg (Codex exec doesn't accept stdin)
+        if !prompt.is_empty() {
+            args.push(LlmArg::Prompt(prompt.to_string()));
         }
 
         LlmProvider::Codex.build_args(&args, resume)
@@ -101,12 +107,12 @@ impl<'a> CodexOrchestrator<'a> {
         let prompt = prompts::codex_challenge_prompt(change_id);
         let env = self.build_env(change_id);
         // First call in Plan stage, no resume
-        let args = self.build_args(complexity, false);
+        // Note: Codex exec doesn't accept stdin, prompt passed via CLI arg
+        let args = self.build_args_with_prompt(&prompt, complexity, false);
 
-        self.runner.run_llm(LlmProvider::Codex, args, env, &prompt, true).await
+        self.runner.run_llm(LlmProvider::Codex, args, env, "", true).await
     }
 
-    /// Run rechallenge (resume previous challenge session)
     /// Run rechallenge (resume previous challenge session)
     #[allow(dead_code)]
     pub async fn run_rechallenge(
@@ -117,9 +123,9 @@ impl<'a> CodexOrchestrator<'a> {
         let prompt = prompts::codex_rechallenge_prompt(change_id);
         let env = self.build_env(change_id);
         // Resume previous session (Plan stage)
-        let args = self.build_args(complexity, true);
+        let args = self.build_args_with_prompt(&prompt, complexity, true);
 
-        self.runner.run_llm(LlmProvider::Codex, args, env, &prompt, true).await
+        self.runner.run_llm(LlmProvider::Codex, args, env, "", true).await
     }
 
     /// Run rechallenge with fresh session (no resume - AGENTS.md provides all context)
@@ -131,9 +137,9 @@ impl<'a> CodexOrchestrator<'a> {
         let prompt = prompts::codex_rechallenge_prompt(change_id);
         let env = self.build_env(change_id);
         // Fresh session - documents in AGENTS.md provide all necessary context
-        let args = self.build_args(complexity, false);
+        let args = self.build_args_with_prompt(&prompt, complexity, false);
 
-        self.runner.run_llm(LlmProvider::Codex, args, env, &prompt, true).await
+        self.runner.run_llm(LlmProvider::Codex, args, env, "", true).await
     }
 
     /// Run local verification tools and capture output
@@ -303,19 +309,19 @@ impl<'a> CodexOrchestrator<'a> {
         let env = self.build_env(change_id);
         // Resume if iteration > 0 (Impl stage)
         let resume = iteration > 0;
-        let args = self.build_args(complexity, resume);
+        let args = self.build_args_with_prompt(&prompt, complexity, resume);
 
-        // Step 3: Run Codex with enriched prompt
-        self.runner.run_llm(LlmProvider::Codex, args, env, &prompt, true).await
+        // Step 3: Run Codex with enriched prompt (via CLI arg, not stdin)
+        self.runner.run_llm(LlmProvider::Codex, args, env, "", true).await
     }
 
     /// Run verification
     pub async fn run_verify(&self, change_id: &str, complexity: Complexity) -> Result<(String, UsageMetrics)> {
         let prompt = prompts::codex_verify_prompt(change_id);
         let env = self.build_env(change_id);
-        let args = self.build_args(complexity, false);
+        let args = self.build_args_with_prompt(&prompt, complexity, false);
 
-        self.runner.run_llm(LlmProvider::Codex, args, env, &prompt, true).await
+        self.runner.run_llm(LlmProvider::Codex, args, env, "", true).await
     }
 
     /// Run archive quality review
@@ -328,9 +334,9 @@ impl<'a> CodexOrchestrator<'a> {
         let prompt = prompts::codex_archive_review_prompt(change_id, strategy);
         let env = self.build_env(change_id);
         // First Codex call in Archive stage, no resume
-        let args = self.build_args(complexity, false);
+        let args = self.build_args_with_prompt(&prompt, complexity, false);
 
-        self.runner.run_llm(LlmProvider::Codex, args, env, &prompt, true).await
+        self.runner.run_llm(LlmProvider::Codex, args, env, "", true).await
     }
 
     // =========================================================================
@@ -386,15 +392,38 @@ Parameters:
         self.runner.run_llm(LlmProvider::Codex, args, env, "", true).await
     }
 
-    /// Run challenge task via MCP
-    pub async fn run_challenge_mcp(
+    /// Run review_proposal task via MCP (Codex reviews proposal)
+    pub async fn run_review_proposal_mcp(
         &self,
         change_id: &str,
         iteration: u32,
         complexity: Complexity,
     ) -> Result<(String, UsageMetrics)> {
         let extra = format!("- iteration: {}", iteration);
-        self.run_task_mcp(change_id, "challenge", &extra, complexity).await
+        self.run_task_mcp(change_id, "review_proposal", &extra, complexity).await
+    }
+
+    /// Run review_spec task via MCP (Codex reviews a single spec)
+    pub async fn run_review_spec_mcp(
+        &self,
+        change_id: &str,
+        spec_id: &str,
+        iteration: u32,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        let extra = format!("- spec_id: \"{}\"\n- iteration: {}", spec_id, iteration);
+        self.run_task_mcp(change_id, "review_spec", &extra, complexity).await
+    }
+
+    /// Run review_tasks task via MCP (Codex reviews tasks)
+    pub async fn run_review_tasks_mcp(
+        &self,
+        change_id: &str,
+        iteration: u32,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        let extra = format!("- iteration: {}", iteration);
+        self.run_task_mcp(change_id, "review_tasks", &extra, complexity).await
     }
 
     /// Run code_review task via MCP

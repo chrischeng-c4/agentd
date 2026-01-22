@@ -9,13 +9,13 @@
 
 | Skill | Purpose |
 |-------|---------|
-| `/agentd:plan` | Planning workflow (proposal → challenge → auto-reproposal loop) |
-| `/agentd:impl` | Implementation workflow (implement → review → auto-resolve loop) |
-| `/agentd:archive` | Archive completed change |
+| `/agentd:plan-change` | Planning workflow (proposal → challenge → auto-reproposal loop) |
+| `/agentd:impl-change` | Implementation workflow (implement → review → auto-resolve loop) |
+| `/agentd:merge-change` | Archive completed change |
 
 All workflows are **state-aware** and resume automatically from the current phase.
 
-Start with: `/agentd:plan <id> "<description>"`
+Start with: `/agentd:plan-change <id> "<description>"`
 
 ### Knowledge Base
 

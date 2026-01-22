@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agentd Plan Viewer</title>
-    <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/highlight.min.css">
+    <!-- Assets served from /static/ on unified server, / on standalone -->
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/highlight.min.css">
 </head>
 <body>
     <div class="app">
@@ -90,8 +91,8 @@
         <div class="toast-container" id="toast-container"></div>
     </div>
 
-    <script src="/highlight.min.js"></script>
-    <script src="/mermaid.min.js"></script>
-    <script src="/app.js"></script>
+    <script src="/static/highlight.min.js"></script>
+    <script src="/static/mermaid.min.js"></script>
+    <script src="/static/app.js"></script>
 </body>
 </html>

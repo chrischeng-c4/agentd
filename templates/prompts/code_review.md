@@ -25,7 +25,14 @@ variables:
    - Best practices (performance, error handling)
    - Requirement compliance (does code match specs?)
 
-4. **Write REVIEW.md** with findings
+4. **Submit review** using the `create_review` MCP tool:
+   - `change_id`: "{{change_id}}"
+   - `iteration`: {{iteration}}
+   - `test_results`: { status, total, passed, failed, skipped }
+   - `security_status`: "CLEAN" | "WARNINGS" | "VULNERABILITIES" | "NOT_RUN"
+   - `issues`: Array of { severity, title, description, file_path?, line_number?, recommendation? }
+   - `verdict`: "APPROVED" | "NEEDS_CHANGES" | "MAJOR_ISSUES"
+   - `next_steps`: Optional string describing what to do next
 
 ## Severity Guidelines
 - **HIGH**: Failing tests, security issues, missing features
@@ -38,4 +45,5 @@ variables:
 - **MAJOR_ISSUES**: Critical problems
 
 ## Tools to Use
-- `read_all_requirements`, `list_changed_files` (required)
+- `read_all_requirements`, `list_changed_files` (required for reading)
+- `create_review` (required for submitting results)

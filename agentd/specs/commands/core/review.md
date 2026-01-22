@@ -149,7 +149,7 @@ sequenceDiagram
 - **WHEN** I run `agentd review feat-clean` and tests pass with no issues
 - **THEN** REVIEW.md is created with verdict `APPROVED`
 - **THEN** Summary shows Tests: ✅ PASS, Security: ✅ CLEAN, Issues: 0
-- **THEN** Next steps suggest archiving: `agentd archive feat-clean`
+- **THEN** Next steps suggest archiving: `agentd merge-change feat-clean`
 - **THEN** Exit code is 0
 
 ### Scenario: Review finds fixable issues
@@ -180,7 +180,7 @@ sequenceDiagram
 ### Scenario: Change not found
 
 - **WHEN** I run `agentd review nonexistent-change`
-- **THEN** I see error "Change 'nonexistent-change' not found. Run 'agentd implement nonexistent-change' first."
+- **THEN** I see error "Change 'nonexistent-change' not found. Run 'agentd impl-change nonexistent-change' first."
 - **THEN** Exit code is 1
 
 ### Scenario: Re-review after manual fixes
@@ -222,7 +222,7 @@ $ agentd review feat-auth
 ⏭️  Next steps:
    ✅ Implementation approved!
    Ready to archive:
-      agentd archive feat-auth
+      agentd merge-change feat-auth
 ```
 
 ### Example 2: Needs changes
@@ -332,7 +332,7 @@ $ agentd review feat-deps
 
 ```bash
 $ agentd review nonexistent
-Error: Change 'nonexistent' not found. Run 'agentd implement nonexistent' first.
+Error: Change 'nonexistent' not found. Run 'agentd impl-change nonexistent' first.
 $ echo $?
 1
 ```
@@ -361,13 +361,13 @@ $ agentd review feat-fixed
 ⏭️  Next steps:
    ✅ Implementation approved!
    Ready to archive:
-      agentd archive feat-fixed
+      agentd merge-change feat-fixed
 ```
 
 ## Related Commands
 
 **Previous in workflow:**
-- `agentd implement` - Implements code and automatically calls review
+- `agentd impl-change` - Implements code and automatically calls review
 - Manual code changes - When you fix code manually and want to verify
 
 **Next in workflow:**
@@ -376,7 +376,7 @@ $ agentd review feat-fixed
 - `agentd review` - Re-run review after fixes (same command, iterative)
 
 **Integration points:**
-- Called automatically by `agentd implement` as part of review loop
+- Called automatically by `agentd impl-change` as part of review loop
 - Can be called manually after any code changes
 - Works with `resolve-reviews` command in fix-review-fix cycles
 

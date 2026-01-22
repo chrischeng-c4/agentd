@@ -1,6 +1,6 @@
 //! Proposal CLI commands
 
-use crate::services::proposal_service::{self, CreateProposalInput, ImpactData};
+use crate::services::proposal_service::{self, AffectedSpec, CreateProposalInput, ImpactData};
 use crate::Result;
 use clap::Subcommand;
 use std::env;
@@ -79,12 +79,36 @@ pub fn run(cmd: ProposalCommands) -> Result<()> {
 
             let new_files = impact.get("new_files").and_then(|v| v.as_i64()).unwrap_or(0);
 
-            let affected_specs: Vec<String> = impact
+            let affected_specs: Vec<AffectedSpec> = impact
                 .get("affected_specs")
                 .and_then(|v| v.as_array())
                 .map(|arr| {
                     arr.iter()
-                        .filter_map(|v| v.as_str().map(String::from))
+                        .filter_map(|v| {
+                            // Support both old format (string) and new format (object)
+                            if let Some(s) = v.as_str() {
+                                // Old format: just a string ID
+                                Some(AffectedSpec {
+                                    id: s.to_string(),
+                                    depends: vec![],
+                                })
+                            } else if let Some(obj) = v.as_object() {
+                                // New format: object with id and depends
+                                let id = obj.get("id")?.as_str()?.to_string();
+                                let depends = obj
+                                    .get("depends")
+                                    .and_then(|d| d.as_array())
+                                    .map(|deps| {
+                                        deps.iter()
+                                            .filter_map(|d| d.as_str().map(|s| s.to_string()))
+                                            .collect()
+                                    })
+                                    .unwrap_or_default();
+                                Some(AffectedSpec { id, depends })
+                            } else {
+                                None
+                            }
+                        })
                         .collect()
                 })
                 .unwrap_or_default();

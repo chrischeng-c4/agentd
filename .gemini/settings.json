@@ -1,40 +1,16 @@
 {
-  "approvals": {
-    "autoApprove": {
-      "replace": true,
-      "write_file": true
-    }
-  },
-  "mcp": {
-    "allowed": [
-      "agentd",
-      "playwright"
-    ]
-  },
-  "mcpServers": {
-    "agentd": {
-      "url": "http://localhost:3000/mcp",
-      "headers": {
-        "X-Agentd-Project": "agentd",
-        "X-Agentd-Cwd": "/Users/chrischeng/projects/agentd"
-      },
-      "timeout": 30000
-    },
-    "playwright": {
-      "args": [
-        "@playwright/mcp@latest"
-      ],
-      "command": "npx"
-    }
-  },
   "tools": {
     "allowed": [
       "list_directory",
       "read_file",
       "search_file_content",
-      "glob",
-      "write_file",
-      "replace"
+      "glob"
     ]
+  },
+  "mcpServers": {
+    "agentd": {
+      "command": "agentd",
+      "args": ["mcp-server"]
+    }
   }
 }

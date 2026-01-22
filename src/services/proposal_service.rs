@@ -4,6 +4,19 @@ use crate::Result;
 use chrono::Utc;
 use std::path::Path;
 
+/// Represents a spec with its dependencies
+#[derive(Debug, Clone, PartialEq)]
+pub struct AffectedSpec {
+    pub id: String,
+    pub depends: Vec<String>,
+}
+
+impl std::fmt::Display for AffectedSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+
 /// Input structure for creating a proposal
 #[derive(Debug, Clone)]
 pub struct CreateProposalInput {
@@ -20,7 +33,7 @@ pub struct ImpactData {
     pub scope: String,
     pub affected_files: i64,
     pub new_files: i64,
-    pub affected_specs: Vec<String>,
+    pub affected_specs: Vec<AffectedSpec>,
     pub affected_code: Vec<String>,
     pub breaking_changes: Option<String>,
 }
@@ -80,12 +93,17 @@ pub fn create_proposal(input: CreateProposalInput, project_root: &Path) -> Resul
     content.push_str(&format!("  affected_files: {}\n", input.impact.affected_files));
     content.push_str(&format!("  new_files: {}\n", input.impact.new_files));
 
-    // Affected specs
+    // Affected specs with dependencies
     if !input.impact.affected_specs.is_empty() {
         content.push_str("affected_specs:\n");
-        for spec_id in &input.impact.affected_specs {
-            content.push_str(&format!("  - id: {}\n", spec_id));
-            content.push_str(&format!("    path: specs/{}.md\n", spec_id));
+        for spec in &input.impact.affected_specs {
+            content.push_str(&format!("  - id: {}\n", spec.id));
+            content.push_str(&format!("    path: specs/{}.md\n", spec.id));
+            if !spec.depends.is_empty() {
+                content.push_str(&format!("    depends: [{}]\n", spec.depends.join(", ")));
+            } else {
+                content.push_str("    depends: []\n");
+            }
         }
     }
 
@@ -122,13 +140,15 @@ pub fn create_proposal(input: CreateProposalInput, project_root: &Path) -> Resul
     content.push_str(&format!("- **New Files**: ~{}\n", input.impact.new_files));
 
     if !input.impact.affected_specs.is_empty() {
-        let specs_list: Vec<String> = input
-            .impact
-            .affected_specs
-            .iter()
-            .map(|id| format!("`{}`", id))
-            .collect();
-        content.push_str(&format!("- Affected specs: {}\n", specs_list.join(", ")));
+        content.push_str("- Affected specs:\n");
+        for spec in &input.impact.affected_specs {
+            if spec.depends.is_empty() {
+                content.push_str(&format!("  - `{}` (no dependencies)\n", spec.id));
+            } else {
+                let deps = spec.depends.iter().map(|d| format!("`{}`", d)).collect::<Vec<_>>().join(", ");
+                content.push_str(&format!("  - `{}` → depends on: {}\n", spec.id, deps));
+            }
+        }
     }
 
     if !input.impact.affected_code.is_empty() {
@@ -260,7 +280,10 @@ mod tests {
                 scope: "minor".to_string(),
                 affected_files: 5,
                 new_files: 2,
-                affected_specs: vec!["test-spec".to_string()],
+                affected_specs: vec![AffectedSpec {
+                    id: "test-spec".to_string(),
+                    depends: vec![],
+                }],
                 affected_code: vec!["src/services/".to_string()],
                 breaking_changes: None,
             },

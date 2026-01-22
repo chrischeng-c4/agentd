@@ -213,16 +213,16 @@ async fn run_challenge_step(
         if attempt > 0 {
             println!(
                 "{}",
-                format!("🔄 Retrying Codex challenge (attempt {}/{})", attempt + 1, max_retries + 1).yellow()
+                format!("🔄 Retrying Codex review_proposal (attempt {}/{})", attempt + 1, max_retries + 1).yellow()
             );
             tokio::time::sleep(retry_delay).await;
         }
 
-        // Run MCP-based challenge (agent calls get_task with task_type=challenge)
-        match orchestrator.run_challenge_mcp(change_id, 1, complexity).await {
+        // Run MCP-based review_proposal (Codex reviews the proposal)
+        match orchestrator.run_review_proposal_mcp(change_id, 1, complexity).await {
             Ok((_output, usage)) => {
                 let model = config.codex.select_model(complexity).model.clone();
-                record_usage(change_id, project_root, "challenge", &model, &usage, config, complexity);
+                record_usage(change_id, project_root, "review-proposal", &model, &usage, config, complexity);
                 last_error = None;
                 break;
             }
@@ -232,7 +232,7 @@ async fn run_challenge_step(
                 if err_msg.contains("exit code") || err_msg.contains("connection") || err_msg.contains("timeout") {
                     println!(
                         "{}",
-                        format!("⚠️  Codex challenge failed: {}", err_msg).yellow()
+                        format!("⚠️  Codex review_proposal failed: {}", err_msg).yellow()
                     );
                     last_error = Some(e);
                 } else {
@@ -287,12 +287,12 @@ async fn run_rechallenge_step(
     // Regenerate AGENTS.md context
     crate::context::generate_agents_context(&change_dir, ContextPhase::Challenge)?;
 
-    // Run MCP-based challenge (agent calls get_task with task_type=challenge)
+    // Run MCP-based review_proposal (Codex reviews the proposal)
     // Iteration is 1-indexed for the MCP tool, so add 1 to the loop iteration
     let orchestrator = CodexOrchestrator::new(config, project_root);
-    let (_output, usage) = orchestrator.run_challenge_mcp(change_id, (iteration + 1) as u32, complexity).await?;
+    let (_output, usage) = orchestrator.run_review_proposal_mcp(change_id, (iteration + 1) as u32, complexity).await?;
     let model = config.codex.select_model(complexity).model.clone();
-    record_usage(change_id, project_root, "rechallenge", &model, &usage, config, complexity);
+    record_usage(change_id, project_root, "review-proposal", &model, &usage, config, complexity);
 
     // Parse verdict from proposal.md review block
     let proposal_path = change.proposal_path(project_root);
@@ -340,18 +340,18 @@ async fn run_reproposal_step(
         if attempt > 0 {
             println!(
                 "{}",
-                format!("🔄 Retrying Gemini reproposal (attempt {}/{})", attempt + 1, max_retries + 1).yellow()
+                format!("🔄 Retrying Gemini revise_proposal (attempt {}/{})", attempt + 1, max_retries + 1).yellow()
             );
             tokio::time::sleep(retry_delay).await;
         }
 
-        // Run MCP-based reproposal (agent calls get_task with task_type=reproposal)
-        let result = orchestrator.run_reproposal_mcp(change_id, complexity).await;
+        // Run MCP-based revise_proposal (Gemini fixes the proposal based on review feedback)
+        let result = orchestrator.run_revise_proposal_mcp(change_id, complexity).await;
 
         match result {
             Ok((_output, usage)) => {
                 let model = config.gemini.select_model(complexity).model.clone();
-                record_usage(change_id, project_root, "reproposal", &model, &usage, config, complexity);
+                record_usage(change_id, project_root, "revise-proposal", &model, &usage, config, complexity);
                 last_error = None;
                 break;
             }
@@ -360,7 +360,7 @@ async fn run_reproposal_step(
                 if err_msg.contains("exit code") || err_msg.contains("connection") || err_msg.contains("timeout") {
                     println!(
                         "{}",
-                        format!("⚠️  Gemini reproposal failed: {}", err_msg).yellow()
+                        format!("⚠️  Gemini revise_proposal failed: {}", err_msg).yellow()
                     );
                     last_error = Some(e);
                 } else {
@@ -604,52 +604,77 @@ pub async fn run_proposal_step_sequential(
     let proposal_content = std::fs::read_to_string(&proposal_path)?;
     let affected_specs = parse_affected_specs(&proposal_content)?;
 
-    if affected_specs.is_empty() {
+    // Sort specs by dependencies (topological sort)
+    let sorted_specs = crate::parser::topological_sort_specs(&affected_specs)?;
+
+    if sorted_specs.is_empty() {
         println!("{}", "ℹ️  No specs required for this change".blue());
     } else {
-        println!("{}", format!("📋 Found {} specs to generate: {:?}", affected_specs.len(), affected_specs).cyan());
+        let spec_ids: Vec<&str> = sorted_specs.iter().map(|s| s.id.as_str()).collect();
+        println!("{}", format!("📋 Found {} specs to generate (in dependency order): {:?}", sorted_specs.len(), spec_ids).cyan());
     }
 
+    // Create Codex orchestrator for reviews
+    let codex_orchestrator = CodexOrchestrator::new(config, project_root);
+
     // ====================
-    // Phase 2: Generate specs sequentially
+    // Phase 2: Generate specs sequentially (in dependency order)
     // ====================
-    if !affected_specs.is_empty() {
+    if !sorted_specs.is_empty() {
         println!();
-        println!("{}", format!("📝 Phase 2/3: Generating {} specs...", affected_specs.len()).cyan().bold());
+        println!("{}", format!("📝 Phase 2/3: Generating {} specs...", sorted_specs.len()).cyan().bold());
 
-        for (idx, spec_id) in affected_specs.iter().enumerate() {
+        for (idx, spec) in sorted_specs.iter().enumerate() {
             println!();
-            println!("{}", format!("  📄 Spec {}/{}: {}", idx + 1, affected_specs.len(), spec_id).cyan());
+            println!("{}", format!("  📄 Spec {}/{}: {}", idx + 1, sorted_specs.len(), spec.id).cyan());
+            if !spec.depends.is_empty() {
+                println!("{}", format!("     Dependencies: {:?}", spec.depends).dimmed());
+            }
 
-            // Run MCP-based spec creation (agent calls get_task to get full instructions)
-            let (_spec_output, spec_usage) = orchestrator.run_create_spec_mcp(&resolved_change_id, spec_id, complexity).await?;
+            // Run MCP-based spec creation with dependencies
+            let (_spec_output, spec_usage) = orchestrator.run_create_spec_mcp(&resolved_change_id, &spec.id, &spec.depends, complexity).await?;
             let model = config.gemini.select_model(complexity).model.clone();
-            record_usage(&resolved_change_id, project_root, &format!("spec-gen-{}", spec_id), &model, &spec_usage, config, complexity);
+            record_usage(&resolved_change_id, project_root, &format!("spec-gen-{}", spec.id), &model, &spec_usage, config, complexity);
 
-            println!("{}", format!("     ✅ {}.md generated", spec_id).green());
+            println!("{}", format!("     ✅ {}.md generated", spec.id).green());
 
-            // Self-review loop for this spec
-            println!("{}", format!("     🔍 Self-reviewing {}...", spec_id).cyan());
+            // Review loop for this spec (Codex reviews, Gemini revises)
+            println!("{}", format!("     🔍 Reviewing {}...", spec.id).cyan());
 
             for review_iter in 0..max_review_iterations {
-                // Run MCP-based spec review (agent calls get_task to get review instructions)
-                match orchestrator.run_review_spec_mcp(&resolved_change_id, spec_id, complexity).await {
-                    Ok((spec_review_output, spec_review_usage)) => {
-                        let model = config.gemini.select_model(complexity).model.clone();
-                        record_usage(&resolved_change_id, project_root, &format!("spec-review-{}", spec_id), &model, &spec_review_usage, config, complexity);
+                // Run Codex review for spec
+                match codex_orchestrator.run_review_spec_mcp(&resolved_change_id, &spec.id, (review_iter + 1) as u32, complexity).await {
+                    Ok((_spec_review_output, spec_review_usage)) => {
+                        let model = config.codex.select_model(complexity).model.clone();
+                        record_usage(&resolved_change_id, project_root, &format!("spec-review-{}", spec.id), &model, &spec_review_usage, config, complexity);
 
-                        let result = detect_self_review_marker(&spec_review_output);
-                        match result {
-                            SelfReviewResult::Pass => {
-                                println!("{}", format!("        ✓ Review {}: PASS", review_iter + 1).green());
-                                break;
-                            }
-                            SelfReviewResult::NeedsRevision => {
-                                println!("{}", format!("        ⚠ Review {}: NEEDS_REVISION (auto-fixed)", review_iter + 1).yellow());
-                                if review_iter >= max_review_iterations - 1 {
-                                    println!("{}", "        ⚠ Max review iterations reached".yellow());
+                        // Parse review verdict from proposal.md
+                        let updated_content = std::fs::read_to_string(&proposal_path)?;
+                        if let Ok(Some(review)) = crate::parser::parse_latest_review(&updated_content) {
+                            match review.status.as_str() {
+                                "approved" => {
+                                    println!("{}", format!("        ✓ Review {}: APPROVED", review_iter + 1).green());
+                                    break;
+                                }
+                                "needs_revision" => {
+                                    println!("{}", format!("        ⚠ Review {}: NEEDS_REVISION", review_iter + 1).yellow());
+                                    if review_iter < max_review_iterations - 1 {
+                                        // Run Gemini revision
+                                        let (_revise_output, revise_usage) = orchestrator.run_revise_spec_mcp(&resolved_change_id, &spec.id, complexity).await?;
+                                        let model = config.gemini.select_model(complexity).model.clone();
+                                        record_usage(&resolved_change_id, project_root, &format!("spec-revise-{}", spec.id), &model, &revise_usage, config, complexity);
+                                    } else {
+                                        println!("{}", "        ⚠ Max review iterations reached".yellow());
+                                    }
+                                }
+                                _ => {
+                                    println!("{}", format!("        ⚠ Review {}: Unknown status", review_iter + 1).yellow());
+                                    break;
                                 }
                             }
+                        } else {
+                            println!("{}", format!("        ⚠ Review {}: No review block found", review_iter + 1).yellow());
+                            break;
                         }
                     }
                     Err(e) => {
@@ -674,28 +699,43 @@ pub async fn run_proposal_step_sequential(
 
     println!("{}", "✅ tasks.md generated".green());
 
-    // Self-review loop for tasks
-    println!("{}", "🔍 Self-reviewing tasks.md...".cyan());
+    // Review loop for tasks (Codex reviews, Gemini revises)
+    println!("{}", "🔍 Reviewing tasks.md...".cyan());
 
     for iteration in 0..max_review_iterations {
-        // Run MCP-based tasks review (agent calls get_task to get review instructions)
-        match orchestrator.run_review_tasks_mcp(&resolved_change_id, complexity).await {
-            Ok((tasks_review_output, tasks_review_usage)) => {
-                let model = config.gemini.select_model(complexity).model.clone();
+        // Run Codex review for tasks
+        match codex_orchestrator.run_review_tasks_mcp(&resolved_change_id, (iteration + 1) as u32, complexity).await {
+            Ok((_tasks_review_output, tasks_review_usage)) => {
+                let model = config.codex.select_model(complexity).model.clone();
                 record_usage(&resolved_change_id, project_root, "tasks-review", &model, &tasks_review_usage, config, complexity);
 
-                let result = detect_self_review_marker(&tasks_review_output);
-                match result {
-                    SelfReviewResult::Pass => {
-                        println!("{}", format!("   ✓ Review {}: PASS", iteration + 1).green());
-                        break;
-                    }
-                    SelfReviewResult::NeedsRevision => {
-                        println!("{}", format!("   ⚠ Review {}: NEEDS_REVISION (auto-fixed)", iteration + 1).yellow());
-                        if iteration >= max_review_iterations - 1 {
-                            println!("{}", "   ⚠ Max review iterations reached".yellow());
+                // Parse review verdict from proposal.md
+                let updated_content = std::fs::read_to_string(&proposal_path)?;
+                if let Ok(Some(review)) = crate::parser::parse_latest_review(&updated_content) {
+                    match review.status.as_str() {
+                        "approved" => {
+                            println!("{}", format!("   ✓ Review {}: APPROVED", iteration + 1).green());
+                            break;
+                        }
+                        "needs_revision" => {
+                            println!("{}", format!("   ⚠ Review {}: NEEDS_REVISION", iteration + 1).yellow());
+                            if iteration < max_review_iterations - 1 {
+                                // Run Gemini revision
+                                let (_revise_output, revise_usage) = orchestrator.run_revise_tasks_mcp(&resolved_change_id, complexity).await?;
+                                let model = config.gemini.select_model(complexity).model.clone();
+                                record_usage(&resolved_change_id, project_root, "tasks-revise", &model, &revise_usage, config, complexity);
+                            } else {
+                                println!("{}", "   ⚠ Max review iterations reached".yellow());
+                            }
+                        }
+                        _ => {
+                            println!("{}", format!("   ⚠ Review {}: Unknown status", iteration + 1).yellow());
+                            break;
                         }
                     }
+                } else {
+                    println!("{}", format!("   ⚠ Review {}: No review block found", iteration + 1).yellow());
+                    break;
                 }
             }
             Err(e) => {

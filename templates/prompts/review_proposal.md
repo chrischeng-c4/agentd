@@ -1,36 +1,47 @@
 ---
 task_type: review_proposal
-agent: gemini
+agent: codex
 phase: plan
 variables:
   - change_id
+  - iteration
 ---
-# Task: Review Proposal
+# Task: Review Proposal (Iteration {{iteration}})
 
 ## Change ID
 {{change_id}}
 
 ## Instructions
 
-1. **Read the proposal**:
+1. **Get all context**:
    - Use: `read_file` with change_id="{{change_id}}" and file="proposal"
 
-2. **Check quality criteria**:
-   - Summary is clear and specific (not vague)
-   - Why section has compelling business/technical value
-   - affected_specs list is complete and well-scoped
-   - Impact analysis covers all affected areas
+2. **Review for content/logical issues**:
+   - **Clarity**: Is the summary clear and specific (not vague)?
+   - **Value**: Does the Why section have compelling business/technical value?
+   - **Completeness**: Is affected_specs list complete and well-scoped?
+   - **Feasibility**: Is the proposed design implementable?
+   - **Impact**: Does the impact analysis cover all affected areas?
 
-3. **If issues found**:
-   - Call `create_proposal` MCP tool with updated data
-   - Output: `<review>NEEDS_REVISION</review>`
+3. **Submit review**:
+   - Use: `append_review` MCP tool with your findings
 
-4. **If no issues**:
-   - Output: `<review>PASS</review>`
+## Review Submission
 
-## Expected Output
-- Either `<review>PASS</review>` or `<review>NEEDS_REVISION</review>`
+Call `append_review` with:
+- `change_id`: "{{change_id}}"
+- `status`: "approved" | "needs_revision" | "rejected"
+- `iteration`: {{iteration}}
+- `reviewer`: "codex"
+- `content`: Markdown with ## Summary, ## Issues, ## Verdict, ## Next Steps
+
+## Verdict Guidelines
+- **approved**: Proposal is clear, complete, and ready for spec creation
+- **needs_revision**: Has issues that need fixing (unclear scope, missing details)
+- **rejected**: Fundamental problems with the proposal
+
+**IMPORTANT**: Focus ONLY on content/logical issues. MCP tools guarantee correct format.
 
 ## Tools to Use
 - `read_file` (required)
-- `create_proposal` (if fixes needed)
+- `append_review` (required)

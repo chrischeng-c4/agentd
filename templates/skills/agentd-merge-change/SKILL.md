@@ -1,10 +1,10 @@
 ---
-name: agentd:archive
+name: agentd:merge-change
 description: Archive workflow - merge specs and move to archive
 user-invocable: true
 ---
 
-# /agentd:archive
+# /agentd:merge-change
 
 Orchestrates the archival process, merging spec deltas to main specs and moving the change to the archive directory.
 
@@ -12,7 +12,7 @@ Orchestrates the archival process, merging spec deltas to main specs and moving 
 
 **DO NOT perform archival steps yourself.** Your job is to:
 1. Check the current phase in `STATE.yaml`
-2. Run the `agentd archive` command
+2. Run the `agentd merge-change` command
 
 The actual merging and archiving is done by the command, which uses:
 - **Gemini** (spec merging)
@@ -23,13 +23,13 @@ You are a dispatcher, not an archiver. Run the command and let it handle the wor
 ## Usage
 
 ```bash
-/agentd:archive <change-id>
+/agentd:merge-change <change-id>
 ```
 
 ## Example
 
 ```bash
-/agentd:archive add-oauth
+/agentd:merge-change add-oauth
 ```
 
 ## How it works
@@ -38,7 +38,7 @@ The skill checks the `phase` field in `STATE.yaml`:
 
 | Phase | Action |
 |-------|--------|
-| `complete` | ✅ Run `agentd archive` to merge and archive |
+| `complete` | ✅ Run `agentd merge-change` to merge and archive |
 | Other phases | ❌ **ChangeNotComplete** error - not ready for archive |
 
 ## What it does
@@ -71,7 +71,7 @@ This error occurs when trying to archive before implementation is complete:
 ❌ ChangeNotComplete: Change must be in 'complete' phase
 
 Current phase: implementing
-Action required: Complete implementation first with /agentd:impl <change-id>
+Action required: Complete implementation first with /agentd:impl-change <change-id>
 ```
 
-**Resolution**: Ensure all implementation tasks are complete and tests pass using `/agentd:impl`.
+**Resolution**: Ensure all implementation tasks are complete and tests pass using `/agentd:impl-change`.

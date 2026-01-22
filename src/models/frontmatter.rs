@@ -163,7 +163,8 @@ pub enum RiskSeverity {
 /// Frontmatter for tasks.md
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TasksFrontmatter {
-    /// Change identifier
+    /// Change identifier (supports both "id" and "change_id" for compatibility)
+    #[serde(alias = "change_id")]
     pub id: String,
 
     /// Document type (always "tasks")

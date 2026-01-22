@@ -438,26 +438,20 @@ Parameters:
         self.run_task_mcp(change_id, "review_proposal", "", complexity).await
     }
 
-    /// Run create_spec task via MCP
+    /// Run create_spec task via MCP with optional dependencies
     pub async fn run_create_spec_mcp(
         &self,
         change_id: &str,
         spec_id: &str,
+        dependencies: &[String],
         complexity: Complexity,
     ) -> Result<(String, UsageMetrics)> {
-        let extra = format!("- spec_id: \"{}\"", spec_id);
+        let mut extra = format!("- spec_id: \"{}\"", spec_id);
+        if !dependencies.is_empty() {
+            let deps_json: Vec<String> = dependencies.iter().map(|d| format!("\"{}\"", d)).collect();
+            extra.push_str(&format!("\n- dependencies: [{}]", deps_json.join(", ")));
+        }
         self.run_task_mcp(change_id, "create_spec", &extra, complexity).await
-    }
-
-    /// Run review_spec task via MCP
-    pub async fn run_review_spec_mcp(
-        &self,
-        change_id: &str,
-        spec_id: &str,
-        complexity: Complexity,
-    ) -> Result<(String, UsageMetrics)> {
-        let extra = format!("- spec_id: \"{}\"", spec_id);
-        self.run_task_mcp(change_id, "review_spec", &extra, complexity).await
     }
 
     /// Run create_tasks task via MCP
@@ -469,22 +463,33 @@ Parameters:
         self.run_task_mcp(change_id, "create_tasks", "", complexity).await
     }
 
-    /// Run review_tasks task via MCP
-    pub async fn run_review_tasks_mcp(
+    /// Run revise_proposal task via MCP (fix proposal based on review feedback)
+    pub async fn run_revise_proposal_mcp(
         &self,
         change_id: &str,
         complexity: Complexity,
     ) -> Result<(String, UsageMetrics)> {
-        self.run_task_mcp(change_id, "review_tasks", "", complexity).await
+        self.run_task_mcp(change_id, "revise_proposal", "", complexity).await
     }
 
-    /// Run reproposal task via MCP
-    pub async fn run_reproposal_mcp(
+    /// Run revise_spec task via MCP (fix spec based on review feedback)
+    pub async fn run_revise_spec_mcp(
+        &self,
+        change_id: &str,
+        spec_id: &str,
+        complexity: Complexity,
+    ) -> Result<(String, UsageMetrics)> {
+        let extra = format!("- spec_id: \"{}\"", spec_id);
+        self.run_task_mcp(change_id, "revise_spec", &extra, complexity).await
+    }
+
+    /// Run revise_tasks task via MCP (fix tasks based on review feedback)
+    pub async fn run_revise_tasks_mcp(
         &self,
         change_id: &str,
         complexity: Complexity,
     ) -> Result<(String, UsageMetrics)> {
-        self.run_task_mcp(change_id, "reproposal", "", complexity).await
+        self.run_task_mcp(change_id, "revise_tasks", "", complexity).await
     }
 }
 

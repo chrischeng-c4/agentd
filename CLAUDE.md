@@ -5,15 +5,15 @@
 
 **IMPORTANT**: Do NOT make direct code changes. Use the SDD workflow below.
 
-| Skill | Purpose |
-|-------|---------|
-| `/agentd:plan` | Planning workflow (proposal → challenge → auto-reproposal loop) |
-| `/agentd:impl` | Implementation workflow (implement → review → auto-resolve loop) |
-| `/agentd:archive` | Archive completed change |
+| Skill | CLI Command | Purpose |
+|-------|-------------|---------|
+| `/agentd:plan-change` | `plan-change` | Planning workflow (gen → review → revise loop for proposal/specs/tasks) |
+| `/agentd:impl-change` | `impl-change` | Implementation workflow (implement → review → resolve loop per spec) |
+| `/agentd:merge-change` | `merge-change` | Merge completed specs to main agentd/specs/ |
 
 All workflows are **state-aware** and resume automatically from the current phase.
 
-Start with: `/agentd:plan <id> "<description>"`
+Start with: `/agentd:plan-change <id> "<description>"`
 
 ### Knowledge Base
 
@@ -63,18 +63,6 @@ agentd knowledge write <path> --json-file knowledge.json
 2. Write JSON to temporary file
 3. Execute CLI command with `--json-file`
 4. Parse output to verify success
-
-### MCP Server (for AI Agents)
-
-HTTP MCP server provides Agentd tools to AI agents (Gemini, Codex) without file I/O:
-
-```bash
-agentd mcp-server start --update-clients    # Start and configure clients
-agentd mcp-server list                      # List registered projects
-agentd mcp-server shutdown                  # Stop server
-```
-
-See [HTTP MCP Server](agentd/knowledge/40-mcp/http-server.md) for details.
 <!-- agentd:end -->
 
 # Project Context

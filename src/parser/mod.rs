@@ -11,7 +11,7 @@ pub mod xml;
 
 pub use archive_review::parse_archive_review_verdict;
 pub use challenge::{parse_challenge_verdict, ChallengeParser};
-pub use proposal::{parse_affected_specs, parse_latest_review, ReviewBlock};
+pub use proposal::{parse_affected_specs, parse_latest_review, topological_sort_specs, ReviewBlock};
 pub use frontmatter::{
     calculate_body_checksum, calculate_checksum, has_frontmatter, is_stale, normalize_content,
     parse_document, parse_frontmatter_value, split_frontmatter, ParsedDocument,

@@ -280,7 +280,7 @@ agentd proposal review oauth-auth --json-file proposal-review.json
 # === Archive Phase ===
 
 # 10. Archive completed change (moves specs to main directory)
-agentd archive oauth-auth
+agentd merge-change oauth-auth
 ```
 
 ### Quick Reference: Command by Workflow Stage

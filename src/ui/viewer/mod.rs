@@ -7,7 +7,7 @@ mod ipc;
 mod manager;
 mod render;
 
-pub use manager::{ViewerError, ViewerManager};
+pub use manager::{FileInfo, ViewerError, ViewerManager};
 pub use render::slugify;
 
 /// Result of a review session
@@ -69,13 +69,14 @@ async fn run_server(manager: ViewerManager, change_id: String) -> anyhow::Result
     }));
 
     let app = Router::new()
-        // Static assets
+        // Serve index at root
         .route("/", get(serve_index))
-        .route("/styles.css", get(serve_styles))
-        .route("/app.js", get(serve_app_js))
-        .route("/highlight.min.css", get(serve_highlight_css))
-        .route("/highlight.min.js", get(serve_highlight_js))
-        .route("/mermaid.min.js", get(serve_mermaid_js))
+        // Static assets at /static/* to match unified server
+        .route("/static/styles.css", get(serve_styles))
+        .route("/static/app.js", get(serve_app_js))
+        .route("/static/highlight.min.css", get(serve_highlight_css))
+        .route("/static/highlight.min.js", get(serve_highlight_js))
+        .route("/static/mermaid.min.js", get(serve_mermaid_js))
         // API endpoints
         .route("/api/info", get(api_info))
         .route("/api/files", get(api_list_files))

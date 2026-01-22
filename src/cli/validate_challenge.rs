@@ -93,11 +93,11 @@ pub async fn run(change_id: &str, options: &ValidationOptions) -> Result<()> {
         match result.verdict {
             ChallengeVerdict::Approved => {
                 println!("{}", "⏭️  Next steps:".yellow());
-                println!("   agentd implement {}", change_id);
+                println!("   agentd impl-change {}", change_id);
             }
             ChallengeVerdict::NeedsRevision => {
                 println!("{}", "⏭️  Next steps:".yellow());
-                println!("   agentd reproposal {}", change_id);
+                println!("   agentd plan-change {}", change_id);
             }
             ChallengeVerdict::Rejected => {
                 println!("{}", "⚠️  Proposal was rejected. Review and recreate:".yellow());

@@ -193,7 +193,7 @@ pub async fn run(change_id: &str) -> Result<()> {
                     );
                     restore_original_specs(&project_root)?;
                     println!();
-                    println!("Fix issues manually and re-run: agentd archive {}", change_id);
+                    println!("Fix issues manually and re-run: agentd merge-change {}", change_id);
                     return Ok(());
                 }
 
@@ -224,7 +224,7 @@ pub async fn run(change_id: &str) -> Result<()> {
                 restore_original_specs(&project_root)?;
 
                 println!();
-                println!("Fix issues and re-run: agentd archive {}", change_id);
+                println!("Fix issues and re-run: agentd merge-change {}", change_id);
                 return Ok(());
             }
             ArchiveReviewVerdict::Unknown => {
@@ -239,7 +239,7 @@ pub async fn run(change_id: &str) -> Result<()> {
                 restore_original_specs(&project_root)?;
 
                 println!();
-                println!("Check review report and re-run: agentd archive {}", change_id);
+                println!("Check review report and re-run: agentd merge-change {}", change_id);
                 return Ok(());
             }
         }

@@ -14,15 +14,20 @@ use std::path::Path;
 /// Task types for workflows
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskType {
-    // Plan workflow tasks
+    // Plan workflow tasks - Generation (Gemini)
     CreateProposal,
-    ReviewProposal,
     CreateSpec,
-    ReviewSpec,
     CreateTasks,
+
+    // Plan workflow tasks - Review (Codex)
+    ReviewProposal,
+    ReviewSpec,
     ReviewTasks,
-    Challenge,
-    Reproposal,
+
+    // Plan workflow tasks - Revision (Gemini)
+    ReviseProposal,
+    ReviseSpec,
+    ReviseTasks,
 
     // Implement workflow tasks
     Implement,
@@ -35,13 +40,14 @@ impl TaskType {
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "create_proposal" => Ok(TaskType::CreateProposal),
-            "review_proposal" => Ok(TaskType::ReviewProposal),
             "create_spec" => Ok(TaskType::CreateSpec),
-            "review_spec" => Ok(TaskType::ReviewSpec),
             "create_tasks" => Ok(TaskType::CreateTasks),
+            "review_proposal" => Ok(TaskType::ReviewProposal),
+            "review_spec" => Ok(TaskType::ReviewSpec),
             "review_tasks" => Ok(TaskType::ReviewTasks),
-            "challenge" => Ok(TaskType::Challenge),
-            "reproposal" => Ok(TaskType::Reproposal),
+            "revise_proposal" => Ok(TaskType::ReviseProposal),
+            "revise_spec" => Ok(TaskType::ReviseSpec),
+            "revise_tasks" => Ok(TaskType::ReviseTasks),
             "implement" => Ok(TaskType::Implement),
             "review_impl" => Ok(TaskType::ReviewImpl),
             "code_review" => Ok(TaskType::CodeReview),
@@ -54,13 +60,14 @@ impl TaskType {
     fn template_name(&self) -> &'static str {
         match self {
             TaskType::CreateProposal => "create_proposal.md",
-            TaskType::ReviewProposal => "review_proposal.md",
             TaskType::CreateSpec => "create_spec.md",
-            TaskType::ReviewSpec => "review_spec.md",
             TaskType::CreateTasks => "create_tasks.md",
+            TaskType::ReviewProposal => "review_proposal.md",
+            TaskType::ReviewSpec => "review_spec.md",
             TaskType::ReviewTasks => "review_tasks.md",
-            TaskType::Challenge => "challenge.md",
-            TaskType::Reproposal => "reproposal.md",
+            TaskType::ReviseProposal => "revise_proposal.md",
+            TaskType::ReviseSpec => "revise_spec.md",
+            TaskType::ReviseTasks => "revise_tasks.md",
             TaskType::Implement => "implement.md",
             TaskType::ReviewImpl => "review_impl.md",
             TaskType::CodeReview => "code_review.md",
@@ -86,13 +93,14 @@ pub fn definition() -> ToolDefinition {
                     "type": "string",
                     "enum": [
                         "create_proposal",
-                        "review_proposal",
                         "create_spec",
-                        "review_spec",
                         "create_tasks",
+                        "review_proposal",
+                        "review_spec",
                         "review_tasks",
-                        "challenge",
-                        "reproposal",
+                        "revise_proposal",
+                        "revise_spec",
+                        "revise_tasks",
                         "implement",
                         "review_impl",
                         "code_review",
@@ -102,7 +110,7 @@ pub fn definition() -> ToolDefinition {
                 },
                 "spec_id": {
                     "type": "string",
-                    "description": "Spec ID (required for create_spec and review_spec tasks)"
+                    "description": "Spec ID (required for create_spec, review_spec, revise_spec tasks)"
                 },
                 "description": {
                     "type": "string",
@@ -110,7 +118,12 @@ pub fn definition() -> ToolDefinition {
                 },
                 "iteration": {
                     "type": "integer",
-                    "description": "Current iteration number (for challenge and code_review tasks)"
+                    "description": "Current iteration number (for review_* tasks)"
+                },
+                "dependencies": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "List of spec IDs this spec depends on (for create_spec task)"
                 }
             }
         }),
@@ -126,6 +139,15 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
     let spec_id = get_optional_string(args, "spec_id");
     let description = get_optional_string(args, "description");
     let iteration = args.get("iteration").and_then(|v| v.as_i64()).unwrap_or(1);
+    let dependencies: Vec<String> = args
+        .get("dependencies")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
 
     // Build variables map
     let mut vars = HashMap::new();
@@ -139,9 +161,21 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
         vars.insert("description".to_string(), desc.clone());
     }
 
+    // Format dependencies for template
+    if dependencies.is_empty() {
+        vars.insert("dependencies".to_string(), "None".to_string());
+    } else {
+        let deps_list = dependencies
+            .iter()
+            .map(|d| format!("- `{}`", d))
+            .collect::<Vec<_>>()
+            .join("\n");
+        vars.insert("dependencies".to_string(), deps_list);
+    }
+
     // Validate required variables for specific task types
     match task_type {
-        TaskType::CreateSpec | TaskType::ReviewSpec => {
+        TaskType::CreateSpec | TaskType::ReviewSpec | TaskType::ReviseSpec => {
             if spec_id.is_none() {
                 anyhow::bail!("spec_id is required for {} task", task_type_str);
             }
@@ -258,17 +292,7 @@ fn embedded_template(task_type: TaskType) -> String {
 2. Call `create_tasks` MCP tool
 "#.to_string(),
 
-        TaskType::ReviewTasks => r#"# Task: Review Tasks
-
-## Change ID
-{{change_id}}
-
-## Instructions
-1. Read tasks and specs
-2. Output `<review>PASS</review>` or `<review>NEEDS_REVISION</review>`
-"#.to_string(),
-
-        TaskType::Challenge => r#"# Task: Challenge Proposal (Iteration {{iteration}})
+        TaskType::ReviewTasks => r#"# Task: Review Tasks (Iteration {{iteration}})
 
 ## Change ID
 {{change_id}}
@@ -279,14 +303,34 @@ fn embedded_template(task_type: TaskType) -> String {
 3. Call `append_review` MCP tool with verdict
 "#.to_string(),
 
-        TaskType::Reproposal => r#"# Task: Revise Proposal
+        TaskType::ReviseProposal => r#"# Task: Revise Proposal
 
 ## Change ID
 {{change_id}}
 
 ## Instructions
 1. Read review feedback
-2. Use MCP tools to fix issues
+2. Use `create_proposal` MCP tool to fix issues
+"#.to_string(),
+
+        TaskType::ReviseSpec => r#"# Task: Revise Spec '{{spec_id}}'
+
+## Change ID
+{{change_id}}
+
+## Instructions
+1. Read review feedback
+2. Use `create_spec` MCP tool to fix issues
+"#.to_string(),
+
+        TaskType::ReviseTasks => r#"# Task: Revise Tasks
+
+## Change ID
+{{change_id}}
+
+## Instructions
+1. Read review feedback
+2. Use `create_tasks` MCP tool to fix issues
 "#.to_string(),
 
         TaskType::Implement => r#"# Task: Implement Code
@@ -429,7 +473,8 @@ Description: {{description}}"#,
     #[test]
     fn test_task_type_template_names() {
         assert_eq!(TaskType::CreateProposal.template_name(), "create_proposal.md");
-        assert_eq!(TaskType::Challenge.template_name(), "challenge.md");
+        assert_eq!(TaskType::ReviewProposal.template_name(), "review_proposal.md");
+        assert_eq!(TaskType::ReviseProposal.template_name(), "revise_proposal.md");
         assert_eq!(TaskType::CodeReview.template_name(), "code_review.md");
     }
 }

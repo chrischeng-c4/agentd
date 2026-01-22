@@ -390,6 +390,15 @@ pub fn resolve_change_id_conflict(change_id: &str, changes_dir: &Path) -> Result
         return Ok(change_id.to_string());
     }
 
+    // If directory only has clarifications.md (no STATE.yaml or proposal.md),
+    // it's the expected state after clarification phase - not a conflict
+    let state_exists = change_dir.join("STATE.yaml").exists();
+    let proposal_exists = change_dir.join("proposal.md").exists();
+    if !state_exists && !proposal_exists {
+        // This is a fresh change with only clarifications - continue with same ID
+        return Ok(change_id.to_string());
+    }
+
     // Conflict detected - find next available ID
     let suggested_id = find_next_available_id(change_id, changes_dir);
     let similar_changes = list_similar_changes(change_id, changes_dir);

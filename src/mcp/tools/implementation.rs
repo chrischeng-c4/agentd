@@ -3,7 +3,10 @@
 //! Tools for reading requirements and implementation summaries to support
 //! the implementation and review workflow stages.
 
-use super::{get_optional_string, get_required_string, ToolDefinition};
+use super::{get_optional_string, get_required_array, get_required_string, ToolDefinition};
+use crate::services::implementation_service::{
+    CreateReviewInput, ReviewIssue, ReviewVerdict, Severity, TestResults,
+};
 use crate::Result;
 use serde_json::{json, Value};
 use std::path::Path;
@@ -422,6 +425,178 @@ pub fn execute_list_changed_files(args: &Value, _project_root: &Path) -> Result<
     ));
 
     Ok(output)
+}
+
+// ============================================================================
+// Tool 4: create_review
+// ============================================================================
+
+/// Get the tool definition for create_review
+pub fn create_review_definition() -> ToolDefinition {
+    ToolDefinition {
+        name: "create_review".to_string(),
+        description: "Create structured REVIEW.md file with test results, issues, and verdict"
+            .to_string(),
+        input_schema: json!({
+            "type": "object",
+            "required": ["change_id", "iteration", "verdict", "issues"],
+            "properties": {
+                "change_id": {
+                    "type": "string",
+                    "description": "The change ID being reviewed"
+                },
+                "iteration": {
+                    "type": "integer",
+                    "description": "Review iteration number (starts at 0)"
+                },
+                "test_results": {
+                    "type": "object",
+                    "description": "Test execution results",
+                    "properties": {
+                        "status": {
+                            "type": "string",
+                            "enum": ["PASS", "FAIL", "PARTIAL", "UNKNOWN"],
+                            "description": "Overall test status"
+                        },
+                        "total": { "type": "integer" },
+                        "passed": { "type": "integer" },
+                        "failed": { "type": "integer" },
+                        "skipped": { "type": "integer" }
+                    }
+                },
+                "security_status": {
+                    "type": "string",
+                    "enum": ["CLEAN", "WARNINGS", "VULNERABILITIES", "NOT_RUN"],
+                    "description": "Security scan status"
+                },
+                "issues": {
+                    "type": "array",
+                    "description": "List of issues found",
+                    "items": {
+                        "type": "object",
+                        "required": ["severity", "title", "description"],
+                        "properties": {
+                            "severity": {
+                                "type": "string",
+                                "enum": ["HIGH", "MEDIUM", "LOW"]
+                            },
+                            "title": { "type": "string" },
+                            "description": { "type": "string" },
+                            "file_path": { "type": "string" },
+                            "line_number": { "type": "integer" },
+                            "recommendation": { "type": "string" }
+                        }
+                    }
+                },
+                "verdict": {
+                    "type": "string",
+                    "enum": ["APPROVED", "NEEDS_CHANGES", "MAJOR_ISSUES"],
+                    "description": "Review verdict"
+                },
+                "next_steps": {
+                    "type": "string",
+                    "description": "Suggested next steps"
+                }
+            }
+        }),
+    }
+}
+
+/// Execute the create_review tool
+pub fn execute_create_review(args: &Value, project_root: &Path) -> Result<String> {
+    let change_id = get_required_string(args, "change_id")?;
+    validate_change_id(&change_id)?;
+
+    let iteration = args
+        .get("iteration")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u32;
+
+    // Parse test results
+    let test_results = if let Some(tr) = args.get("test_results") {
+        TestResults {
+            status: tr
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("UNKNOWN")
+                .to_string(),
+            total: tr.get("total").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+            passed: tr.get("passed").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+            failed: tr.get("failed").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+            skipped: tr.get("skipped").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        }
+    } else {
+        TestResults {
+            status: "UNKNOWN".to_string(),
+            ..Default::default()
+        }
+    };
+
+    let security_status = get_optional_string(args, "security_status")
+        .unwrap_or_else(|| "NOT_RUN".to_string());
+
+    // Parse issues
+    let issues_array = get_required_array(args, "issues")?;
+    let mut issues = Vec::new();
+
+    for issue_val in issues_array {
+        let severity_str = issue_val
+            .get("severity")
+            .and_then(|v| v.as_str())
+            .unwrap_or("MEDIUM");
+        let severity = match severity_str {
+            "HIGH" => Severity::High,
+            "LOW" => Severity::Low,
+            _ => Severity::Medium,
+        };
+
+        let title = issue_val
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Untitled Issue")
+            .to_string();
+
+        let description = issue_val
+            .get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let file_path = issue_val.get("file_path").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let line_number = issue_val.get("line_number").and_then(|v| v.as_u64()).map(|n| n as u32);
+        let recommendation = issue_val.get("recommendation").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+        issues.push(ReviewIssue {
+            severity,
+            title,
+            description,
+            file_path,
+            line_number,
+            recommendation,
+        });
+    }
+
+    // Parse verdict
+    let verdict_str = get_required_string(args, "verdict")?;
+    let verdict = match verdict_str.as_str() {
+        "APPROVED" => ReviewVerdict::Approved,
+        "MAJOR_ISSUES" => ReviewVerdict::MajorIssues,
+        _ => ReviewVerdict::NeedsChanges,
+    };
+
+    let next_steps = get_optional_string(args, "next_steps");
+
+    let input = CreateReviewInput {
+        change_id,
+        iteration,
+        test_results,
+        security_status,
+        issues,
+        verdict,
+        next_steps,
+    };
+
+    crate::services::implementation_service::create_review(input, project_root)
 }
 
 // ============================================================================

@@ -299,11 +299,15 @@ impl ScriptRunner {
         // Write prompt to stdin only if provided
         if use_stdin {
             if let Some(mut stdin) = child.stdin.take() {
-                stdin
-                    .write_all(prompt.as_bytes())
-                    .await
-                    .context("Failed to write to stdin")?;
-                stdin.flush().await.context("Failed to flush stdin")?;
+                // Handle BrokenPipe gracefully - the process may have closed stdin early
+                // All stdin write errors are non-fatal - we can still read stdout/stderr
+                // Common cases: BrokenPipe (process closed stdin), process exited early
+                if let Err(e) = stdin.write_all(prompt.as_bytes()).await {
+                    eprintln!("[agentd] Warning: stdin write failed ({}), continuing...", e.kind());
+                } else {
+                    // Flush may also fail, which is OK
+                    let _ = stdin.flush().await;
+                }
                 drop(stdin);
             }
         }

@@ -8,9 +8,9 @@ use std::process::Command;
 const AGENTD_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Claude Code Skills (high-level workflows only)
-const SKILL_PLAN: &str = include_str!("../../templates/skills/agentd-plan/SKILL.md");
-const SKILL_IMPL: &str = include_str!("../../templates/skills/agentd-impl/SKILL.md");
-const SKILL_ARCHIVE: &str = include_str!("../../templates/skills/agentd-archive/SKILL.md");
+const SKILL_PLAN_CHANGE: &str = include_str!("../../templates/skills/agentd-plan-change/SKILL.md");
+const SKILL_IMPL_CHANGE: &str = include_str!("../../templates/skills/agentd-impl-change/SKILL.md");
+const SKILL_MERGE_CHANGE: &str = include_str!("../../templates/skills/agentd-merge-change/SKILL.md");
 
 // Gemini Commands
 const GEMINI_PROPOSAL: &str = include_str!("../../templates/gemini/commands/agentd/proposal.toml");
@@ -634,6 +634,10 @@ fn install_claude_skills(skills_dir: &Path) -> Result<()> {
         "agentd-resolve-reviews",
         "agentd-fix",
         "agentd-verify",
+        // Old workflow skill names (renamed)
+        "agentd-plan",
+        "agentd-impl",
+        "agentd-archive",
     ];
 
     for deprecated in &deprecated_skills {
@@ -646,9 +650,9 @@ fn install_claude_skills(skills_dir: &Path) -> Result<()> {
 
     // Install current skills
     let skills = vec![
-        ("plan", SKILL_PLAN),
-        ("impl", SKILL_IMPL),
-        ("archive", SKILL_ARCHIVE),
+        ("plan-change", SKILL_PLAN_CHANGE),
+        ("impl-change", SKILL_IMPL_CHANGE),
+        ("merge-change", SKILL_MERGE_CHANGE),
     ];
 
     for (name, content) in skills {

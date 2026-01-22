@@ -61,6 +61,14 @@ impl TaskGraph {
         let content = std::fs::read_to_string(tasks_path)
             .with_context(|| format!("Failed to read tasks.md from {}", tasks_path.display()))?;
 
+        // Extract change_id from path (agentd/changes/<change_id>/tasks.md)
+        let change_id = tasks_path
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
         // Parse frontmatter to get layer definitions
         let frontmatter = Self::parse_frontmatter(&content)?;
 
@@ -68,7 +76,7 @@ impl TaskGraph {
         let tasks = Self::parse_tasks(&content)?;
 
         // Build layer structure
-        let layers = Self::build_layers(&frontmatter, &tasks)?;
+        let layers = Self::build_layers(&frontmatter, &tasks, &change_id)?;
 
         // Build specs_by_layer map
         let specs_by_layer = layers
@@ -83,19 +91,27 @@ impl TaskGraph {
     }
 
     /// Parse YAML frontmatter from tasks.md
+    /// Returns default frontmatter if parsing fails (for robustness)
     fn parse_frontmatter(content: &str) -> Result<TasksFrontmatter> {
         // Extract frontmatter between --- delimiters
-        let frontmatter_start = content.find("---").context("No frontmatter start found")?;
+        let Some(frontmatter_start) = content.find("---") else {
+            // No frontmatter found - return default
+            return Ok(TasksFrontmatter::default());
+        };
+
         let content_after_start = &content[frontmatter_start + 3..];
-        let frontmatter_end = content_after_start
-            .find("---")
-            .context("No frontmatter end found")?;
+        let Some(frontmatter_end) = content_after_start.find("---") else {
+            // No frontmatter end found - return default
+            return Ok(TasksFrontmatter::default());
+        };
 
         let frontmatter_str = &content_after_start[..frontmatter_end];
-        let frontmatter: TasksFrontmatter = serde_yaml::from_str(frontmatter_str)
-            .context("Failed to parse tasks frontmatter")?;
 
-        Ok(frontmatter)
+        // Try to parse, return default on failure
+        match serde_yaml::from_str::<TasksFrontmatter>(frontmatter_str) {
+            Ok(fm) => Ok(fm),
+            Err(_) => Ok(TasksFrontmatter::default()),
+        }
     }
 
     /// Parse task blocks from markdown content
@@ -229,61 +245,101 @@ impl TaskGraph {
     }
 
     /// Build layer structure from frontmatter and tasks
+    /// If frontmatter doesn't have layers, infer from task IDs
     fn build_layers(
         frontmatter: &TasksFrontmatter,
         tasks: &[TaskBlock],
+        change_id: &str,
     ) -> Result<Vec<Layer>> {
-        // Get layer definitions from frontmatter
-        let layer_breakdown = frontmatter
-            .layers
-            .as_ref()
-            .context("No layers defined in frontmatter")?;
-
-        // Define layer order and names
-        let layer_defs = vec![
-            (1, "data", &layer_breakdown.data),
-            (2, "logic", &layer_breakdown.logic),
-            (3, "integration", &layer_breakdown.integration),
-            (4, "testing", &layer_breakdown.testing),
+        // Standard layer mapping
+        let layer_names: [(u8, &str); 4] = [
+            (1, "data"),
+            (2, "logic"),
+            (3, "integration"),
+            (4, "testing"),
         ];
+
+        // Check if frontmatter has layers defined
+        let use_frontmatter_layers = frontmatter.layers.as_ref().map_or(false, |lb| {
+            lb.data.is_some() || lb.logic.is_some() || lb.integration.is_some() || lb.testing.is_some()
+        });
 
         let mut layers = Vec::new();
 
-        for (order, name, layer_info_opt) in layer_defs {
-            // Skip if layer not defined in frontmatter
-            if layer_info_opt.is_none() {
-                continue;
+        if use_frontmatter_layers {
+            // Use frontmatter layer definitions
+            let layer_breakdown = frontmatter.layers.as_ref().unwrap();
+            let layer_defs = vec![
+                (1, "data", &layer_breakdown.data),
+                (2, "logic", &layer_breakdown.logic),
+                (3, "integration", &layer_breakdown.integration),
+                (4, "testing", &layer_breakdown.testing),
+            ];
+
+            for (order, name, layer_info_opt) in layer_defs {
+                if layer_info_opt.is_none() {
+                    continue;
+                }
+
+                let layer_tasks: Vec<_> = tasks
+                    .iter()
+                    .filter(|t| {
+                        if let Some(first_dot) = t.id.find('.') {
+                            if let Ok(layer_num) = t.id[..first_dot].parse::<u8>() {
+                                return layer_num == order;
+                            }
+                        }
+                        false
+                    })
+                    .collect();
+
+                let specs = Self::group_by_spec(&layer_tasks, change_id)?;
+
+                layers.push(Layer {
+                    name: name.to_string(),
+                    order,
+                    specs,
+                });
+            }
+        } else {
+            // Infer layers from task IDs
+            // Group tasks by their layer number (first part of ID like "1.1" -> 1)
+            let mut layer_tasks_map: std::collections::HashMap<u8, Vec<&TaskBlock>> =
+                std::collections::HashMap::new();
+
+            for task in tasks {
+                if let Some(first_dot) = task.id.find('.') {
+                    if let Ok(layer_num) = task.id[..first_dot].parse::<u8>() {
+                        layer_tasks_map.entry(layer_num).or_default().push(task);
+                    }
+                }
             }
 
-            // Filter tasks for this layer
-            let layer_tasks: Vec<_> = tasks
-                .iter()
-                .filter(|t| {
-                    // Extract layer from task ID (e.g., "1.1" -> layer 1)
-                    if let Some(first_dot) = t.id.find('.') {
-                        if let Ok(layer_num) = t.id[..first_dot].parse::<u8>() {
-                            return layer_num == order;
-                        }
-                    }
-                    false
-                })
-                .collect();
+            // Build layers from the map
+            for (order, name) in &layer_names {
+                if let Some(layer_tasks) = layer_tasks_map.get(order) {
+                    let specs = Self::group_by_spec(layer_tasks, change_id)?;
+                    layers.push(Layer {
+                        name: name.to_string(),
+                        order: *order,
+                        specs,
+                    });
+                }
+            }
+        }
 
-            // Group tasks by spec_ref
-            let specs = Self::group_by_spec(&layer_tasks)?;
+        // Sort layers by order
+        layers.sort_by_key(|l| l.order);
 
-            layers.push(Layer {
-                name: name.to_string(),
-                order,
-                specs,
-            });
+        if layers.is_empty() {
+            bail!("No layers found in tasks.md");
         }
 
         Ok(layers)
     }
 
     /// Group tasks by spec reference
-    fn group_by_spec(tasks: &[&TaskBlock]) -> Result<Vec<SpecGroup>> {
+    fn group_by_spec(tasks: &[&TaskBlock], change_id: &str) -> Result<Vec<SpecGroup>> {
         let mut spec_map: HashMap<String, Vec<&TaskBlock>> = HashMap::new();
 
         for task in tasks {
@@ -342,7 +398,7 @@ impl TaskGraph {
                 })
                 .collect();
 
-            let spec_path = PathBuf::from(format!("agentd/changes/{{change_id}}/specs/{}.md", spec_id));
+            let spec_path = PathBuf::from(format!("agentd/changes/{}/specs/{}.md", change_id, spec_id));
 
             spec_groups.push(SpecGroup {
                 spec_id: spec_id.clone(),
