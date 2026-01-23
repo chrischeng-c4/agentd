@@ -1,6 +1,6 @@
 [package]
 name = "agentd"
-version = "0.1.15-alpha"
+version = "0.1.15"
 edition = "2021"
 authors = ["Chris Cheng <chris.cheng@shopee.com>"]
 description = "AI agent orchestrator for spec-driven development with iterative proposal refinement"
@@ -28,6 +28,9 @@ serde_json = "1"
 serde_yaml = "0.9"
 toml = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
+
+# Version comparison
+semver = "1"
 
 # Hashing
 sha2 = "0.10"

@@ -97,9 +97,38 @@ pub async fn run(name: Option<&str>, _force: bool) -> Result<()> {
         // Update mode: overwrite system files, preserve project.md
         let old_version = std::fs::read_to_string(&version_file)
             .unwrap_or_else(|_| "unknown".to_string());
+        let old_version_trimmed = old_version.trim();
+
+        // Check for version downgrade
+        if old_version_trimmed != "unknown" && old_version_trimmed != AGENTD_VERSION {
+            if !super::update::is_newer(AGENTD_VERSION, old_version_trimmed) {
+                println!(
+                    "{}",
+                    format!(
+                        "⚠️  Cannot downgrade from {} to {}",
+                        old_version_trimmed, AGENTD_VERSION
+                    )
+                    .yellow()
+                    .bold()
+                );
+                println!();
+                println!("   {} This would downgrade your Agentd installation.", "⚠️".yellow());
+                println!("   {} Current CLI version: {}", "ℹ️".cyan(), AGENTD_VERSION.yellow());
+                println!("   {} Installed version:  {}", "ℹ️".cyan(), old_version_trimmed.green());
+                println!();
+                println!(
+                    "{}",
+                    "💡 To upgrade, install a newer version of the CLI first:".yellow()
+                );
+                println!("   curl -fsSL https://raw.githubusercontent.com/chrischeng-c4/agentd/main/install.sh | bash");
+                println!();
+                return Ok(());
+            }
+        }
+
         println!(
             "{}",
-            format!("🔄 Updating Agentd {} → {}...", old_version.trim(), AGENTD_VERSION).cyan().bold()
+            format!("🔄 Updating Agentd {} → {}...", old_version_trimmed, AGENTD_VERSION).cyan().bold()
         );
         println!();
         run_update(name, &project_root, &agentd_dir, &claude_dir, &version_file)?;

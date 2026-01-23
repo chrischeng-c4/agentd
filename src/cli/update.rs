@@ -1,5 +1,6 @@
 use crate::Result;
 use colored::Colorize;
+use semver::Version;
 use std::env;
 use std::process::Command;
 
@@ -85,28 +86,37 @@ fn get_latest_version() -> Result<String> {
     anyhow::bail!("Could not parse version from GitHub response")
 }
 
-/// Compare versions (simple semver comparison)
+/// Compare versions using semver (fully compliant with Semantic Versioning 2.0.0)
+///
+/// This function compares two version strings according to the Semantic Versioning specification:
+/// - Pre-release versions are lower than normal versions (1.0.0-alpha < 1.0.0)
+/// - Pre-release identifiers are compared by parts: numeric < alphanumeric
+/// - Examples: 1.0.0-alpha.1 < 1.0.0-alpha.beta < 1.0.0-beta.2 < 1.0.0
 pub fn is_newer(new_version: &str, current: &str) -> bool {
-    let parse_version = |v: &str| -> Vec<u32> {
-        v.trim_start_matches('v')
-            .split('.')
-            .filter_map(|s| s.parse().ok())
-            .collect()
+    // Normalize versions (remove 'v' prefix if present)
+    let new_ver = new_version.trim_start_matches('v');
+    let curr_ver = current.trim_start_matches('v');
+
+    // Parse versions using semver crate
+    let new_parsed = match Version::parse(new_ver) {
+        Ok(v) => v,
+        Err(_) => {
+            // If parsing fails, fall back to string comparison
+            // This handles malformed versions gracefully
+            return new_ver > curr_ver;
+        }
     };
 
-    let new_parts = parse_version(new_version);
-    let current_parts = parse_version(current);
-
-    for (n, c) in new_parts.iter().zip(current_parts.iter()) {
-        if n > c {
+    let current_parsed = match Version::parse(curr_ver) {
+        Ok(v) => v,
+        Err(_) => {
+            // If current version is malformed, consider new version as newer
             return true;
         }
-        if n < c {
-            return false;
-        }
-    }
+    };
 
-    new_parts.len() > current_parts.len()
+    // Use semver's built-in comparison (fully compliant with Semver 2.0.0)
+    new_parsed > current_parsed
 }
 
 /// Download and install the new binary
@@ -176,11 +186,32 @@ mod tests {
 
     #[test]
     fn test_is_newer() {
+        // Basic version comparison
         assert!(is_newer("0.2.0", "0.1.0"));
         assert!(is_newer("1.0.0", "0.9.9"));
         assert!(is_newer("0.1.1", "0.1.0"));
         assert!(!is_newer("0.1.0", "0.1.0"));
         assert!(!is_newer("0.1.0", "0.2.0"));
         assert!(!is_newer("0.0.9", "0.1.0"));
+
+        // Pre-release version comparison (Semver 2.0.0 compliant)
+        assert!(is_newer("0.1.15", "0.1.15-alpha")); // Release > pre-release
+        assert!(!is_newer("0.1.15-alpha", "0.1.15")); // Pre-release < release
+        assert!(is_newer("0.1.15-beta", "0.1.15-alpha")); // beta > alpha
+        assert!(is_newer("0.1.15-alpha", "0.1.14")); // 0.1.15-alpha > 0.1.14
+        assert!(!is_newer("0.1.13", "0.1.15-alpha")); // 0.1.13 < 0.1.15-alpha
+
+        // Equal versions
+        assert!(!is_newer("0.1.15-alpha", "0.1.15-alpha")); // Same version
+        assert!(is_newer("0.1.15-rc.1", "0.1.15-beta.1")); // rc > beta
+
+        // Semver-compliant numeric comparison in pre-release
+        assert!(is_newer("1.0.0-alpha.11", "1.0.0-alpha.2")); // Numeric: 11 > 2
+        assert!(is_newer("1.0.0-alpha.beta", "1.0.0-alpha.1")); // Alphanumeric > numeric
+        assert!(is_newer("1.0.0-beta.2", "1.0.0-beta")); // More identifiers > fewer
+
+        // Version with 'v' prefix
+        assert!(is_newer("v1.0.0", "v0.9.0"));
+        assert!(is_newer("v1.0.0", "0.9.0")); // Mixed prefix handling
     }
 }
