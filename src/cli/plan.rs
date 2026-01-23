@@ -63,7 +63,7 @@ pub async fn run(change_id: &str, description: Option<String>, skip_clarify: boo
         println!("{}", "ℹ️  Continuing existing change".blue());
     }
 
-    // Delegate to shared proposal engine
+    // Delegate to idempotent plan engine
     let engine_config = proposal_engine::ProposalEngineConfig {
         change_id: change_id.to_string(),
         description,
@@ -72,6 +72,6 @@ pub async fn run(change_id: &str, description: Option<String>, skip_clarify: boo
         config,
     };
 
-    proposal_engine::run_proposal_loop(engine_config).await?;
+    proposal_engine::run_plan_change(engine_config).await?;
     Ok(())
 }
