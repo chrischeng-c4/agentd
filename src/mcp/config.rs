@@ -101,8 +101,13 @@ pub fn ensure_gemini_mcp_config(project_root: &Path) -> Result<()> {
         settings["mcpServers"] = serde_json::json!({});
     }
 
-    // Force overwrite agentd server config (HTTP mode for Gemini)
-    settings["mcpServers"]["agentd"] = serde_json::json!({
+    // Remove old "agentd" entry if exists
+    if let Some(servers) = settings["mcpServers"].as_object_mut() {
+        servers.remove("agentd");
+    }
+
+    // Force overwrite agentd-mcp server config (HTTP mode for Gemini)
+    settings["mcpServers"]["agentd-mcp"] = serde_json::json!({
         "type": "http",
         "url": "http://localhost:3456/mcp"
     });
@@ -221,14 +226,16 @@ pub fn ensure_codex_mcp_config() -> Result<()> {
     agentd_config.insert("type".to_string(), toml::Value::String("http".to_string()));
     agentd_config.insert("url".to_string(), toml::Value::String("http://localhost:3456/mcp".to_string()));
 
-    // Get or create mcp_servers table and force overwrite agentd
+    // Get or create mcp_servers table and force overwrite agentd-mcp
     if let Some(root_table) = config.as_table_mut() {
         let mcp_servers = root_table
             .entry("mcp_servers".to_string())
             .or_insert_with(|| toml::Value::Table(toml::map::Map::new()));
 
         if let Some(mcp_table) = mcp_servers.as_table_mut() {
-            mcp_table.insert("agentd".to_string(), toml::Value::Table(agentd_config));
+            // Remove old "agentd" entry if exists
+            mcp_table.remove("agentd");
+            mcp_table.insert("agentd-mcp".to_string(), toml::Value::Table(agentd_config));
         }
     }
 
@@ -299,8 +306,8 @@ mod tests {
         // Verify content (HTTP format for Gemini)
         let content = std::fs::read_to_string(&settings_path).unwrap();
         let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
-        assert_eq!(settings["mcpServers"]["agentd"]["type"].as_str(), Some("http"));
-        assert_eq!(settings["mcpServers"]["agentd"]["url"].as_str(), Some("http://localhost:3456/mcp"));
+        assert_eq!(settings["mcpServers"]["agentd-mcp"]["type"].as_str(), Some("http"));
+        assert_eq!(settings["mcpServers"]["agentd-mcp"]["url"].as_str(), Some("http://localhost:3456/mcp"));
     }
 
     #[test]
@@ -321,11 +328,11 @@ mod tests {
         let content = std::fs::read_to_string(&settings_path).unwrap();
         let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
         assert!(settings["tools"]["allowed"][0].as_str() == Some("read_file"));
-        assert_eq!(settings["mcpServers"]["agentd"]["type"].as_str(), Some("http"));
+        assert_eq!(settings["mcpServers"]["agentd-mcp"]["type"].as_str(), Some("http"));
     }
 
     #[test]
-    fn test_ensure_gemini_mcp_config_overwrites_existing_agentd() {
+    fn test_ensure_gemini_mcp_config_removes_old_agentd() {
         let temp_dir = TempDir::new().unwrap();
         let project_root = temp_dir.path();
 
@@ -339,11 +346,12 @@ mod tests {
         // Ensure config
         ensure_gemini_mcp_config(project_root).unwrap();
 
-        // Verify config was overwritten with correct HTTP format
+        // Verify old "agentd" removed and "agentd-mcp" added
         let content = std::fs::read_to_string(&settings_path).unwrap();
         let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
-        assert_eq!(settings["mcpServers"]["agentd"]["type"].as_str(), Some("http"));
-        assert_eq!(settings["mcpServers"]["agentd"]["url"].as_str(), Some("http://localhost:3456/mcp"));
+        assert!(settings["mcpServers"].get("agentd").is_none());
+        assert_eq!(settings["mcpServers"]["agentd-mcp"]["type"].as_str(), Some("http"));
+        assert_eq!(settings["mcpServers"]["agentd-mcp"]["url"].as_str(), Some("http://localhost:3456/mcp"));
     }
 
     // =========================================================================
@@ -367,7 +375,7 @@ mod tests {
 
         // Verify content (HTTP format)
         let content = std::fs::read_to_string(&config_path).unwrap();
-        assert!(content.contains("[mcp_servers.agentd]"));
+        assert!(content.contains("[mcp_servers.agentd-mcp]"));
         assert!(content.contains("type = \"http\""));
         assert!(content.contains("url = \"http://localhost:3456/mcp\""));
     }
@@ -393,16 +401,16 @@ mod tests {
         let content = std::fs::read_to_string(&config_path).unwrap();
         assert!(content.contains("[model]"));
         assert!(content.contains("default = \"gpt-4\""));
-        assert!(content.contains("[mcp_servers.agentd]"));
+        assert!(content.contains("[mcp_servers.agentd-mcp]"));
         assert!(content.contains("type = \"http\""));
     }
 
     #[test]
-    fn test_ensure_codex_mcp_config_overwrites_existing_agentd() {
+    fn test_ensure_codex_mcp_config_removes_old_agentd() {
         let temp_dir = TempDir::new().unwrap();
         let temp_home = temp_dir.path();
 
-        // Create .codex directory with existing mcp_servers.agentd (old stdio config)
+        // Create .codex directory with existing mcp_servers.agentd (old config)
         let codex_dir = temp_home.join(".codex");
         std::fs::create_dir_all(&codex_dir).unwrap();
         let config_path = codex_dir.join("config.toml");
@@ -418,11 +426,12 @@ args = ["custom-arg"]
         // Ensure config
         ensure_codex_mcp_config().unwrap();
 
-        // Verify config was overwritten with HTTP format
+        // Verify old "agentd" removed and "agentd-mcp" added
         let content = std::fs::read_to_string(&config_path).unwrap();
+        assert!(content.contains("[mcp_servers.agentd-mcp]"));
         assert!(content.contains("type = \"http\""));
-        assert!(content.contains("url = \"http://localhost:3456/mcp\""));
         assert!(!content.contains("custom-agentd"));
+        assert!(!content.contains("[mcp_servers.agentd]\n"));
     }
 
     // =========================================================================
