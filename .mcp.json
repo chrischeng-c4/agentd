@@ -1,12 +1,8 @@
 {
   "mcpServers": {
-    "agentd": {
+    "agentd-mcp": {
       "type": "http",
-      "url": "http://localhost:3000/mcp",
-      "headers": {
-        "X-Agentd-Project": "agentd",
-        "X-Agentd-Cwd": "/Users/chrischeng/projects/agentd"
-      }
+      "url": "http://localhost:3456/mcp"
     }
   }
 }

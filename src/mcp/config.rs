@@ -82,161 +82,113 @@ pub fn ensure_mcp_config(project_root: &Path) -> Result<std::path::PathBuf> {
 
 /// Ensure Gemini MCP config exists in .gemini/settings.json
 ///
-/// If the file exists, adds mcpServers.agentd if missing.
-/// If the file doesn't exist, creates it with the MCP server config.
+/// Always overwrites mcpServers.agentd with HTTP format config.
 pub fn ensure_gemini_mcp_config(project_root: &Path) -> Result<()> {
     let settings_path = project_root.join(".gemini/settings.json");
 
-    if settings_path.exists() {
-        // Read existing settings
+    let mut settings = if settings_path.exists() {
         let content = std::fs::read_to_string(&settings_path)?;
-        let mut settings: serde_json::Value = serde_json::from_str(&content)?;
-
-        // Check if mcpServers.agentd exists
-        let has_agentd = settings
-            .get("mcpServers")
-            .and_then(|s| s.get("agentd"))
-            .is_some();
-
-        if !has_agentd {
-            // Ensure mcpServers object exists
-            if settings.get("mcpServers").is_none() {
-                settings["mcpServers"] = serde_json::json!({});
-            }
-
-            // Add agentd server config
-            settings["mcpServers"]["agentd"] = serde_json::json!({
-                "command": "agentd-mcp",
-                "args": ["mcp-server"]
-            });
-
-            // Write back
-            let content = serde_json::to_string_pretty(&settings)?;
-            std::fs::write(&settings_path, content)?;
-        }
+        serde_json::from_str(&content)?
     } else {
-        // Create new settings.json with mcpServers
         if let Some(parent) = settings_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
+        serde_json::json!({})
+    };
 
-        let settings = serde_json::json!({
-            "mcpServers": {
-                "agentd": {
-                    "command": "agentd-mcp",
-                    "args": ["mcp-server"]
-                }
-            }
-        });
-
-        let content = serde_json::to_string_pretty(&settings)?;
-        std::fs::write(&settings_path, content)?;
+    // Ensure mcpServers object exists
+    if settings.get("mcpServers").is_none() {
+        settings["mcpServers"] = serde_json::json!({});
     }
+
+    // Force overwrite agentd server config (HTTP mode for Gemini)
+    settings["mcpServers"]["agentd"] = serde_json::json!({
+        "type": "http",
+        "url": "http://localhost:3456/mcp"
+    });
+
+    let content = serde_json::to_string_pretty(&settings)?;
+    std::fs::write(&settings_path, content)?;
 
     Ok(())
 }
 
 /// Ensure Claude Code MCP config exists in .mcp.json (project root)
 ///
-/// Creates .mcp.json with the agentd MCP server config.
-/// This is read by Claude Code to discover available MCP servers.
+/// Always overwrites mcpServers.agentd-mcp with HTTP format config.
+/// Uses "agentd-mcp" as server name to avoid Claude Code blocking "agentd" CLI.
 pub fn ensure_claude_mcp_json(project_root: &Path) -> Result<()> {
     let mcp_json_path = project_root.join(".mcp.json");
 
-    if mcp_json_path.exists() {
-        // Read existing config
+    let mut config = if mcp_json_path.exists() {
         let content = std::fs::read_to_string(&mcp_json_path)?;
-        let mut config: serde_json::Value = serde_json::from_str(&content)?;
-
-        // Check if mcpServers.agentd exists
-        let has_agentd = config
-            .get("mcpServers")
-            .and_then(|s| s.get("agentd"))
-            .is_some();
-
-        if !has_agentd {
-            // Ensure mcpServers object exists
-            if config.get("mcpServers").is_none() {
-                config["mcpServers"] = serde_json::json!({});
-            }
-
-            // Add agentd server config (stdio mode for Claude Code)
-            config["mcpServers"]["agentd"] = serde_json::json!({
-                "command": "agentd-mcp",
-                "args": ["mcp-server"]
-            });
-
-            // Write back
-            let content = serde_json::to_string_pretty(&config)?;
-            std::fs::write(&mcp_json_path, content)?;
-        }
+        serde_json::from_str(&content)?
     } else {
-        // Create new .mcp.json
-        let config = serde_json::json!({
-            "mcpServers": {
-                "agentd": {
-                    "command": "agentd-mcp",
-                    "args": ["mcp-server"]
-                }
-            }
-        });
+        serde_json::json!({})
+    };
 
-        let content = serde_json::to_string_pretty(&config)?;
-        std::fs::write(&mcp_json_path, content)?;
+    // Ensure mcpServers object exists
+    if config.get("mcpServers").is_none() {
+        config["mcpServers"] = serde_json::json!({});
     }
+
+    // Remove old "agentd" entry if exists
+    if let Some(servers) = config["mcpServers"].as_object_mut() {
+        servers.remove("agentd");
+    }
+
+    // Force overwrite agentd-mcp server config (HTTP mode for Claude Code)
+    config["mcpServers"]["agentd-mcp"] = serde_json::json!({
+        "type": "http",
+        "url": "http://localhost:3456/mcp"
+    });
+
+    let content = serde_json::to_string_pretty(&config)?;
+    std::fs::write(&mcp_json_path, content)?;
 
     Ok(())
 }
 
-/// Ensure Claude Code settings enable the agentd MCP server
+/// Ensure Claude Code settings enable the agentd-mcp MCP server
 ///
-/// Updates .claude/settings.local.json to enable the agentd MCP server.
+/// Updates .claude/settings.local.json to enable the agentd-mcp MCP server.
 pub fn ensure_claude_settings(project_root: &Path) -> Result<()> {
     let claude_dir = project_root.join(".claude");
     std::fs::create_dir_all(&claude_dir)?;
 
     let settings_path = claude_dir.join("settings.local.json");
 
-    if settings_path.exists() {
-        // Read existing settings
+    let mut settings = if settings_path.exists() {
         let content = std::fs::read_to_string(&settings_path)?;
-        let mut settings: serde_json::Value = serde_json::from_str(&content)?;
-
-        // Check if enableAllProjectMcpServers is set
-        let all_enabled = settings
-            .get("enableAllProjectMcpServers")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
-        // Check if agentd is in enabledMcpjsonServers
-        let has_agentd = settings
-            .get("enabledMcpjsonServers")
-            .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().any(|v| v.as_str() == Some("agentd")))
-            .unwrap_or(false);
-
-        if !all_enabled && !has_agentd {
-            // Add agentd to enabledMcpjsonServers
-            let servers = settings
-                .get_mut("enabledMcpjsonServers")
-                .and_then(|v| v.as_array_mut());
-
-            if let Some(servers) = servers {
-                servers.push(serde_json::json!("agentd"));
-            } else {
-                settings["enabledMcpjsonServers"] = serde_json::json!(["agentd"]);
-            }
-
-            // Write back
-            let content = serde_json::to_string_pretty(&settings)?;
-            std::fs::write(&settings_path, content)?;
-        }
+        serde_json::from_str(&content)?
     } else {
-        // Create new settings.local.json
-        let settings = serde_json::json!({
-            "enabledMcpjsonServers": ["agentd"]
-        });
+        serde_json::json!({})
+    };
 
+    // Check if enableAllProjectMcpServers is set
+    let all_enabled = settings
+        .get("enableAllProjectMcpServers")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    if !all_enabled {
+        // Get or create enabledMcpjsonServers array
+        let servers = settings
+            .get_mut("enabledMcpjsonServers")
+            .and_then(|v| v.as_array_mut());
+
+        if let Some(servers) = servers {
+            // Remove old "agentd" entry if exists
+            servers.retain(|v| v.as_str() != Some("agentd"));
+            // Add "agentd-mcp" if not present
+            if !servers.iter().any(|v| v.as_str() == Some("agentd-mcp")) {
+                servers.push(serde_json::json!("agentd-mcp"));
+            }
+        } else {
+            settings["enabledMcpjsonServers"] = serde_json::json!(["agentd-mcp"]);
+        }
+
+        // Write back
         let content = serde_json::to_string_pretty(&settings)?;
         std::fs::write(&settings_path, content)?;
     }
@@ -246,8 +198,7 @@ pub fn ensure_claude_settings(project_root: &Path) -> Result<()> {
 
 /// Ensure Codex MCP config exists in ~/.codex/config.toml
 ///
-/// If the file exists, adds [mcp_servers.agentd] if missing.
-/// If the file doesn't exist, creates it with the MCP server config.
+/// Always overwrites mcp_servers.agentd with HTTP format config.
 pub fn ensure_codex_mcp_config() -> Result<()> {
     let home_dir = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
@@ -255,53 +206,34 @@ pub fn ensure_codex_mcp_config() -> Result<()> {
 
     let config_path = std::path::PathBuf::from(&home_dir).join(".codex/config.toml");
 
-    if config_path.exists() {
-        // Read existing config
+    let mut config: toml::Value = if config_path.exists() {
         let content = std::fs::read_to_string(&config_path)?;
-        let mut config: toml::Value = content.parse()?;
-
-        // Check if mcp_servers.agentd exists
-        let has_agentd = config
-            .get("mcp_servers")
-            .and_then(|s| s.get("agentd"))
-            .is_some();
-
-        if !has_agentd {
-            // Build the agentd server config
-            let mut agentd_config = toml::map::Map::new();
-            agentd_config.insert("command".to_string(), toml::Value::String("agentd-mcp".to_string()));
-            agentd_config.insert(
-                "args".to_string(),
-                toml::Value::Array(vec![toml::Value::String("mcp-server".to_string())]),
-            );
-
-            // Get or create mcp_servers table
-            if let Some(root_table) = config.as_table_mut() {
-                let mcp_servers = root_table
-                    .entry("mcp_servers".to_string())
-                    .or_insert_with(|| toml::Value::Table(toml::map::Map::new()));
-
-                if let Some(mcp_table) = mcp_servers.as_table_mut() {
-                    mcp_table.insert("agentd".to_string(), toml::Value::Table(agentd_config));
-                }
-            }
-
-            // Write back
-            let content = toml::to_string_pretty(&config)?;
-            std::fs::write(&config_path, content)?;
-        }
+        content.parse()?
     } else {
-        // Create new config.toml with mcp_servers section
         if let Some(parent) = config_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
+        toml::Value::Table(toml::map::Map::new())
+    };
 
-        let content = r#"[mcp_servers.agentd]
-command = "agentd-mcp"
-args = ["mcp-server"]
-"#;
-        std::fs::write(&config_path, content)?;
+    // Build the agentd server config (HTTP mode)
+    let mut agentd_config = toml::map::Map::new();
+    agentd_config.insert("type".to_string(), toml::Value::String("http".to_string()));
+    agentd_config.insert("url".to_string(), toml::Value::String("http://localhost:3456/mcp".to_string()));
+
+    // Get or create mcp_servers table and force overwrite agentd
+    if let Some(root_table) = config.as_table_mut() {
+        let mcp_servers = root_table
+            .entry("mcp_servers".to_string())
+            .or_insert_with(|| toml::Value::Table(toml::map::Map::new()));
+
+        if let Some(mcp_table) = mcp_servers.as_table_mut() {
+            mcp_table.insert("agentd".to_string(), toml::Value::Table(agentd_config));
+        }
     }
+
+    let content = toml::to_string_pretty(&config)?;
+    std::fs::write(&config_path, content)?;
 
     Ok(())
 }
@@ -364,11 +296,11 @@ mod tests {
         let settings_path = project_root.join(".gemini/settings.json");
         assert!(settings_path.exists());
 
-        // Verify content
+        // Verify content (HTTP format for Gemini)
         let content = std::fs::read_to_string(&settings_path).unwrap();
         let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
-        assert!(settings["mcpServers"]["agentd"]["command"].as_str() == Some("agentd-mcp"));
-        assert!(settings["mcpServers"]["agentd"]["args"][0].as_str() == Some("mcp-server"));
+        assert_eq!(settings["mcpServers"]["agentd"]["type"].as_str(), Some("http"));
+        assert_eq!(settings["mcpServers"]["agentd"]["url"].as_str(), Some("http://localhost:3456/mcp"));
     }
 
     #[test]
@@ -389,15 +321,15 @@ mod tests {
         let content = std::fs::read_to_string(&settings_path).unwrap();
         let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
         assert!(settings["tools"]["allowed"][0].as_str() == Some("read_file"));
-        assert!(settings["mcpServers"]["agentd"]["command"].as_str() == Some("agentd-mcp"));
+        assert_eq!(settings["mcpServers"]["agentd"]["type"].as_str(), Some("http"));
     }
 
     #[test]
-    fn test_ensure_gemini_mcp_config_preserves_existing_agentd() {
+    fn test_ensure_gemini_mcp_config_overwrites_existing_agentd() {
         let temp_dir = TempDir::new().unwrap();
         let project_root = temp_dir.path();
 
-        // Create .gemini directory with existing mcpServers.agentd
+        // Create .gemini directory with existing mcpServers.agentd (old format)
         let gemini_dir = project_root.join(".gemini");
         std::fs::create_dir_all(&gemini_dir).unwrap();
         let settings_path = gemini_dir.join("settings.json");
@@ -407,10 +339,11 @@ mod tests {
         // Ensure config
         ensure_gemini_mcp_config(project_root).unwrap();
 
-        // Verify existing config was preserved (not overwritten)
+        // Verify config was overwritten with correct HTTP format
         let content = std::fs::read_to_string(&settings_path).unwrap();
         let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
-        assert!(settings["mcpServers"]["agentd"]["command"].as_str() == Some("custom-agentd"));
+        assert_eq!(settings["mcpServers"]["agentd"]["type"].as_str(), Some("http"));
+        assert_eq!(settings["mcpServers"]["agentd"]["url"].as_str(), Some("http://localhost:3456/mcp"));
     }
 
     // =========================================================================
@@ -432,11 +365,11 @@ mod tests {
         let config_path = temp_home.join(".codex/config.toml");
         assert!(config_path.exists());
 
-        // Verify content
+        // Verify content (HTTP format)
         let content = std::fs::read_to_string(&config_path).unwrap();
         assert!(content.contains("[mcp_servers.agentd]"));
-        assert!(content.contains("command = \"agentd-mcp\""));
-        assert!(content.contains("args = [\"mcp-server\"]"));
+        assert!(content.contains("type = \"http\""));
+        assert!(content.contains("url = \"http://localhost:3456/mcp\""));
     }
 
     #[test]
@@ -461,14 +394,15 @@ mod tests {
         assert!(content.contains("[model]"));
         assert!(content.contains("default = \"gpt-4\""));
         assert!(content.contains("[mcp_servers.agentd]"));
+        assert!(content.contains("type = \"http\""));
     }
 
     #[test]
-    fn test_ensure_codex_mcp_config_preserves_existing_agentd() {
+    fn test_ensure_codex_mcp_config_overwrites_existing_agentd() {
         let temp_dir = TempDir::new().unwrap();
         let temp_home = temp_dir.path();
 
-        // Create .codex directory with existing mcp_servers.agentd
+        // Create .codex directory with existing mcp_servers.agentd (old stdio config)
         let codex_dir = temp_home.join(".codex");
         std::fs::create_dir_all(&codex_dir).unwrap();
         let config_path = codex_dir.join("config.toml");
@@ -484,9 +418,11 @@ args = ["custom-arg"]
         // Ensure config
         ensure_codex_mcp_config().unwrap();
 
-        // Verify existing config was preserved (not overwritten)
+        // Verify config was overwritten with HTTP format
         let content = std::fs::read_to_string(&config_path).unwrap();
-        assert!(content.contains("custom-agentd"));
+        assert!(content.contains("type = \"http\""));
+        assert!(content.contains("url = \"http://localhost:3456/mcp\""));
+        assert!(!content.contains("custom-agentd"));
     }
 
     // =========================================================================
@@ -505,11 +441,11 @@ args = ["custom-arg"]
         let mcp_json_path = project_root.join(".mcp.json");
         assert!(mcp_json_path.exists());
 
-        // Verify content
+        // Verify content (HTTP format with agentd-mcp name)
         let content = std::fs::read_to_string(&mcp_json_path).unwrap();
         let config: serde_json::Value = serde_json::from_str(&content).unwrap();
-        assert!(config["mcpServers"]["agentd"]["command"].as_str() == Some("agentd-mcp"));
-        assert!(config["mcpServers"]["agentd"]["args"][0].as_str() == Some("mcp-server"));
+        assert_eq!(config["mcpServers"]["agentd-mcp"]["type"].as_str(), Some("http"));
+        assert_eq!(config["mcpServers"]["agentd-mcp"]["url"].as_str(), Some("http://localhost:3456/mcp"));
     }
 
     #[test]
@@ -524,30 +460,32 @@ args = ["custom-arg"]
         // Ensure config
         ensure_claude_mcp_json(project_root).unwrap();
 
-        // Verify agentd was added while preserving existing
+        // Verify agentd-mcp was added while preserving existing
         let content = std::fs::read_to_string(&mcp_json_path).unwrap();
         let config: serde_json::Value = serde_json::from_str(&content).unwrap();
         assert!(config["mcpServers"]["other"]["command"].as_str() == Some("other-cmd"));
-        assert!(config["mcpServers"]["agentd"]["command"].as_str() == Some("agentd-mcp"));
+        assert_eq!(config["mcpServers"]["agentd-mcp"]["type"].as_str(), Some("http"));
     }
 
     #[test]
-    fn test_ensure_claude_mcp_json_preserves_existing_agentd() {
+    fn test_ensure_claude_mcp_json_removes_old_agentd() {
         let temp_dir = TempDir::new().unwrap();
         let project_root = temp_dir.path();
 
-        // Create .mcp.json with existing agentd config
+        // Create .mcp.json with old "agentd" entry
         let mcp_json_path = project_root.join(".mcp.json");
-        let existing = r#"{"mcpServers": {"agentd": {"command": "custom-agentd", "args": ["custom-arg"]}}}"#;
+        let existing = r#"{"mcpServers": {"agentd": {"type": "http", "url": "http://localhost:3000/mcp"}}}"#;
         std::fs::write(&mcp_json_path, existing).unwrap();
 
         // Ensure config
         ensure_claude_mcp_json(project_root).unwrap();
 
-        // Verify existing config was preserved
+        // Verify old "agentd" removed and "agentd-mcp" added
         let content = std::fs::read_to_string(&mcp_json_path).unwrap();
         let config: serde_json::Value = serde_json::from_str(&content).unwrap();
-        assert!(config["mcpServers"]["agentd"]["command"].as_str() == Some("custom-agentd"));
+        assert!(config["mcpServers"].get("agentd").is_none());
+        assert_eq!(config["mcpServers"]["agentd-mcp"]["type"].as_str(), Some("http"));
+        assert_eq!(config["mcpServers"]["agentd-mcp"]["url"].as_str(), Some("http://localhost:3456/mcp"));
     }
 
     #[test]
@@ -566,7 +504,7 @@ args = ["custom-arg"]
         let content = std::fs::read_to_string(&settings_path).unwrap();
         let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
         let servers = settings["enabledMcpjsonServers"].as_array().unwrap();
-        assert!(servers.iter().any(|v| v.as_str() == Some("agentd")));
+        assert!(servers.iter().any(|v| v.as_str() == Some("agentd-mcp")));
     }
 
     #[test]
@@ -583,12 +521,35 @@ args = ["custom-arg"]
         // Ensure settings
         ensure_claude_settings(project_root).unwrap();
 
-        // Verify agentd was added while preserving existing
+        // Verify agentd-mcp was added while preserving existing
         let content = std::fs::read_to_string(&settings_path).unwrap();
         let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
         assert!(settings["permissions"]["allow"][0].as_str() == Some("Bash"));
         let servers = settings["enabledMcpjsonServers"].as_array().unwrap();
-        assert!(servers.iter().any(|v| v.as_str() == Some("agentd")));
+        assert!(servers.iter().any(|v| v.as_str() == Some("agentd-mcp")));
+    }
+
+    #[test]
+    fn test_ensure_claude_settings_removes_old_agentd() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+
+        // Create settings with old "agentd" entry
+        let claude_dir = project_root.join(".claude");
+        std::fs::create_dir_all(&claude_dir).unwrap();
+        let settings_path = claude_dir.join("settings.local.json");
+        std::fs::write(&settings_path, r#"{"enabledMcpjsonServers": ["agentd", "other"]}"#).unwrap();
+
+        // Ensure settings
+        ensure_claude_settings(project_root).unwrap();
+
+        // Verify old "agentd" removed and "agentd-mcp" added
+        let content = std::fs::read_to_string(&settings_path).unwrap();
+        let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
+        let servers = settings["enabledMcpjsonServers"].as_array().unwrap();
+        assert!(!servers.iter().any(|v| v.as_str() == Some("agentd")));
+        assert!(servers.iter().any(|v| v.as_str() == Some("agentd-mcp")));
+        assert!(servers.iter().any(|v| v.as_str() == Some("other")));
     }
 
     #[test]
