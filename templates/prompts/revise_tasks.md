@@ -4,8 +4,12 @@ agent: gemini
 phase: plan
 variables:
   - change_id
+mcp_instruction: |
+  mcp__agentd-mcp__get_task(project_path="{{project_path}}", change_id="{{change_id}}", task_type="revise_tasks")
 ---
 # Task: Revise Tasks Based on Review Feedback
+
+All agentd MCP tools require `project_path="{{project_path}}"`
 
 ## Change ID
 {{change_id}}
@@ -13,11 +17,9 @@ variables:
 ## Instructions
 
 1. **Read the review feedback**:
-   - Use: `read_file` with change_id="{{change_id}}" and file="proposal"
-   - Look for the latest `<review>` block with issues about tasks
+   - Look for the latest review block with issues about tasks
 
 2. **Read current context**:
-   - Use: `read_all_requirements` with change_id="{{change_id}}"
    - Understand all specs and their requirements
 
 3. **Address each issue** using the `create_tasks` MCP tool:
@@ -32,6 +34,15 @@ variables:
 ## Expected Output
 - Updated tasks.md via `create_tasks` MCP tool addressing all review feedback
 
-## Tools to Use
-- `read_file`, `read_all_requirements` (required)
-- `create_tasks` (required)
+## MCP Tools
+
+### Read Context
+```
+mcp__agentd-mcp__read_file(project_path="{{project_path}}", change_id="{{change_id}}", file="proposal")
+mcp__agentd-mcp__read_all_requirements(project_path="{{project_path}}", change_id="{{change_id}}")
+```
+
+### Generate Artifact
+```
+mcp__agentd-mcp__create_tasks(project_path="{{project_path}}", change_id="{{change_id}}", tasks=[{layer:"data", number:1, title:"...", file:{path:"...", action:"CREATE"}, spec_ref:"...", description:"...", depends:[]}])
+```

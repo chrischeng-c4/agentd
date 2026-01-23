@@ -6,8 +6,12 @@ variables:
   - change_id
   - spec_id
   - iteration
+mcp_instruction: |
+  mcp__agentd-mcp__get_task(project_path="{{project_path}}", change_id="{{change_id}}", task_type="review_spec", spec_id="{{spec_id}}")
 ---
 # Task: Review Spec '{{spec_id}}' (Iteration {{iteration}})
+
+All agentd MCP tools require `project_path="{{project_path}}"`
 
 ## Change ID
 {{change_id}}
@@ -15,9 +19,7 @@ variables:
 ## Instructions
 
 1. **Get all context**:
-   - Use: `read_file` with change_id="{{change_id}}" and file="{{spec_id}}"
-   - Use: `read_file` with change_id="{{change_id}}" and file="proposal"
-   - Use: `list_specs` to see other specs for consistency check
+   - Read the spec, proposal, and dependency specs
 
 2. **Review for content/logical issues**:
    - **Requirements**: Are requirements testable, specific, and complete?
@@ -27,12 +29,11 @@ variables:
    - **Diagrams**: Are Mermaid diagrams correct (if present)?
 
 3. **Submit review**:
-   - Use: `append_review` MCP tool with your findings
+   - Use `append_review` MCP tool with your findings
 
 ## Review Submission
 
 Call `append_review` with:
-- `change_id`: "{{change_id}}"
 - `status`: "approved" | "needs_revision" | "rejected"
 - `iteration`: {{iteration}}
 - `reviewer`: "codex"
@@ -45,6 +46,17 @@ Call `append_review` with:
 
 **IMPORTANT**: Focus ONLY on content/logical issues. MCP tools guarantee correct format.
 
-## Tools to Use
-- `read_file`, `list_specs` (required)
-- `append_review` (required)
+## MCP Tools
+
+### Read Context
+```
+mcp__agentd-mcp__read_file(project_path="{{project_path}}", change_id="{{change_id}}", file="{{spec_id}}")
+mcp__agentd-mcp__read_file(project_path="{{project_path}}", change_id="{{change_id}}", file="proposal")
+mcp__agentd-mcp__list_specs(project_path="{{project_path}}", change_id="{{change_id}}", spec_id="{{spec_id}}")
+# Then read each dependency spec returned by list_specs
+```
+
+### Generate Artifact
+```
+mcp__agentd-mcp__append_review(project_path="{{project_path}}", change_id="{{change_id}}", status="approved|needs_revision|rejected", iteration={{iteration}}, reviewer="codex", content="## Summary\n...\n## Issues\n...\n## Verdict\n...\n## Next Steps\n...")
+```

@@ -10,8 +10,12 @@ pub fn definition() -> ToolDefinition {
         description: "Create clarifications.md file with structured Q&A from user".to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id", "questions"],
+            "required": ["project_path", "change_id", "questions"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "pattern": "^[a-z0-9-]+$",

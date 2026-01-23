@@ -34,7 +34,7 @@ pub fn run(cmd: SpecCommands) -> Result<()> {
 
     match cmd {
         SpecCommands::List { change_id } => {
-            let result = file_service::list_specs(&change_id, &project_root)?;
+            let result = file_service::list_specs(&change_id, None, &project_root)?;
             println!("{}", result);
         }
 

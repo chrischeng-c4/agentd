@@ -82,7 +82,8 @@ pub fn ensure_mcp_config(project_root: &Path) -> Result<std::path::PathBuf> {
 
 /// Ensure Gemini MCP config exists in .gemini/settings.json
 ///
-/// Always overwrites mcpServers.agentd with HTTP format config.
+/// Always overwrites mcpServers.agentd-mcp with HTTP format config.
+/// Note: project_path is now a parameter in each tool call, not in headers.
 pub fn ensure_gemini_mcp_config(project_root: &Path) -> Result<()> {
     let settings_path = project_root.join(".gemini/settings.json");
 
@@ -106,7 +107,7 @@ pub fn ensure_gemini_mcp_config(project_root: &Path) -> Result<()> {
         servers.remove("agentd");
     }
 
-    // Force overwrite agentd-mcp server config (HTTP mode for Gemini)
+    // Force overwrite agentd-mcp server config (HTTP mode, no headers)
     settings["mcpServers"]["agentd-mcp"] = serde_json::json!({
         "type": "http",
         "url": "http://localhost:3456/mcp"
@@ -122,6 +123,7 @@ pub fn ensure_gemini_mcp_config(project_root: &Path) -> Result<()> {
 ///
 /// Always overwrites mcpServers.agentd-mcp with HTTP format config.
 /// Uses "agentd-mcp" as server name to avoid Claude Code blocking "agentd" CLI.
+/// Note: project_path is now a parameter in each tool call, not in headers.
 pub fn ensure_claude_mcp_json(project_root: &Path) -> Result<()> {
     let mcp_json_path = project_root.join(".mcp.json");
 
@@ -142,7 +144,7 @@ pub fn ensure_claude_mcp_json(project_root: &Path) -> Result<()> {
         servers.remove("agentd");
     }
 
-    // Force overwrite agentd-mcp server config (HTTP mode for Claude Code)
+    // Force overwrite agentd-mcp server config (HTTP mode, no headers)
     config["mcpServers"]["agentd-mcp"] = serde_json::json!({
         "type": "http",
         "url": "http://localhost:3456/mcp"

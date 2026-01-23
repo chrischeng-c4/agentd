@@ -83,8 +83,12 @@ pub fn definition() -> ToolDefinition {
         description: "Get task instructions for the current workflow step. Call this first to understand your assignment.".to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id", "task_type"],
+            "required": ["project_path", "change_id", "task_type"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "description": "The change ID to work on"
@@ -151,6 +155,7 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
 
     // Build variables map
     let mut vars = HashMap::new();
+    vars.insert("project_path".to_string(), project_root.display().to_string());
     vars.insert("change_id".to_string(), change_id.clone());
     vars.insert("iteration".to_string(), iteration.to_string());
 

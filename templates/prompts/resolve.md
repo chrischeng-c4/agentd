@@ -4,8 +4,12 @@ agent: claude
 phase: implement
 variables:
   - change_id
+mcp_instruction: |
+  mcp__agentd-mcp__get_task(project_path="{{project_path}}", change_id="{{change_id}}", task_type="resolve")
 ---
 # Task: Fix Review Issues
+
+All agentd MCP tools require `project_path="{{project_path}}"`
 
 ## Change ID
 {{change_id}}
@@ -25,5 +29,13 @@ variables:
 - Issues fixed
 - Tests passing
 
-## Tools to Use
-- Standard code editing tools
+## MCP Tools
+
+### Read Context
+```
+mcp__agentd-mcp__read_file(project_path="{{project_path}}", change_id="{{change_id}}", file="review")
+mcp__agentd-mcp__read_all_requirements(project_path="{{project_path}}", change_id="{{change_id}}")
+```
+
+### Generate Artifact
+Use standard code editing tools (Read, Edit, Write) to fix the issues.

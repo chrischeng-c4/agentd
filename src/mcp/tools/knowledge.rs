@@ -16,8 +16,12 @@ pub fn read_definition() -> ToolDefinition {
         description: "Read a knowledge document. Path is relative to agentd/knowledge/".to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["path"],
+            "required": ["project_path", "path"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "path": {
                     "type": "string",
                     "description": "Path relative to agentd/knowledge/, e.g. 'index.md' or '00-architecture/01-overview.md'"
@@ -41,7 +45,12 @@ pub fn list_definition() -> ToolDefinition {
             .to_string(),
         input_schema: json!({
             "type": "object",
+            "required": ["project_path"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "path": {
                     "type": "string",
                     "description": "Optional subdirectory to list, e.g. '00-architecture'. Lists all if not specified."
@@ -59,8 +68,12 @@ pub fn write_definition() -> ToolDefinition {
             .to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["path", "title", "source", "content"],
+            "required": ["project_path", "path", "title", "source", "content"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "path": {
                     "type": "string",
                     "description": "Path relative to agentd/knowledge/, e.g. '30-claude/skills.md'"
@@ -160,8 +173,12 @@ pub fn write_main_spec_definition() -> ToolDefinition {
             .to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["path", "content"],
+            "required": ["project_path", "path", "content"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "path": {
                     "type": "string",
                     "description": "Path relative to agentd/specs/, e.g. 'math-utility.md'"

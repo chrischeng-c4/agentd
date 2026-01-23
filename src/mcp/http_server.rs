@@ -24,7 +24,6 @@ use axum::{
 use serde::Serialize;
 use serde_json::Value;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
@@ -94,7 +93,6 @@ impl AppState {
 }
 
 // JSON-RPC error codes
-const INVALID_REQUEST: i32 = -32600;
 const INTERNAL_ERROR: i32 = -32603;
 
 // =============================================================================
@@ -703,55 +701,16 @@ async fn api_viewer_close() -> Json<serde_json::Value> {
 // =============================================================================
 
 /// Main MCP request handler
+///
+/// Project context is now determined by the `project_path` parameter in each tool call,
+/// not by HTTP headers. This allows tools to work with any project without header configuration.
 async fn handle_mcp_request(
-    State(state): State<AppState>,
-    headers: HeaderMap,
+    State(_state): State<AppState>,
+    _headers: HeaderMap,
     Json(request): Json<JsonRpcRequest>,
 ) -> Response {
-    // Extract project from header
-    let project_name = match extract_project_name(&headers) {
-        Ok(name) => name,
-        Err(e) => {
-            return error_response(
-                request.id,
-                INVALID_REQUEST,
-                format!("Missing or invalid X-Agentd-Project header: {}", e),
-            );
-        }
-    };
-
-    // Reload registry from disk to pick up new registrations
-    let fresh_registry = match Registry::load() {
-        Ok(reg) => reg,
-        Err(e) => {
-            return error_response(
-                request.id,
-                INTERNAL_ERROR,
-                format!("Failed to load registry: {}", e),
-            );
-        }
-    };
-
-    // Update shared state with fresh registry
-    {
-        let mut registry_lock = state.registry.write().await;
-        *registry_lock = fresh_registry.clone();
-    }
-
-    // Get project path from fresh registry
-    let project_path = match fresh_registry.get_project_path(&project_name) {
-        Some(path) => path.clone(),
-        None => {
-            return error_response(
-                request.id,
-                INVALID_REQUEST,
-                format!("Project '{}' not registered", project_name),
-            );
-        }
-    };
-
-    // Execute request in project context
-    match execute_in_project_context(request, project_path).await {
+    // Execute request directly - project_path is in tool arguments
+    match execute_mcp_request(request).await {
         Ok(Some(response)) => Json(response).into_response(),
         Ok(None) => {
             // Notification - return HTTP 202 Accepted with empty body
@@ -768,38 +727,18 @@ async fn handle_mcp_request(
     }
 }
 
-/// Extract project name from headers
-fn extract_project_name(headers: &HeaderMap) -> Result<String> {
-    let header_value = headers
-        .get("X-Agentd-Project")
-        .or_else(|| headers.get("x-agentd-project"))
-        .ok_or_else(|| anyhow::anyhow!("X-Agentd-Project header not found"))?;
-
-    let project_name = header_value
-        .to_str()
-        .map_err(|_| anyhow::anyhow!("Invalid header value"))?
-        .to_string();
-
-    Ok(project_name)
-}
-
-/// Execute MCP request in project context
-async fn execute_in_project_context(
+/// Execute MCP request
+///
+/// The project context is determined by the `project_path` parameter in tool arguments,
+/// so we don't need to change directories or extract project from headers.
+async fn execute_mcp_request(
     request: JsonRpcRequest,
-    project_path: PathBuf,
 ) -> Result<Option<JsonRpcResponse>> {
-    // Change to project directory
-    let original_dir = std::env::current_dir()?;
-    std::env::set_current_dir(&project_path)?;
-
-    // Create MCP server instance for this project
+    // Create MCP server instance
     let server = McpServer::new()?;
 
-    // Handle the request
+    // Handle the request (project_path is in tool arguments)
     let response = server.handle_request_json(&request).await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir)?;
 
     Ok(response)
 }
@@ -822,23 +761,8 @@ fn error_response(id: Option<Value>, code: i32, message: String) -> Response {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
-
-    #[test]
-    fn test_extract_project_name() {
-        let mut headers = HeaderMap::new();
-        headers.insert("X-Agentd-Project", "test-project".parse().unwrap());
-
-        let name = extract_project_name(&headers).unwrap();
-        assert_eq!(name, "test-project");
-    }
-
-    #[test]
-    fn test_extract_project_name_missing() {
-        let headers = HeaderMap::new();
-        let result = extract_project_name(&headers);
-        assert!(result.is_err());
-    }
 
     #[cfg(feature = "ui")]
     #[test]

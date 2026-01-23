@@ -51,13 +51,27 @@ pub fn read_file(change_id: &str, file: &str, project_root: &Path) -> Result<Str
     ))
 }
 
-/// List all spec files in a change directory
-pub fn list_specs(change_id: &str, project_root: &Path) -> Result<String> {
+/// List spec files in a change directory
+/// If spec_id is provided, only list its dependency specs from proposal.md
+pub fn list_specs(change_id: &str, spec_id: Option<&str>, project_root: &Path) -> Result<String> {
     // Check change directory exists
     let change_dir = project_root.join("agentd/changes").join(change_id);
     if !change_dir.exists() {
         anyhow::bail!("Change '{}' not found.", change_id);
     }
+
+    // If spec_id is provided, find its dependencies from proposal.md
+    let filter_specs: Option<Vec<String>> = if let Some(sid) = spec_id {
+        let proposal_path = change_dir.join("proposal.md");
+        if proposal_path.exists() {
+            let content = std::fs::read_to_string(&proposal_path)?;
+            Some(extract_spec_dependencies(&content, sid))
+        } else {
+            Some(vec![])
+        }
+    } else {
+        None
+    };
 
     let specs_dir = change_dir.join("specs");
     if !specs_dir.exists() {
@@ -70,28 +84,103 @@ pub fn list_specs(change_id: &str, project_root: &Path) -> Result<String> {
         let path = entry.path();
         if path.extension().map_or(false, |ext| ext == "md") {
             if let Some(name) = path.file_stem() {
-                let name_str = name.to_string_lossy();
+                let name_str = name.to_string_lossy().to_string();
                 // Skip skeleton files
-                if !name_str.starts_with('_') {
-                    specs.push(name_str.to_string());
+                if name_str.starts_with('_') {
+                    continue;
+                }
+                // Filter by dependencies if spec_id was provided
+                if let Some(ref filter) = filter_specs {
+                    if filter.contains(&name_str) {
+                        specs.push(name_str);
+                    }
+                } else {
+                    specs.push(name_str);
                 }
             }
         }
     }
 
+    specs.sort();
+
+    let title = if let Some(sid) = spec_id {
+        format!("# Dependencies for spec '{}' in change '{}'\n\n", sid, change_id)
+    } else {
+        format!("# Specs for change '{}'\n\n", change_id)
+    };
+
     if specs.is_empty() {
+        if spec_id.is_some() {
+            return Ok(format!("{}No dependency specs found.", title));
+        }
         return Ok("No spec files found.".to_string());
     }
 
-    specs.sort();
-
-    let mut result = format!("# Specs for change '{}'\n\n", change_id);
+    let mut result = title;
     for spec in &specs {
         result.push_str(&format!("- {}\n", spec));
     }
     result.push_str(&format!("\nTotal: {} spec(s)", specs.len()));
 
     Ok(result)
+}
+
+/// Extract dependency spec IDs for a given spec from proposal content
+/// Parses YAML frontmatter format:
+/// ```yaml
+/// affected_specs:
+///   - id: spec-a
+///     depends: []
+///   - id: spec-b
+///     depends: [spec-a]
+/// ```
+fn extract_spec_dependencies(content: &str, spec_id: &str) -> Vec<String> {
+    let mut deps = Vec::new();
+    let mut in_frontmatter = false;
+    let mut found_spec = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        // Track frontmatter boundaries
+        if trimmed == "---" {
+            if !in_frontmatter {
+                in_frontmatter = true;
+                continue;
+            } else {
+                break; // End of frontmatter
+            }
+        }
+
+        if !in_frontmatter {
+            continue;
+        }
+
+        // Look for "- id: spec_id"
+        if trimmed.starts_with("- id:") {
+            let id = trimmed.strip_prefix("- id:").unwrap().trim();
+            found_spec = id == spec_id;
+            continue;
+        }
+
+        // If we found our spec, look for depends line
+        if found_spec && trimmed.starts_with("depends:") {
+            let depends_str = trimmed.strip_prefix("depends:").unwrap().trim();
+            // Parse [dep1, dep2] format
+            if depends_str.starts_with('[') && depends_str.ends_with(']') {
+                let inner = &depends_str[1..depends_str.len() - 1];
+                for dep in inner.split(',') {
+                    let dep = dep.trim();
+                    if !dep.is_empty() {
+                        deps.push(dep.to_string());
+                    }
+                }
+            }
+            found_spec = false; // Done with this spec
+        }
+    }
+
+    deps
 }
 
 #[cfg(test)]
@@ -148,10 +237,49 @@ mod tests {
         std::fs::write(specs_dir.join("spec-b.md"), "# Spec B").unwrap();
         std::fs::write(specs_dir.join("_skeleton.md"), "# Skeleton").unwrap();
 
-        let result = list_specs("test-change", project_root).unwrap();
+        let result = list_specs("test-change", None, project_root).unwrap();
         assert!(result.contains("spec-a"));
         assert!(result.contains("spec-b"));
         assert!(!result.contains("_skeleton"));
+        assert!(result.contains("Total: 2 spec(s)"));
+    }
+
+    #[test]
+    fn test_list_specs_with_dependencies() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+
+        // Create change directory with specs and proposal
+        let change_dir = project_root.join("agentd/changes/test-change");
+        let specs_dir = change_dir.join("specs");
+        std::fs::create_dir_all(&specs_dir).unwrap();
+        std::fs::write(specs_dir.join("spec-a.md"), "# Spec A").unwrap();
+        std::fs::write(specs_dir.join("spec-b.md"), "# Spec B").unwrap();
+        std::fs::write(specs_dir.join("spec-c.md"), "# Spec C").unwrap();
+
+        // Create proposal with YAML frontmatter affected_specs
+        let proposal = r#"---
+id: test-change
+affected_specs:
+  - id: spec-a
+    path: specs/spec-a.md
+    depends: []
+  - id: spec-b
+    path: specs/spec-b.md
+    depends: [spec-a]
+  - id: spec-c
+    path: specs/spec-c.md
+    depends: [spec-a, spec-b]
+---
+# Proposal
+"#;
+        std::fs::write(change_dir.join("proposal.md"), proposal).unwrap();
+
+        // List dependencies for spec-c
+        let result = list_specs("test-change", Some("spec-c"), project_root).unwrap();
+        assert!(result.contains("spec-a"));
+        assert!(result.contains("spec-b"));
+        assert!(!result.contains("spec-c")); // spec-c itself should not be in its own deps
         assert!(result.contains("Total: 2 spec(s)"));
     }
 }

@@ -4,8 +4,12 @@ agent: claude
 phase: implement
 variables:
   - change_id
+mcp_instruction: |
+  mcp__agentd-mcp__get_task(project_path="{{project_path}}", change_id="{{change_id}}", task_type="review_impl")
 ---
 # Task: Self-Review Implementation
+
+All agentd MCP tools require `project_path="{{project_path}}"`
 
 ## Change ID
 {{change_id}}
@@ -13,8 +17,7 @@ variables:
 ## Instructions
 
 1. **Read requirements and implementation**:
-   - Use: `read_all_requirements` with change_id="{{change_id}}"
-   - Review the code you implemented
+   - Review the code you implemented against requirements
 
 2. **Check quality**:
    - All tasks completed
@@ -28,3 +31,14 @@ variables:
 
 ## Expected Output
 - Self-review result
+
+## MCP Tools
+
+### Read Context
+```
+mcp__agentd-mcp__read_all_requirements(project_path="{{project_path}}", change_id="{{change_id}}")
+mcp__agentd-mcp__list_changed_files(project_path="{{project_path}}", change_id="{{change_id}}")
+```
+
+### Generate Artifact
+Output "PASS" if implementation is complete, or describe issues to fix.

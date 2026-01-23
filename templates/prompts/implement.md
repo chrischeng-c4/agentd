@@ -4,8 +4,12 @@ agent: claude
 phase: implement
 variables:
   - change_id
+mcp_instruction: |
+  mcp__agentd-mcp__get_task(project_path="{{project_path}}", change_id="{{change_id}}", task_type="implement")
 ---
 # Task: Implement Code
+
+All agentd MCP tools require `project_path="{{project_path}}"`
 
 ## Change ID
 {{change_id}}
@@ -13,7 +17,7 @@ variables:
 ## Instructions
 
 1. **Read requirements**:
-   - Use: `read_all_requirements` with change_id="{{change_id}}"
+   - Get all specs and tasks for implementation
 
 2. **Implement ALL tasks in tasks.md**:
    - Follow the layer order (data → logic → integration → testing)
@@ -29,6 +33,12 @@ variables:
 - All code files created/modified per tasks.md
 - Tests written for all features
 
-## Tools to Use
-- `read_all_requirements` (required)
-- Standard code editing tools
+## MCP Tools
+
+### Read Context
+```
+mcp__agentd-mcp__read_all_requirements(project_path="{{project_path}}", change_id="{{change_id}}")
+```
+
+### Generate Artifact
+Use standard code editing tools (Read, Edit, Write) to implement the code.

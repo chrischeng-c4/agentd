@@ -16,8 +16,12 @@ pub fn definition() -> ToolDefinition {
         description: "Create a validated proposal.md file with enforced structure".to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id", "summary", "why", "what_changes", "impact"],
+            "required": ["project_path", "change_id", "summary", "why", "what_changes", "impact"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "pattern": "^[a-z0-9-]+$",
@@ -190,8 +194,12 @@ pub fn append_review_definition() -> ToolDefinition {
         description: "Append a review block to an existing proposal.md file".to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id", "status", "iteration", "reviewer", "content"],
+            "required": ["project_path", "change_id", "status", "iteration", "reviewer", "content"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "pattern": "^[a-z0-9-]+$",

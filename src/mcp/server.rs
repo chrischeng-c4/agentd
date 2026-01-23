@@ -15,7 +15,6 @@ use super::tools::ToolRegistry;
 /// MCP Server for handling JSON-RPC requests over stdio
 pub struct McpServer {
     tool_registry: ToolRegistry,
-    project_root: std::path::PathBuf,
 }
 
 /// JSON-RPC 2.0 Request
@@ -57,10 +56,8 @@ const INVALID_PARAMS: i32 = -32602;
 impl McpServer {
     /// Create a new MCP server with all tools
     pub fn new() -> Result<Self> {
-        let project_root = std::env::current_dir()?;
         Ok(Self {
             tool_registry: ToolRegistry::new(),
-            project_root,
         })
     }
 
@@ -71,7 +68,6 @@ impl McpServer {
     /// * `stage` - Optional workflow stage (plan, challenge, implement, review, archive)
     ///             If None, all tools are loaded
     pub fn new_for_stage(stage: Option<&str>) -> Result<Self> {
-        let project_root = std::env::current_dir()?;
         let tool_registry = match stage {
             Some(s) => ToolRegistry::new_for_stage(s),
             None => ToolRegistry::new(),
@@ -79,7 +75,6 @@ impl McpServer {
 
         Ok(Self {
             tool_registry,
-            project_root,
         })
     }
 
@@ -241,8 +236,8 @@ impl McpServer {
 
         let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
 
-        // Execute the tool
-        match self.tool_registry.call_tool(name, &arguments, &self.project_root).await {
+        // Execute the tool (project_path is extracted from arguments by the tool registry)
+        match self.tool_registry.call_tool(name, &arguments).await {
             Ok(result) => Ok(json!({
                 "content": [{
                     "type": "text",

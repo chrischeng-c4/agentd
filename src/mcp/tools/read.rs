@@ -16,8 +16,12 @@ pub fn definition() -> ToolDefinition {
             .to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id"],
+            "required": ["project_path", "change_id"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "description": "The change ID to read from"
@@ -43,14 +47,22 @@ pub fn execute(args: &Value, project_root: &Path) -> Result<String> {
 pub fn list_specs_definition() -> ToolDefinition {
     ToolDefinition {
         name: "list_specs".to_string(),
-        description: "List all spec files in a change directory".to_string(),
+        description: "List spec files in a change directory. If spec_id is provided, only list its dependencies.".to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id"],
+            "required": ["project_path", "change_id"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "description": "The change ID to list specs for"
+                },
+                "spec_id": {
+                    "type": "string",
+                    "description": "If provided, only list dependency specs for this spec"
                 }
             }
         }),
@@ -60,7 +72,8 @@ pub fn list_specs_definition() -> ToolDefinition {
 /// Execute the list_specs tool
 pub fn execute_list_specs(args: &Value, project_root: &Path) -> Result<String> {
     let change_id = get_required_string(args, "change_id")?;
-    list_specs(&change_id, project_root)
+    let spec_id = get_optional_string(args, "spec_id");
+    list_specs(&change_id, spec_id.as_deref(), project_root)
 }
 
 #[cfg(test)]

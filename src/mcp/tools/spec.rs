@@ -16,8 +16,12 @@ pub fn definition() -> ToolDefinition {
             .to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id", "spec_id", "title", "overview", "requirements", "scenarios"],
+            "required": ["project_path", "change_id", "spec_id", "title", "overview", "requirements", "scenarios"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "description": "The change ID this spec belongs to"

@@ -16,8 +16,12 @@ pub fn definition() -> ToolDefinition {
         description: "Validate all proposal files for a change".to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id"],
+            "required": ["project_path", "change_id"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "description": "The change ID to validate"

@@ -16,7 +16,7 @@ pub mod validate;
 
 use crate::Result;
 use serde_json::{json, Value};
-use std::path::Path;
+use std::path::PathBuf;
 
 /// Registry of available MCP tools
 pub struct ToolRegistry {
@@ -158,38 +158,46 @@ impl ToolRegistry {
     }
 
     /// Call a tool by name with the given arguments
+    ///
+    /// The project_path is extracted from the arguments for most tools.
+    /// Mermaid tools don't require a project context.
     pub async fn call_tool(
         &self,
         name: &str,
         arguments: &Value,
-        project_root: &Path,
     ) -> Result<String> {
+        // Mermaid tools don't need project context
+        if name.starts_with("generate_mermaid_") {
+            return mermaid::call_tool(name, arguments);
+        }
+
+        // All other tools require project_path
+        let project_root = resolve_project_path(arguments)?;
+
         match name {
-            "get_task" => task::execute(arguments, project_root),
-            "create_clarifications" => clarifications::execute(arguments, project_root),
-            "create_proposal" => proposal::execute(arguments, project_root),
-            "append_review" => proposal::execute_append_review(arguments, project_root),
-            "create_spec" => spec::execute(arguments, project_root),
-            "create_tasks" => tasks::execute(arguments, project_root),
-            "validate_change" => validate::execute(arguments, project_root).await,
-            "read_file" => read::execute(arguments, project_root),
-            "list_specs" => read::execute_list_specs(arguments, project_root),
-            "read_knowledge" => knowledge::execute_read(arguments, project_root),
-            "list_knowledge" => knowledge::execute_list(arguments, project_root),
-            "write_knowledge" => knowledge::execute_write(arguments, project_root),
-            "write_main_spec" => knowledge::execute_write_main_spec(arguments, project_root),
+            "get_task" => task::execute(arguments, &project_root),
+            "create_clarifications" => clarifications::execute(arguments, &project_root),
+            "create_proposal" => proposal::execute(arguments, &project_root),
+            "append_review" => proposal::execute_append_review(arguments, &project_root),
+            "create_spec" => spec::execute(arguments, &project_root),
+            "create_tasks" => tasks::execute(arguments, &project_root),
+            "validate_change" => validate::execute(arguments, &project_root).await,
+            "read_file" => read::execute(arguments, &project_root),
+            "list_specs" => read::execute_list_specs(arguments, &project_root),
+            "read_knowledge" => knowledge::execute_read(arguments, &project_root),
+            "list_knowledge" => knowledge::execute_list(arguments, &project_root),
+            "write_knowledge" => knowledge::execute_write(arguments, &project_root),
+            "write_main_spec" => knowledge::execute_write_main_spec(arguments, &project_root),
             "read_all_requirements" => {
-                implementation::execute_read_all_requirements(arguments, project_root)
+                implementation::execute_read_all_requirements(arguments, &project_root)
             }
             "read_implementation_summary" => {
-                implementation::execute_read_implementation_summary(arguments, project_root)
+                implementation::execute_read_implementation_summary(arguments, &project_root)
             }
             "list_changed_files" => {
-                implementation::execute_list_changed_files(arguments, project_root)
+                implementation::execute_list_changed_files(arguments, &project_root)
             }
-            "create_review" => implementation::execute_create_review(arguments, project_root),
-            // Mermaid diagram tools
-            name if name.starts_with("generate_mermaid_") => mermaid::call_tool(name, arguments),
+            "create_review" => implementation::execute_create_review(arguments, &project_root),
             _ => anyhow::bail!("Unknown tool: {}", name),
         }
     }
@@ -228,4 +236,31 @@ pub fn get_required_object(args: &Value, field: &str) -> Result<Value> {
         .filter(|v| v.is_object())
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("Missing required object field: {}", field))
+}
+
+/// Resolve project_path from tool arguments
+///
+/// Extracts and validates the project_path parameter from MCP tool arguments.
+/// Supports ~ expansion for home directory.
+pub fn resolve_project_path(args: &Value) -> Result<PathBuf> {
+    let path_str = get_required_string(args, "project_path")?;
+
+    // Expand ~ to home directory
+    let expanded = if path_str.starts_with("~") {
+        let home = std::env::var("HOME")
+            .or_else(|_| std::env::var("USERPROFILE"))
+            .map_err(|_| anyhow::anyhow!("Could not determine home directory"))?;
+        path_str.replacen("~", &home, 1)
+    } else {
+        path_str
+    };
+
+    let path = PathBuf::from(&expanded);
+
+    // Validate path exists and has agentd directory
+    if !path.join("agentd").exists() {
+        anyhow::bail!("Not an agentd project: {} (agentd directory not found)", path.display());
+    }
+
+    Ok(path)
 }

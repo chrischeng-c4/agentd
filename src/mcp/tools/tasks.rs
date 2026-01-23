@@ -15,8 +15,12 @@ pub fn definition() -> ToolDefinition {
         description: "Create a validated tasks.md file with layered task structure".to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id", "tasks"],
+            "required": ["project_path", "change_id", "tasks"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "description": "The change ID these tasks belong to"

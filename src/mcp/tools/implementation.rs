@@ -87,8 +87,12 @@ pub fn read_all_requirements_definition() -> ToolDefinition {
             .to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id"],
+            "required": ["project_path", "change_id"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "description": "The change ID to read requirements for"
@@ -185,8 +189,12 @@ pub fn read_implementation_summary_definition() -> ToolDefinition {
         description: "Get git diff summary and commit log for implementation review".to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id"],
+            "required": ["project_path", "change_id"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "description": "The change ID to get implementation summary for"
@@ -294,8 +302,12 @@ pub fn list_changed_files_definition() -> ToolDefinition {
         description: "List changed files with detailed statistics (additions/deletions)".to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id"],
+            "required": ["project_path", "change_id"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "description": "The change ID to list files for"
@@ -439,8 +451,12 @@ pub fn create_review_definition() -> ToolDefinition {
             .to_string(),
         input_schema: json!({
             "type": "object",
-            "required": ["change_id", "iteration", "verdict", "issues"],
+            "required": ["project_path", "change_id", "iteration", "verdict", "issues"],
             "properties": {
+                "project_path": {
+                    "type": "string",
+                    "description": "Project root path (use $PWD for current directory)"
+                },
                 "change_id": {
                     "type": "string",
                     "description": "The change ID being reviewed"

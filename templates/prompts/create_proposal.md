@@ -5,8 +5,12 @@ phase: plan
 variables:
   - change_id
   - description
+mcp_instruction: |
+  mcp__agentd-mcp__get_task(project_path="{{project_path}}", change_id="{{change_id}}", task_type="create_proposal")
 ---
 # Task: Create Proposal
+
+All agentd MCP tools require `project_path="{{project_path}}"`
 
 ## Change ID
 {{change_id}}
@@ -35,6 +39,16 @@ variables:
 ## Expected Output
 - proposal.md created via `create_proposal` MCP tool
 
-## Tools to Use
-- `create_proposal` (required)
-- `read_file`, `list_specs` (for context)
+## MCP Tools
+
+### Read Context
+```
+mcp__agentd-mcp__list_knowledge(project_path="{{project_path}}")
+mcp__agentd-mcp__read_knowledge(project_path="{{project_path}}", path="index.md")
+mcp__agentd-mcp__read_file(project_path="{{project_path}}", change_id="{{change_id}}", file="clarifications")
+```
+
+### Generate Artifact
+```
+mcp__agentd-mcp__create_proposal(project_path="{{project_path}}", change_id="{{change_id}}", summary="...", why="...", what_changes=["..."], impact={...})
+```
