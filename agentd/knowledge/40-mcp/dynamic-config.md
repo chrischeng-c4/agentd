@@ -29,13 +29,13 @@ agentd mcp-server --tools archive     # 6 tools (knowledge + read)
 
 ### Tool Sets by Stage
 
-| Stage | Provider | Tool Count | Tools |
-|-------|----------|------------|-------|
-| **Plan** | Gemini | 22 | All core + Mermaid |
-| **Challenge** | Codex | 5 | read_file, list_specs, read_knowledge, validate_change |
-| **Implement** | Claude | 4 | read_all_requirements, read_implementation_summary, list_changed_files, read_file |
-| **Review** | Codex | 3 | validate_change, append_review, read_file |
-| **Archive** | Gemini | 6 | read_knowledge, write_knowledge, read_file, list_specs |
+| Stage | Tool Count | Tools |
+|-------|------------|-------|
+| **Plan** | 22 | All core + Mermaid |
+| **Challenge** | 5 | read_file, list_specs, read_knowledge, validate_change |
+| **Implement** | 4 | read_all_requirements, read_implementation_summary, list_changed_files, read_file |
+| **Review** | 3 | validate_change, append_review, read_file |
+| **Archive** | 6 | read_knowledge, write_knowledge, read_file, list_specs |
 
 ## Implementation Strategy
 
@@ -121,11 +121,11 @@ pub async fn run(args: McpServerArgs) -> Result<()> {
 }
 ```
 
-### Step 3: Provider-Specific Integration
+### Step 3: Claude Code Integration
 
-#### Claude (Implement Stage)
+Create stage-specific MCP configs in `agentd/mcp-configs/`:
 
-Create `agentd/mcp-configs/implement.json`:
+**implement.json**:
 ```json
 {
   "mcpServers": {
@@ -137,55 +137,32 @@ Create `agentd/mcp-configs/implement.json`:
 }
 ```
 
-Update orchestrator:
+**review.json**:
+```json
+{
+  "mcpServers": {
+    "agentd": {
+      "command": "agentd",
+      "args": ["mcp-server", "--tools", "review"]
+    }
+  }
+}
+```
+
+The orchestrator loads the appropriate config based on the workflow stage:
 ```rust
 // src/orchestrator/claude.rs
+let config_file = match stage {
+    "implement" => "implement.json",
+    "review" => "review.json",
+    "challenge" => "challenge.json",
+    _ => "default.json",
+};
 let args = vec![
     "--mcp-config".to_string(),
-    project_root.join("agentd/mcp-configs/implement.json").display().to_string(),
+    project_root.join(format!("agentd/mcp-configs/{}", config_file)).display().to_string(),
 ];
 ```
-
-#### Codex (Review/Challenge Stages)
-
-⚠️ **UPDATE**: Codex currently does **NOT support per-profile MCP servers** ([Issue #2800](https://github.com/openai/codex/issues/2800)).
-
-**Current approach**: Use global MCP configuration with all tools:
-
-`~/.codex/config.toml`:
-```toml
-model = "gpt-5.2-codex"
-reasoning = "medium"
-
-[mcp_servers.agentd]
-command = "agentd"
-args = ["mcp-server"]  # All 22 tools exposed
-```
-
-**Rationale**:
-- Codex's **400K context window** can easily handle 22 tools
-- Prompt engineering ensures correct tool usage
-- Simpler than manual config switching
-- Future-proof when per-profile MCP support lands
-
-Update orchestrator (no special args):
-```rust
-// src/orchestrator/codex.rs
-let args = vec![];  // Use default config
-let prompt = "Review the implementation. Use validate_change and append_review tools.";
-```
-
-#### Gemini (Plan/Archive Stages)
-
-Use default config (all tools):
-```toml
-# ~/.config/gemini/config.toml
-[mcp.servers.agentd]
-command = "agentd"
-args = ["mcp-server"]  # No --tools flag, expose all
-```
-
-**Rationale**: Gemini has 2M context window, tool count impact is minimal.
 
 ## Benefits
 

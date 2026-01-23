@@ -5,11 +5,11 @@
 
 **IMPORTANT**: Do NOT make direct code changes. Use the SDD workflow below.
 
-| Skill | CLI Command | Purpose |
-|-------|-------------|---------|
-| `/agentd:plan-change` | `plan-change` | Planning workflow (gen → review → revise loop for proposal/specs/tasks) |
-| `/agentd:impl-change` | `impl-change` | Implementation workflow (implement → review → resolve loop per spec) |
-| `/agentd:merge-change` | `merge-change` | Merge completed specs to main agentd/specs/ |
+| Skill | Purpose |
+|-------|---------|
+| `/agentd:plan-change` | Planning workflow (proposal → challenge → auto-reproposal loop) |
+| `/agentd:impl-change` | Implementation workflow (implement → review → auto-resolve loop) |
+| `/agentd:merge-change` | Archive completed change |
 
 All workflows are **state-aware** and resume automatically from the current phase.
 
@@ -17,52 +17,33 @@ Start with: `/agentd:plan-change <id> "<description>"`
 
 ### Knowledge Base
 
-System documentation is in `agentd/knowledge/`. Use CLI commands to read:
-```bash
-agentd knowledge list                # List all knowledge files
-agentd knowledge read <path>         # Read specific file
-```
+System documentation is in `agentd/knowledge/`. Use MCP tools to read:
+- `mcp__agentd__list_knowledge` - List all knowledge files
+- `mcp__agentd__read_knowledge` - Read specific file
 
-### CLI Commands
+### MCP Tools (Preferred)
 
-The agentd workflows use CLI commands with JSON files for all operations. All commands use the same service layer as the MCP server (when available), ensuring consistent behavior.
+**Use MCP tools for all agentd operations.** MCP provides structured input/output that is optimized for LLM interaction.
 
-**Complete Documentation**:
-- **CLI Guide**: See `agentd/specs/cli-guide/README.md`
-- **JSON Examples**: See `agentd/specs/cli-guide/examples/`
+**Read Operations**:
+- `mcp__agentd__list_knowledge` / `mcp__agentd__read_knowledge` - Knowledge base
+- `mcp__agentd__list_specs` / `mcp__agentd__read_file` - Specs and proposals
+- `mcp__agentd__read_all_requirements` - All requirements for implementation
+- `mcp__agentd__list_changed_files` - Git changes for a change
 
-**Quick Reference**:
+**Creation Operations**:
+- `mcp__agentd__create_proposal` - Create proposal.md
+- `mcp__agentd__create_spec` - Create spec files
+- `mcp__agentd__create_tasks` - Create tasks.md
+- `mcp__agentd__append_review` - Add review to proposal
+- `mcp__agentd__create_clarifications` - Create clarifications.md
 
-**Read Operations** (no JSON needed):
-```bash
-agentd knowledge list                    # List knowledge files
-agentd knowledge read <path>             # Read knowledge file
-agentd spec list <change-id>             # List specs
-agentd file read <change-id> proposal    # Read proposal.md
-agentd implementation read-all <id>      # Read all requirements
-agentd implementation list-files <id>    # List changed files
-```
+**Diagram Generation**:
+- `mcp__agentd__generate_mermaid_flowchart` / `sequence` / `class` / `state` / `erd` / `mindmap`
 
-**Creation Operations** (using JSON files):
-```bash
-agentd proposal create <id> --json-file proposal.json
-agentd spec create <id> <spec-id> --json-file spec.json
-agentd tasks create <id> --json-file tasks.json
-agentd proposal review <id> --json-file review.json
-agentd clarifications create <id> --json-file clarifications.json
-agentd knowledge write <path> --json-file knowledge.json
-```
+### CLI Commands (Fallback)
 
-**Phase Summary**:
-- **Phase 1 (Read-Only)**: 5 commands - knowledge, spec, file operations
-- **Phase 2 (Creation)**: 4 commands - proposal, spec, tasks, review
-- **Phase 3 (Specialized)**: 5 commands - implementation, clarifications, knowledge write
-
-**LLM Usage Pattern**:
-1. Generate JSON from examples in `agentd/specs/cli-guide/examples/`
-2. Write JSON to temporary file
-3. Execute CLI command with `--json-file`
-4. Parse output to verify success
+CLI commands are available when MCP is not configured. See `agentd/specs/cli-guide/` for documentation.
 <!-- agentd:end -->
 
 # Project Context

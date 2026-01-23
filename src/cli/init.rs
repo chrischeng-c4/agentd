@@ -12,17 +12,6 @@ const SKILL_PLAN_CHANGE: &str = include_str!("../../templates/skills/agentd-plan
 const SKILL_IMPL_CHANGE: &str = include_str!("../../templates/skills/agentd-impl-change/SKILL.md");
 const SKILL_MERGE_CHANGE: &str = include_str!("../../templates/skills/agentd-merge-change/SKILL.md");
 
-// Gemini Commands
-const GEMINI_PROPOSAL: &str = include_str!("../../templates/gemini/commands/agentd/proposal.toml");
-const GEMINI_REPROPOSAL: &str =
-    include_str!("../../templates/gemini/commands/agentd/reproposal.toml");
-const GEMINI_FILLBACK: &str = include_str!("../../templates/gemini/commands/agentd/fillback.toml");
-const GEMINI_SETTINGS: &str = include_str!("../../templates/gemini/settings.json");
-
-// Codex Prompts
-const CODEX_CHALLENGE: &str = include_str!("../../templates/codex/prompts/agentd-challenge.md");
-const CODEX_REVIEW: &str = include_str!("../../templates/codex/prompts/agentd-review.md");
-
 // Project Context Template
 const PROJECT_TEMPLATE: &str = include_str!("../../templates/project.md");
 
@@ -31,58 +20,6 @@ const KNOWLEDGE_INDEX_TEMPLATE: &str = include_str!("../../templates/knowledge/i
 
 // CLAUDE.md Template for target projects
 const CLAUDE_TEMPLATE: &str = include_str!("../../templates/CLAUDE.md");
-
-// Helper Scripts - Single source of truth from agentd/scripts/
-// Shell scripts are no longer generated during init.
-// Orchestrators now call CLI tools directly instead of using shell scripts.
-// These constants are kept for reference but are no longer used.
-// const SCRIPT_GEMINI_PROPOSAL: &str = include_str!("../../agentd/scripts/gemini-proposal.sh");
-// const SCRIPT_GEMINI_REPROPOSAL: &str = include_str!("../../agentd/scripts/gemini-reproposal.sh");
-// const SCRIPT_GEMINI_FILLBACK: &str = include_str!("../../agentd/scripts/gemini-fillback.sh");
-// const SCRIPT_GEMINI_MERGE_SPECS: &str = include_str!("../../agentd/scripts/gemini-merge-specs.sh");
-// const SCRIPT_GEMINI_CHANGELOG: &str = include_str!("../../agentd/scripts/gemini-changelog.sh");
-// const SCRIPT_GEMINI_ARCHIVE_FIX: &str = include_str!("../../agentd/scripts/gemini-archive-fix.sh");
-// const SCRIPT_CODEX_CHALLENGE: &str = include_str!("../../agentd/scripts/codex-challenge.sh");
-// const SCRIPT_CODEX_RECHALLENGE: &str = include_str!("../../agentd/scripts/codex-rechallenge.sh");
-// const SCRIPT_CODEX_REVIEW: &str = include_str!("../../agentd/scripts/codex-review.sh");
-// const SCRIPT_CODEX_ARCHIVE_REVIEW: &str = include_str!("../../agentd/scripts/codex-archive-review.sh");
-// const SCRIPT_CLAUDE_IMPLEMENT: &str = include_str!("../../agentd/scripts/claude-implement.sh");
-// const SCRIPT_CLAUDE_RESOLVE: &str = include_str!("../../agentd/scripts/claude-resolve.sh");
-
-// Prompt for generating project.md
-const PROJECT_INIT_PROMPT: &str = r#"Analyze this codebase and generate a project.md file.
-
-Output ONLY the markdown content, no explanations or code blocks.
-
-Format:
-# Project Context
-
-## Overview
-<!-- One sentence: What does this project do? -->
-
-## Tech Stack
-- Language: <detected language>
-- Framework: <detected framework or "None">
-- Key libraries: <main dependencies>
-
-## Conventions
-- Error handling: <detected patterns>
-- Naming: <detected style e.g. camelCase, snake_case>
-- Testing: <detected test framework>
-
-## Key Patterns
-<!-- Important abstractions and patterns to follow -->
-
-## Architecture
-<!-- Brief module/component overview - keep concise -->
-
-Analyze package.json, Cargo.toml, go.mod, pyproject.toml, or similar config files.
-Look at src/ structure and key files to understand architecture.
-Keep each section concise (2-4 lines max).
-"#;
-
-// AI Context Files (GEMINI.md and AGENTS.md) are now generated dynamically per change
-// from templates/GEMINI.md and templates/AGENTS.md
 
 pub async fn run(name: Option<&str>, _force: bool) -> Result<()> {
     let project_root = env::current_dir()?;
@@ -172,7 +109,7 @@ fn run_fresh_install(
     std::fs::write(&knowledge_index_path, KNOWLEDGE_INDEX_TEMPLATE)?;
     println!("   ✓ agentd/knowledge/index.md");
 
-    // Try to auto-generate project.md with Gemini
+    // Print instructions for generating project.md
     generate_project_md(&project_md_path);
 
     // Create Claude Code skills directory
@@ -265,10 +202,10 @@ fn run_update(
     Ok(())
 }
 
-/// Install/update all system files (skills, commands, prompts)
+/// Install/update all system files (skills)
 fn install_system_files(
-    project_root: &Path,
-    _agentd_dir: &Path,  // Kept for backward compatibility
+    _project_root: &Path,
+    _agentd_dir: &Path,
     claude_dir: &Path,
 ) -> Result<()> {
     let skills_dir = claude_dir.join("skills");
@@ -277,25 +214,6 @@ fn install_system_files(
     // Install Claude Code Skills
     println!("{}", "🤖 Updating Claude Code Skills...".cyan());
     install_claude_skills(&skills_dir)?;
-
-    // Install Gemini Commands (project-specific)
-    println!();
-    println!("{}", "🤖 Updating Gemini Commands...".cyan());
-    let gemini_dir = project_root.join(".gemini");
-    std::fs::create_dir_all(gemini_dir.join("commands/agentd"))?;
-    install_gemini_commands(&gemini_dir)?;
-
-    // Install Codex Prompts (user-space)
-    println!();
-    println!("{}", "🤖 Updating Codex Prompts...".cyan());
-    let home_dir = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .unwrap_or_else(|_| ".".to_string());
-    let codex_prompts_dir = PathBuf::from(&home_dir).join(".codex/prompts");
-    install_codex_prompts(&codex_prompts_dir)?;
-
-    // Note: Shell scripts are no longer generated. Orchestrators now call CLI tools directly.
-    // The agentd/scripts/ directory is kept for backward compatibility and custom user scripts.
 
     // Install shell completions
     println!();
@@ -321,21 +239,6 @@ fn print_init_success() {
     println!("   agentd/archive/           - Completed changes");
     println!("   agentd/knowledge/         - System documentation");
     println!("   .claude/skills/           - 3 Skills installed");
-    println!("   .gemini/commands/agentd/  - 3 Gemini commands");
-    println!("   ~/.codex/prompts/         - 2 Codex prompts");
-    println!();
-
-    println!("{}", "🤖 AI Commands Installed:".cyan().bold());
-    println!(
-        "   {} - Proposal generation",
-        "gemini agentd:proposal".green()
-    );
-    println!(
-        "   {} - Proposal refinement",
-        "gemini agentd:reproposal".green()
-    );
-    println!("   {} - Code review", "codex agentd-challenge".green());
-    println!("   {} - Test generation", "codex agentd-review".green());
     println!();
 
     println!(
@@ -373,86 +276,10 @@ fn print_init_success() {
     );
 }
 
-/// Try to generate project.md using Gemini, or print prompt if unavailable
-fn generate_project_md(project_md_path: &Path) {
+/// Print prompt for generating project.md manually
+fn generate_project_md(_project_md_path: &Path) {
     println!();
-    println!("{}", "🤖 Generating project context...".cyan());
-
-    // Check if gemini CLI is available
-    let gemini_available = Command::new("gemini")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
-
-    if gemini_available {
-        // Run gemini to generate project.md
-        println!("   Running Gemini to analyze codebase...");
-
-        let output = Command::new("gemini")
-            .args(["prompt", "-m", "gemini-2.0-flash", PROJECT_INIT_PROMPT])
-            .output();
-
-        match output {
-            Ok(result) if result.status.success() => {
-                let raw_content = String::from_utf8_lossy(&result.stdout);
-
-                // Extract markdown content - find # Project Context and take from there
-                let content = if let Some(start) = raw_content.find("# Project Context") {
-                    let section = &raw_content[start..];
-                    // Remove trailing code blocks or extra text
-                    if let Some(end) = section.find("\n```\n") {
-                        &section[..end]
-                    } else {
-                        section.trim_end_matches("```").trim()
-                    }
-                } else {
-                    // Try to strip code blocks
-                    raw_content
-                        .trim()
-                        .trim_start_matches("```markdown")
-                        .trim_start_matches("```md")
-                        .trim_start_matches("```")
-                        .trim_end_matches("```")
-                        .trim()
-                };
-
-                // Only write if we got meaningful content with actual data
-                let has_content = content.contains("## Overview")
-                    && content.len() > 200
-                    && (content.contains("Language:") || content.contains("- Language"));
-
-                if has_content && !content.contains("<!-- One sentence") {
-                    if let Err(e) = std::fs::write(project_md_path, content) {
-                        println!("   {} Failed to write: {}", "⚠️".yellow(), e);
-                    } else {
-                        println!("   {} project.md auto-generated!", "✓".green());
-                        return;
-                    }
-                } else {
-                    println!("   {} Gemini output incomplete, using template", "⚠️".yellow());
-                }
-            }
-            Ok(result) => {
-                let stderr = String::from_utf8_lossy(&result.stderr);
-                println!("   {} Gemini failed: {}", "⚠️".yellow(), stderr.trim());
-            }
-            Err(e) => {
-                println!("   {} Failed to run Gemini: {}", "⚠️".yellow(), e);
-            }
-        }
-    } else {
-        println!("   {} Gemini CLI not found", "⚠️".yellow());
-    }
-
-    // Print prompt for manual use
-    println!();
-    println!("{}", "📋 To generate project.md manually, run:".yellow());
-    println!();
-    println!("   gemini prompt -m gemini-2.0-flash \\");
-    println!("     \"{}\" > agentd/project.md", "Analyze this codebase and generate project.md with Overview, Tech Stack, Conventions, Key Patterns, Architecture sections");
-    println!();
-    println!("   Or ask Claude Code:");
+    println!("{}", "📋 To generate project.md, ask Claude Code:".yellow());
     println!("     {}", "\"Read agentd/project.md and help me fill it out\"".cyan());
 }
 
@@ -700,34 +527,6 @@ fn install_claude_skills(skills_dir: &Path) -> Result<()> {
 // The function has been removed. The agentd/scripts/ directory is kept for
 // backward compatibility and custom user scripts only.
 
-fn install_gemini_commands(gemini_dir: &Path) -> Result<()> {
-    let commands_dir = gemini_dir.join("commands/agentd");
-
-    // Install command definitions
-    std::fs::write(commands_dir.join("proposal.toml"), GEMINI_PROPOSAL)?;
-    std::fs::write(commands_dir.join("reproposal.toml"), GEMINI_REPROPOSAL)?;
-    std::fs::write(commands_dir.join("fillback.toml"), GEMINI_FILLBACK)?;
-
-    println!("   ✓ gemini agentd:proposal");
-    println!("   ✓ gemini agentd:reproposal");
-    println!("   ✓ gemini agentd:fillback");
-
-    // Install settings (base config)
-    std::fs::write(gemini_dir.join("settings.json"), GEMINI_SETTINGS)?;
-    println!("   ✓ settings.json");
-
-    Ok(())
-}
-
-/// Compute a simple checksum for content comparison
-fn compute_checksum(content: &str) -> u64 {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut hasher = DefaultHasher::new();
-    content.hash(&mut hasher);
-    hasher.finish()
-}
-
 /// Install shell completions for supported shells
 fn install_shell_completions() -> Result<()> {
     let home_dir = std::env::var("HOME")
@@ -779,73 +578,6 @@ fn install_shell_completions() -> Result<()> {
             println!("   {} Failed to generate zsh completions: {}", "⚠️".yellow(), e);
         }
     }
-
-    Ok(())
-}
-
-fn install_codex_prompts(prompts_dir: &Path) -> Result<()> {
-    // Create directory if it doesn't exist
-    std::fs::create_dir_all(prompts_dir)?;
-
-    let challenge_path = prompts_dir.join("agentd-challenge.md");
-    let review_path = prompts_dir.join("agentd-review.md");
-
-    // Check if prompts already exist and compare checksums
-    let challenge_same = challenge_path.exists()
-        && std::fs::read_to_string(&challenge_path)
-            .map(|content| compute_checksum(&content) == compute_checksum(CODEX_CHALLENGE))
-            .unwrap_or(false);
-
-    let review_same = review_path.exists()
-        && std::fs::read_to_string(&review_path)
-            .map(|content| compute_checksum(&content) == compute_checksum(CODEX_REVIEW))
-            .unwrap_or(false);
-
-    // If both are the same, skip silently
-    if challenge_same && review_same {
-        println!("   ✓ codex agentd-challenge (up to date)");
-        println!("   ✓ codex agentd-review (up to date)");
-        return Ok(());
-    }
-
-    // Check if any prompts exist but differ
-    let challenge_exists = challenge_path.exists();
-    let review_exists = review_path.exists();
-
-    if (challenge_exists && !challenge_same) || (review_exists && !review_same) {
-        println!();
-        println!(
-            "   {} Codex prompts differ from current version",
-            "⚠️".yellow()
-        );
-
-        // Try to use interactive prompt, fall back to default if not available
-        use dialoguer::Confirm;
-        let overwrite = match Confirm::new()
-            .with_prompt("Overwrite existing prompts?")
-            .default(false)
-            .interact()
-        {
-            Ok(response) => response,
-            Err(_) => {
-                // Not a terminal or dialoguer failed - use default (don't overwrite)
-                println!("   (non-interactive mode: keeping existing prompts)");
-                false
-            }
-        };
-
-        if !overwrite {
-            println!("   Skipping Codex prompts installation");
-            return Ok(());
-        }
-    }
-
-    // Install prompt files
-    std::fs::write(&challenge_path, CODEX_CHALLENGE)?;
-    std::fs::write(&review_path, CODEX_REVIEW)?;
-
-    println!("   ✓ codex agentd-challenge (installed to ~/.codex/prompts/)");
-    println!("   ✓ codex agentd-review (installed to ~/.codex/prompts/)");
 
     Ok(())
 }

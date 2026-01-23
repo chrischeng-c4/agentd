@@ -1,25 +1,23 @@
 # MCP (Model Context Protocol) Configuration
 
-Model Context Protocol servers provide structured tools to LLMs. This section covers MCP configuration strategies for different LLM providers.
+Model Context Protocol servers provide structured tools to LLMs. This section covers MCP configuration for Claude Code.
 
 ## Contents
 
 - [HTTP Server](http-server.md) - **Global HTTP MCP server with multi-project support**
 - [Dynamic Configuration](dynamic-config.md) - Runtime MCP configuration per workflow stage
 - [Claude Code MCP](claude-mcp.md) - Claude Code MCP configuration
-- [Codex MCP](codex-mcp.md) - OpenAI Codex MCP configuration
-- [Gemini MCP](gemini-mcp.md) - Google Gemini MCP configuration
 
 ## Overview
 
-Agentd uses different LLM providers for different workflow stages:
+Agentd uses Claude Code for all workflow stages with dynamic MCP configuration:
 
-| Stage | Provider | Context Window | MCP Tools Needed |
-|-------|----------|----------------|------------------|
-| **Plan** | Gemini | 2M tokens | All (14 core + 8 Mermaid = 22) |
-| **Implement** | Claude | 200K tokens | Implementation only (4-5 tools) |
-| **Review** | Codex | 400K tokens | Review only (3-4 tools) |
-| **Archive** | Gemini | 2M tokens | Knowledge + read tools (5-6 tools) |
+| Stage | MCP Tools Needed |
+|-------|------------------|
+| **Plan** | All (14 core + 8 Mermaid = 22) |
+| **Implement** | Implementation only (4-5 tools) |
+| **Review** | Review only (3-4 tools) |
+| **Archive** | Knowledge + read tools (5-6 tools) |
 
 ## Problem
 

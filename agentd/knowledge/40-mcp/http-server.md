@@ -17,17 +17,16 @@ The HTTP MCP server solves the stdout buffering issue that occurs with stdio tra
 
 ```
 ┌─────────────────┐
-│  Gemini CLI     │──┐
-│  Codex          │  │  HTTP + X-Agentd-Project header
-└─────────────────┘  │
+│  Claude Code    │──┐
+└─────────────────┘  │  HTTP + X-Agentd-Project header
                      │
 ┌─────────────────┐  │    ┌──────────────────────┐
-│  Claude Code    │──┼───>│  HTTP MCP Server     │
+│  Other Tools    │──┼───>│  HTTP MCP Server     │
 └─────────────────┘  │    │  (localhost:3000)    │
                      │    │                      │
-┌─────────────────┐  │    │  ┌───────────────┐  │
-│  Other Tools    │──┘    │  │  Registry     │  │
-└─────────────────┘       │  │  (projects)   │  │
+                     │    │  ┌───────────────┐  │
+                     └───>│  │  Registry     │  │
+                          │  │  (projects)   │  │
                           │  └───────────────┘  │
                           └──────────────────────┘
                                     │
@@ -45,7 +44,7 @@ The HTTP MCP server solves the stdout buffering issue that occurs with stdio tra
 2. **Multi-Project**: Multiple projects registered with the same server
 3. **Project Isolation**: Each project operates in its own directory context
 4. **Dynamic Registry**: Auto-reloads project registrations on each request
-5. **Auto-Configuration**: Automatically updates client configs (.gemini/settings.json, ~/.codex/config.toml)
+5. **Auto-Configuration**: Automatically updates client configs
 
 ## Transport Protocol
 
@@ -113,9 +112,9 @@ agentd mcp-server shutdown
 
 ## Client Configuration
 
-### Gemini CLI
+### Claude Code
 
-Located at `.gemini/settings.json` in the project directory:
+Configure MCP server in `.claude/settings.json` or Claude Code's config:
 
 ```json
 {
@@ -131,20 +130,6 @@ Located at `.gemini/settings.json` in the project directory:
     }
   }
 }
-```
-
-### Codex
-
-Located at `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.agentd]
-url = "http://localhost:3000/mcp"
-timeout = 30000
-
-[mcp_servers.agentd.http_headers]
-X-Agentd-Project = "my-project"
-X-Agentd-Cwd = "/Users/user/projects/my-project"
 ```
 
 Use `--update-clients` flag to auto-generate these configurations.
@@ -294,5 +279,5 @@ agentd mcp-server start --port 8080
 ## Related
 
 - [MCP Index](index.md)
-- [Gemini MCP Configuration](gemini-mcp.md)
-- [Codex MCP Configuration](codex-mcp.md)
+- [Claude Code MCP](claude-mcp.md)
+- [Dynamic Configuration](dynamic-config.md)
