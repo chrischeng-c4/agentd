@@ -1,6 +1,6 @@
 [package]
 name = "agentd"
-version = "0.1.15"
+version = "0.1.16-alpha.1"
 edition = "2021"
 authors = ["Chris Cheng <chris.cheng@shopee.com>"]
 description = "AI agent orchestrator for spec-driven development with iterative proposal refinement"
