@@ -37,20 +37,9 @@ impl<'a> CodexOrchestrator<'a> {
     }
 
     /// Build common Codex environment variables
-    fn build_env(&self, change_id: &str) -> HashMap<String, String> {
-        let codex_instructions_file = self
-            .project_root
-            .join("agentd")
-            .join("changes")
-            .join(change_id)
-            .join("AGENTS.md");
-
-        let mut env = HashMap::new();
-        env.insert(
-            "CODEX_INSTRUCTIONS_FILE".to_string(),
-            codex_instructions_file.to_string_lossy().to_string(),
-        );
-        env
+    /// Note: Previously set CODEX_INSTRUCTIONS_FILE, now using MCP for context injection
+    fn build_env(&self, _change_id: &str) -> HashMap<String, String> {
+        HashMap::new()
     }
 
     /// Build common Codex args with prompt

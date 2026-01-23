@@ -43,9 +43,9 @@ The skill determines readiness based on the `phase` field in `STATE.yaml`:
 
 | Phase | Action |
 |-------|--------|
-| `challenged` | ✅ Run `agentd impl-change` - starts full workflow |
-| `implementing` | ✅ Run `agentd impl-change` - resumes from review step |
-| `complete` | ℹ️ Already done, ready to archive |
+| `planned` | ✅ Run `agentd impl-change` - starts full workflow |
+| `implementing` / `testing` / `code_reviewing` | ✅ Run `agentd impl-change` - resumes workflow |
+| `implemented` | ℹ️ Already done, ready to archive |
 | Other phases | ❌ **ChangeNotReady** error - not ready for implementation |
 
 **Note**: The `agentd impl-change` command is **state-aware** and automatically determines what to do:
@@ -58,7 +58,7 @@ No manual intervention needed between steps!
 
 ## Prerequisites
 
-- Change must have passed challenge (phase: `challenged`)
+- Change must have passed planning (phase: `planned`)
 - All planning artifacts must exist:
   - `proposal.md`
   - `tasks.md`
@@ -76,8 +76,8 @@ Use `agentd knowledge read <path>` CLI command to access documentation.
 ## State transitions
 
 ```
-challenged → implementing → complete
-           ↗ (NEEDS_FIX - auto-fix)
+planned → implementing → testing → code_reviewing → implemented
+          ↑_____________↓______________↓ (auto-fix loops)
 ```
 
 ## Next steps

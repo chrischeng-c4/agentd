@@ -32,21 +32,41 @@ pub async fn run(change_id: &str, json: bool) -> Result<()> {
         println!();
 
         let phase_icon = match state.phase {
-            StatePhase::Proposed => "📝",
-            StatePhase::Challenged => "🔍",
-            StatePhase::Rejected => "⛔",
+            // Plan-change workflow
+            StatePhase::Clarifying => "❓",
+            StatePhase::Drafting => "📝",
+            StatePhase::SpecsGenerated => "📋",
+            StatePhase::TasksGenerated => "📑",
+            StatePhase::Planned => "✅",
+            // Impl-change workflow
             StatePhase::Implementing => "🔨",
-            StatePhase::Complete => "✅",
-            StatePhase::Archived => "📦",
+            StatePhase::Testing => "🧪",
+            StatePhase::CodeReviewing => "🔍",
+            StatePhase::Implemented => "✅",
+            // Merge-change workflow
+            StatePhase::Merging => "📦",
+            StatePhase::Archived => "🗄️",
+            // Error state
+            StatePhase::Rejected => "⛔",
         };
 
         let phase_color = match state.phase {
-            StatePhase::Proposed => format!("{:?}", state.phase).yellow(),
-            StatePhase::Challenged => format!("{:?}", state.phase).cyan(),
-            StatePhase::Rejected => format!("{:?}", state.phase).red(),
+            // Plan-change workflow
+            StatePhase::Clarifying => format!("{:?}", state.phase).yellow(),
+            StatePhase::Drafting => format!("{:?}", state.phase).yellow(),
+            StatePhase::SpecsGenerated => format!("{:?}", state.phase).yellow(),
+            StatePhase::TasksGenerated => format!("{:?}", state.phase).yellow(),
+            StatePhase::Planned => format!("{:?}", state.phase).cyan(),
+            // Impl-change workflow
             StatePhase::Implementing => format!("{:?}", state.phase).blue(),
-            StatePhase::Complete => format!("{:?}", state.phase).green(),
+            StatePhase::Testing => format!("{:?}", state.phase).blue(),
+            StatePhase::CodeReviewing => format!("{:?}", state.phase).blue(),
+            StatePhase::Implemented => format!("{:?}", state.phase).green(),
+            // Merge-change workflow
+            StatePhase::Merging => format!("{:?}", state.phase).magenta(),
             StatePhase::Archived => format!("{:?}", state.phase).bright_black(),
+            // Error state
+            StatePhase::Rejected => format!("{:?}", state.phase).red(),
         };
 
         println!("   Phase:     {} {}", phase_icon, phase_color);
@@ -160,12 +180,18 @@ mod tests {
 
         // Verify icon and color mapping
         let phase_icon = match state.phase {
-            StatePhase::Proposed => "📝",
-            StatePhase::Challenged => "🔍",
-            StatePhase::Rejected => "⛔",
+            StatePhase::Clarifying => "❓",
+            StatePhase::Drafting => "📝",
+            StatePhase::SpecsGenerated => "📋",
+            StatePhase::TasksGenerated => "📑",
+            StatePhase::Planned => "✅",
             StatePhase::Implementing => "🔨",
-            StatePhase::Complete => "✅",
-            StatePhase::Archived => "📦",
+            StatePhase::Testing => "🧪",
+            StatePhase::CodeReviewing => "🔍",
+            StatePhase::Implemented => "✅",
+            StatePhase::Merging => "📦",
+            StatePhase::Archived => "🗄️",
+            StatePhase::Rejected => "⛔",
         };
         assert_eq!(phase_icon, "⛔");
 
@@ -179,24 +205,40 @@ mod tests {
 
     #[test]
     fn test_all_phase_icons() {
-        // Verify all phases have appropriate icons
+        // Verify all 12 phases have appropriate icons
         let phases = [
-            (StatePhase::Proposed, "📝"),
-            (StatePhase::Challenged, "🔍"),
-            (StatePhase::Rejected, "⛔"),
+            // Plan-change workflow
+            (StatePhase::Clarifying, "❓"),
+            (StatePhase::Drafting, "📝"),
+            (StatePhase::SpecsGenerated, "📋"),
+            (StatePhase::TasksGenerated, "📑"),
+            (StatePhase::Planned, "✅"),
+            // Impl-change workflow
             (StatePhase::Implementing, "🔨"),
-            (StatePhase::Complete, "✅"),
-            (StatePhase::Archived, "📦"),
+            (StatePhase::Testing, "🧪"),
+            (StatePhase::CodeReviewing, "🔍"),
+            (StatePhase::Implemented, "✅"),
+            // Merge-change workflow
+            (StatePhase::Merging, "📦"),
+            (StatePhase::Archived, "🗄️"),
+            // Error state
+            (StatePhase::Rejected, "⛔"),
         ];
 
         for (phase, expected_icon) in phases.iter() {
             let icon = match phase {
-                StatePhase::Proposed => "📝",
-                StatePhase::Challenged => "🔍",
-                StatePhase::Rejected => "⛔",
+                StatePhase::Clarifying => "❓",
+                StatePhase::Drafting => "📝",
+                StatePhase::SpecsGenerated => "📋",
+                StatePhase::TasksGenerated => "📑",
+                StatePhase::Planned => "✅",
                 StatePhase::Implementing => "🔨",
-                StatePhase::Complete => "✅",
-                StatePhase::Archived => "📦",
+                StatePhase::Testing => "🧪",
+                StatePhase::CodeReviewing => "🔍",
+                StatePhase::Implemented => "✅",
+                StatePhase::Merging => "📦",
+                StatePhase::Archived => "🗄️",
+                StatePhase::Rejected => "⛔",
             };
             assert_eq!(icon, *expected_icon, "Icon mismatch for phase {:?}", phase);
         }

@@ -1,4 +1,3 @@
-use crate::context::ContextPhase;
 use crate::models::{Change, ChangePhase, ChallengeVerdict, AgentdConfig, Complexity};
 use crate::orchestrator::{detect_self_review_marker, GeminiOrchestrator, CodexOrchestrator, SelfReviewResult, UsageMetrics};
 use crate::parser::parse_affected_specs;
@@ -187,9 +186,6 @@ pub async fn run_plan_change(config: ProposalEngineConfig) -> Result<ProposalEng
     if !proposal_exists {
         println!();
         println!("{}", "📝 Phase 1: Generating proposal.md...".cyan().bold());
-
-        // Generate GEMINI.md context for proposal phase
-        crate::context::generate_gemini_context(&change_dir, ContextPhase::Proposal)?;
 
         // Run MCP-based proposal creation
         let (_output, usage) = orchestrator.run_create_proposal_mcp(&change_id, &description, complexity).await?;

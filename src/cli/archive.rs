@@ -673,7 +673,7 @@ mod tests {
 
         // Create state in Complete phase
         let mut state_manager = StateManager::load(&change_dir).unwrap();
-        state_manager.set_phase(StatePhase::Complete);
+        state_manager.set_phase(StatePhase::Implemented);
         state_manager.save().unwrap();
 
         // Simulate archive operation: update phase to Archived

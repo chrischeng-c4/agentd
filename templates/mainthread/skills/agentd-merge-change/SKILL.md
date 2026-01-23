@@ -38,7 +38,8 @@ The skill checks the `phase` field in `STATE.yaml`:
 
 | Phase | Action |
 |-------|--------|
-| `complete` | ✅ Run `agentd merge-change` to merge and archive |
+| `implemented` | ✅ Run `agentd merge-change` to merge and archive |
+| `merging` | ✅ Run `agentd merge-change` to resume archive workflow |
 | Other phases | ❌ **ChangeNotComplete** error - not ready for archive |
 
 ## What it does
@@ -54,13 +55,13 @@ The skill checks the `phase` field in `STATE.yaml`:
 
 ## Prerequisites
 
-- Change must be complete (phase: `complete`)
+- Change must be implemented (phase: `implemented`)
 - All implementation artifacts must exist and pass validation
 
 ## State transitions
 
 ```
-complete → archived
+implemented → merging → archived
 ```
 
 ## Error: ChangeNotComplete

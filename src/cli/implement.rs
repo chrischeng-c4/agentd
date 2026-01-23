@@ -1,4 +1,3 @@
-use crate::context::ContextPhase;
 use crate::models::frontmatter::StatePhase;
 use crate::models::{SpecGroup, TaskGraph};
 use crate::orchestrator::{ClaudeOrchestrator, CodexOrchestrator, UsageMetrics};
@@ -256,7 +255,7 @@ pub async fn run_sequential(change_id: &str) -> Result<ImplementEngineResult> {
             ReviewVerdict::Approved => {
                 // Update STATE to Complete phase
                 let mut state_manager = StateManager::load(&change_dir)?;
-                state_manager.set_phase(StatePhase::Complete);
+                state_manager.set_phase(StatePhase::Implemented);
                 state_manager.save()?;
 
                 println!();
@@ -277,7 +276,7 @@ pub async fn run_sequential(change_id: &str) -> Result<ImplementEngineResult> {
                     change_id: change_id.to_string(),
                     final_verdict: ReviewVerdict::Approved,
                     iteration_count: iteration,
-                    phase: StatePhase::Complete,
+                    phase: StatePhase::Implemented,
                 });
             }
             ReviewVerdict::NeedsChanges => {
@@ -364,7 +363,7 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<ImplementEngine
 
     // Determine what to do based on current state
     match phase {
-        StatePhase::Challenged => {
+        StatePhase::Planned => {
             // Proposal was challenged and ready for implementation
             println!("▶️  Starting implementation workflow...\n");
             run_full_workflow(change_id, tasks).await
@@ -388,7 +387,7 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<ImplementEngine
                             change_id: change_id.to_string(),
                             final_verdict: ReviewVerdict::Approved,
                             iteration_count: 0,
-                            phase: StatePhase::Complete,
+                            phase: StatePhase::Implemented,
                         })
                     }
                     ReviewVerdict::NeedsChanges | ReviewVerdict::MajorIssues => {
@@ -407,7 +406,7 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<ImplementEngine
                 run_from_review(change_id, &project_root, &config).await
             }
         }
-        StatePhase::Complete => {
+        StatePhase::Implemented => {
             println!("✅ Implementation already complete and approved!");
             println!("   Ready to archive:");
             println!("      agentd merge-change {}", change_id);
@@ -416,7 +415,7 @@ pub async fn run(change_id: &str, tasks: Option<&str>) -> Result<ImplementEngine
                 change_id: change_id.to_string(),
                 final_verdict: ReviewVerdict::Approved,
                 iteration_count: 0,
-                phase: StatePhase::Complete,
+                phase: StatePhase::Implemented,
             })
         }
         StatePhase::Archived => {
@@ -472,7 +471,7 @@ async fn run_full_workflow(change_id: &str, tasks: Option<&str>) -> Result<Imple
             ReviewVerdict::Approved => {
                 // Update STATE to Complete phase
                 let mut state_manager = StateManager::load(&change_dir)?;
-                state_manager.set_phase(StatePhase::Complete);
+                state_manager.set_phase(StatePhase::Implemented);
                 state_manager.save()?;
 
                 println!();
@@ -488,7 +487,7 @@ async fn run_full_workflow(change_id: &str, tasks: Option<&str>) -> Result<Imple
                     change_id: change_id.to_string(),
                     final_verdict: ReviewVerdict::Approved,
                     iteration_count: iteration,
-                    phase: StatePhase::Complete,
+                    phase: StatePhase::Implemented,
                 });
             }
             ReviewVerdict::NeedsChanges => {
@@ -592,9 +591,6 @@ async fn run_review_step(
     // Assess complexity dynamically based on change structure
     let change = Change::new(change_id, "");
     let complexity = change.assess_complexity(project_root);
-
-    // Regenerate AGENTS.md context
-    crate::context::generate_agents_context(&change_dir, ContextPhase::Review)?;
 
     // Create/update REVIEW.md skeleton
     crate::context::create_review_skeleton(&change_dir, change_id, iteration)?;
@@ -745,7 +741,7 @@ async fn run_from_review(
             ReviewVerdict::Approved => {
                 // Update STATE to Complete phase
                 let mut state_manager = StateManager::load(&change_dir)?;
-                state_manager.set_phase(StatePhase::Complete);
+                state_manager.set_phase(StatePhase::Implemented);
                 state_manager.save()?;
 
                 println!();
@@ -756,7 +752,7 @@ async fn run_from_review(
                     change_id: change_id.to_string(),
                     final_verdict: ReviewVerdict::Approved,
                     iteration_count: iteration,
-                    phase: StatePhase::Complete,
+                    phase: StatePhase::Implemented,
                 });
             }
             ReviewVerdict::NeedsChanges => {
@@ -845,7 +841,7 @@ async fn run_resolve_and_review(
     // Update state based on verdict
     let mut state_manager = StateManager::load(&change_dir)?;
     if verdict == ReviewVerdict::Approved {
-        state_manager.set_phase(StatePhase::Complete);
+        state_manager.set_phase(StatePhase::Implemented);
     } else {
         state_manager.set_phase(StatePhase::Implementing);
     }
@@ -869,7 +865,7 @@ async fn run_resolve_and_review(
         final_verdict: verdict.clone(),
         iteration_count: 1,
         phase: if verdict == ReviewVerdict::Approved {
-            StatePhase::Complete
+            StatePhase::Implemented
         } else {
             StatePhase::Implementing
         },

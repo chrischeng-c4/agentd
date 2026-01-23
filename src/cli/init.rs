@@ -8,9 +8,9 @@ use std::process::Command;
 const AGENTD_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Claude Code Skills (high-level workflows only)
-const SKILL_PLAN_CHANGE: &str = include_str!("../../templates/skills/agentd-plan-change/SKILL.md");
-const SKILL_IMPL_CHANGE: &str = include_str!("../../templates/skills/agentd-impl-change/SKILL.md");
-const SKILL_MERGE_CHANGE: &str = include_str!("../../templates/skills/agentd-merge-change/SKILL.md");
+const SKILL_PLAN_CHANGE: &str = include_str!("../../templates/mainthread/skills/agentd-plan-change/SKILL.md");
+const SKILL_IMPL_CHANGE: &str = include_str!("../../templates/mainthread/skills/agentd-impl-change/SKILL.md");
+const SKILL_MERGE_CHANGE: &str = include_str!("../../templates/mainthread/skills/agentd-merge-change/SKILL.md");
 
 // Project Context Template
 const PROJECT_TEMPLATE: &str = include_str!("../../templates/project.md");
@@ -19,7 +19,7 @@ const PROJECT_TEMPLATE: &str = include_str!("../../templates/project.md");
 const KNOWLEDGE_INDEX_TEMPLATE: &str = include_str!("../../templates/knowledge/index.md");
 
 // CLAUDE.md Template for target projects
-const CLAUDE_TEMPLATE: &str = include_str!("../../templates/CLAUDE.md");
+const CLAUDE_TEMPLATE: &str = include_str!("../../templates/mainthread/CLAUDE.md");
 
 pub async fn run(name: Option<&str>, _force: bool) -> Result<()> {
     let project_root = env::current_dir()?;

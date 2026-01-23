@@ -1,6 +1,6 @@
-# Code Review Report: {{change_id}}
+# Code Review Report: plan-change-idempotent
 
-**Iteration**: {{iteration}}
+**Iteration**: 1
 
 ## Summary
 [Overall assessment: code quality, test results, security posture]

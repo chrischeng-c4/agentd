@@ -2,354 +2,141 @@ use crate::Result;
 use colored::Colorize;
 use dialoguer::Select;
 use std::path::Path;
-use walkdir::WalkDir;
 
-const GEMINI_TEMPLATE: &str = include_str!("../templates/GEMINI.md");
-const AGENTS_TEMPLATE: &str = include_str!("../templates/AGENTS.md");
+// Implementation phase skeleton (inline)
+const REVIEW_SKELETON: &str = r#"# Code Review Report: {{change_id}}
 
-// Planning phase skeletons
-const PROPOSAL_SKELETON: &str = include_str!("../templates/skeletons/planning/proposal.md");
-const TASKS_SKELETON: &str = include_str!("../templates/skeletons/planning/tasks.md");
-const SPEC_SKELETON: &str = include_str!("../templates/skeletons/planning/spec.md");
+**Iteration**: {{iteration}}
 
-// Implementation phase skeletons
-const REVIEW_SKELETON: &str = include_str!("../templates/skeletons/impl/review.md");
+## Summary
+[Overall assessment: code quality, test results, security posture]
 
-// Archive phase skeletons
-const ARCHIVE_REVIEW_SKELETON: &str = include_str!("../templates/skeletons/archive/archive_review.md");
+## Test Results
+**Overall Status**: PASS | FAIL | PARTIAL
 
-/// Context phase determines which project.md sections to inject
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ContextPhase {
-    /// Design phase: Overview, Architecture, Key Patterns
-    Proposal,
-    /// Design review: Overview, Architecture, Key Patterns
-    Challenge,
-    /// Code writing: Overview, Tech Stack, Conventions, Key Patterns
-    Implement,
-    /// Code review: Overview, Tech Stack, Conventions, Key Patterns
-    Review,
-    /// Spec merge: Overview, Architecture, Key Patterns
-    Archive,
-}
+### Test Summary
+- Total tests: X
+- Passed: X
+- Failed: X
+- Skipped: X
+- Coverage: X%
 
-impl ContextPhase {
-    /// Get the section names to include for this phase
-    pub fn sections(&self) -> Vec<&'static str> {
-        match self {
-            ContextPhase::Proposal | ContextPhase::Challenge | ContextPhase::Archive => {
-                vec!["Overview", "Architecture", "Key Patterns"]
-            }
-            ContextPhase::Implement | ContextPhase::Review => {
-                vec!["Overview", "Tech Stack", "Conventions", "Key Patterns"]
-            }
-        }
-    }
-}
+### Failed Tests (if any)
+- `test_name`: [Error message]
 
-/// Proposal phase determines which skeleton to inject for sequential generation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProposalPhase {
-    /// Generate proposal.md only
-    Proposal,
-    /// Generate one spec file
-    Spec,
-    /// Generate tasks.md
-    Tasks,
-    /// Generate all (proposal + specs + tasks) - legacy mode
-    All,
-}
+## Security Scan Results
+**Status**: CLEAN | WARNINGS | VULNERABILITIES
 
-impl ProposalPhase {
-    /// Get the skeleton content for this phase
-    pub fn skeleton(&self) -> &'static str {
-        match self {
-            ProposalPhase::Proposal => PROPOSAL_SKELETON,
-            ProposalPhase::Spec => SPEC_SKELETON,
-            ProposalPhase::Tasks => TASKS_SKELETON,
-            ProposalPhase::All => {
-                // For backward compatibility, combine all skeletons
-                // This is a static string, so we use a const
-                concat!(
-                    "## Proposal Format\n\n",
-                    include_str!("../templates/skeletons/planning/proposal.md"),
-                    "\n\n---\n\n## Spec Format\n\n",
-                    include_str!("../templates/skeletons/planning/spec.md"),
-                    "\n\n---\n\n## Tasks Format\n\n",
-                    include_str!("../templates/skeletons/planning/tasks.md")
-                )
-            }
-        }
-    }
-}
+### cargo audit (Dependency Vulnerabilities)
+- [List vulnerabilities or "No vulnerabilities found"]
 
-/// Load specific sections from project.md based on the context phase
-///
-/// Parses agentd/project.md and extracts only the sections relevant to the phase.
-/// Returns formatted markdown with the selected sections.
-pub fn load_project_sections(phase: ContextPhase) -> Result<String> {
-    let current_dir = std::env::current_dir()?;
-    let project_path = current_dir.join("agentd/project.md");
+### semgrep (Code Pattern Scan)
+- [List security issues or "No issues found"]
 
-    // If project.md doesn't exist, return empty string
-    if !project_path.exists() {
-        return Ok(String::new());
-    }
+## Best Practices Issues
+[HIGH priority - must fix]
 
-    let content = std::fs::read_to_string(&project_path)?;
-    let sections_to_include = phase.sections();
+### Issue: [Title]
+- **Severity**: High
+- **Category**: Security | Performance | Style
+- **File**: path/to/file.rs:123
+- **Description**: [What's wrong]
+- **Recommendation**: [How to fix]
 
-    let mut result = String::new();
-    let mut current_section: Option<&str> = None;
-    let mut current_content = String::new();
+## Requirement Compliance Issues
+[HIGH priority - must fix]
 
-    for line in content.lines() {
-        // Check if this is a section header (## Level)
-        if line.starts_with("## ") {
-            // Save previous section if it was one we wanted
-            if let Some(section_name) = current_section {
-                if sections_to_include.contains(&section_name) && !current_content.trim().is_empty() {
-                    result.push_str(&format!("## {}\n", section_name));
-                    result.push_str(current_content.trim());
-                    result.push_str("\n\n");
-                }
-            }
+### Issue: [Title]
+- **Severity**: High
+- **Category**: Missing Feature | Wrong Behavior
+- **Requirement**: [Which spec/task]
+- **Description**: [What's missing or wrong]
+- **Recommendation**: [How to fix]
 
-            // Start new section
-            let section_name = line.trim_start_matches("## ").trim();
-            current_section = sections_to_include.iter().find(|&&s| s == section_name).copied();
-            current_content.clear();
-        } else if current_section.is_some() {
-            // Skip HTML comments
-            if !line.trim().starts_with("<!--") && !line.trim().ends_with("-->") {
-                current_content.push_str(line);
-                current_content.push('\n');
-            }
-        }
-    }
+## Consistency Issues
+[MEDIUM priority - should fix]
 
-    // Don't forget the last section
-    if let Some(section_name) = current_section {
-        if sections_to_include.contains(&section_name) && !current_content.trim().is_empty() {
-            result.push_str(&format!("## {}\n", section_name));
-            result.push_str(current_content.trim());
-            result.push_str("\n\n");
-        }
-    }
+### Issue: [Title]
+- **Severity**: Medium
+- **Category**: Style | Architecture | Naming
+- **Location**: path/to/file
+- **Description**: [How it differs from codebase patterns]
+- **Recommendation**: [How to align]
 
-    Ok(result.trim().to_string())
-}
+## Test Quality Issues
+[MEDIUM priority - should fix]
 
-/// Generate GEMINI.md context file for a specific change (legacy - injects all skeletons)
-pub fn generate_gemini_context(change_dir: &Path, phase: ContextPhase) -> Result<()> {
-    generate_gemini_context_with_skeleton(change_dir, phase, ProposalPhase::All)
-}
+### Issue: [Title]
+- **Severity**: Medium
+- **Category**: Coverage | Edge Case | Scenario
+- **Description**: [What's missing in tests]
+- **Recommendation**: [What to add]
 
-/// Generate GEMINI.md context file with a specific skeleton for sequential generation
-///
-/// This function supports the new sequential generation workflow:
-/// - Phase 1: Generate proposal.md (ProposalPhase::Proposal)
-/// - Phase 2: Generate spec(s) (ProposalPhase::Spec) - called once per spec
-/// - Phase 3: Generate tasks.md (ProposalPhase::Tasks)
-///
-/// For backward compatibility, use ProposalPhase::All to inject all skeletons.
-pub fn generate_gemini_context_with_skeleton(
-    change_dir: &Path,
-    context_phase: ContextPhase,
-    proposal_phase: ProposalPhase,
-) -> Result<()> {
-    let project_structure = scan_project_structure()?;
-    let project_context = load_project_sections(context_phase)?;
-    let skeleton = proposal_phase.skeleton();
+## Verdict
+- [ ] APPROVED - Ready for merge (all tests pass, no HIGH issues)
+- [ ] NEEDS_CHANGES - Address issues above (specify which)
+- [ ] MAJOR_ISSUES - Fundamental problems (failing tests or critical security)
 
-    let content = GEMINI_TEMPLATE
-        .replace("{{PROJECT_STRUCTURE}}", &project_structure)
-        .replace("{{PROJECT_CONTEXT}}", &project_context)
-        .replace("{{SKELETON}}", skeleton);
+**Next Steps**: [What should be done]
+"#;
 
-    let output_path = change_dir.join("GEMINI.md");
-    std::fs::write(&output_path, content)?;
+// Archive phase skeleton (inline)
+const ARCHIVE_REVIEW_SKELETON: &str = r#"# Archive Review Report: {{change_id}}
 
-    Ok(())
-}
+**Iteration**: {{iteration}}
 
-/// Generate AGENTS.md context file for a specific change
-pub fn generate_agents_context(change_dir: &Path, phase: ContextPhase) -> Result<()> {
-    let project_structure = scan_project_structure()?;
-    let project_context = load_project_sections(phase)?;
+## Summary
+[Overall assessment: merge quality, spec consistency, completeness]
 
-    let content = AGENTS_TEMPLATE
-        .replace("{{PROJECT_STRUCTURE}}", &project_structure)
-        .replace("{{PROJECT_CONTEXT}}", &project_context);
+## Merge Quality
 
-    let output_path = change_dir.join("AGENTS.md");
-    std::fs::write(&output_path, content)?;
+### Spec Integration
+- **Status**: CLEAN | ISSUES
+- [Assessment of how well change specs were merged into main specs]
 
-    Ok(())
-}
+### Content Preservation
+- **Requirements preserved**: Yes | No (list missing)
+- **Scenarios preserved**: Yes | No (list missing)
+- **Diagrams preserved**: Yes | No (list missing)
 
-/// Scan project structure and generate a tree representation
-fn scan_project_structure() -> Result<String> {
-    let current_dir = std::env::current_dir()?;
-    let mut output = String::from("```\n");
+## Issues Found
 
-    // Scan important directories
-    let important_dirs = vec!["src", "agentd/specs", "agentd/changes"];
+### Issue: [Title]
+- **Severity**: High | Medium | Low
+- **Category**: Missing Content | Duplicate Content | Format Error | Inconsistency
+- **File**: agentd/specs/[file.md]
+- **Description**: [What's wrong]
+- **Recommendation**: [How to fix]
 
-    for dir in important_dirs {
-        let path = current_dir.join(dir);
-        if path.exists() {
-            output.push_str(&format!("{}:\n", dir));
-            output.push_str(&scan_directory(&path, 2)?);
-            output.push('\n');
-        }
-    }
+## CHANGELOG Quality
+- **Entry present**: Yes | No
+- **Description accurate**: Yes | No
+- **Format correct**: Yes | No
 
-    output.push_str("```");
-    Ok(output)
-}
+## Verdict
+- [ ] APPROVED - Merge quality acceptable, ready for archive
+- [ ] NEEDS_FIX - Address issues above (fixable automatically)
+- [ ] REJECTED - Fundamental problems (require manual intervention)
 
-/// Recursively scan a directory with depth limit
-fn scan_directory(path: &Path, max_depth: usize) -> Result<String> {
-    let mut output = String::new();
-    let entries: Vec<_> = WalkDir::new(path)
-        .max_depth(max_depth)
-        .into_iter()
-        .filter_entry(|e| {
-            // Skip hidden files and common ignore patterns
-            let name = e.file_name().to_string_lossy();
-            !name.starts_with('.')
-                && name != "target"
-                && name != "node_modules"
-                && name != "dist"
-        })
-        .filter_map(|e| e.ok())
-        .collect();
-
-    for entry in entries {
-        let depth = entry.depth();
-        if depth == 0 {
-            continue;
-        }
-
-        let indent = "  ".repeat(depth);
-        let name = entry.file_name().to_string_lossy();
-
-        if entry.file_type().is_dir() {
-            output.push_str(&format!("{}{}/\n", indent, name));
-        } else {
-            output.push_str(&format!("{}{}\n", indent, name));
-        }
-    }
-
-    Ok(output)
-}
-
-/// Load a template file, checking for user override first, then falling back to embedded default.
-///
-/// - `name`: Template filename including extension (e.g., "proposal.md", "challenge.md")
-/// - `project_root`: Project root directory to check for overrides
-/// - `vars`: Key-value pairs for variable replacement (e.g., `change_id`, `iteration`)
-///
-/// Override path: `<project_root>/agentd/templates/<name>`
-/// Variables use `{{key}}` syntax in templates.
-pub fn load_template(name: &str, project_root: &Path, vars: &[(&str, &str)]) -> Result<String> {
-    // Try to load user override first
-    let override_path = project_root.join("agentd/templates").join(name);
-    let content = if override_path.exists() {
-        match std::fs::read_to_string(&override_path) {
-            Ok(content) => content,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                // Shouldn't happen since we checked exists(), but handle gracefully
-                get_embedded_template(name)?
-            }
-            Err(e) => {
-                // Surface read errors (permissions, etc.) instead of silently falling back
-                anyhow::bail!("Failed to read template override '{}': {}", override_path.display(), e);
-            }
-        }
-    } else {
-        get_embedded_template(name)?
-    };
-
-    // Replace variables: {{key}} -> value
-    let mut result = content;
-    for (key, value) in vars {
-        let placeholder = format!("{{{{{}}}}}", key); // {{key}}
-        result = result.replace(&placeholder, value);
-    }
-
-    Ok(result)
-}
-
-/// Get embedded template by name
-fn get_embedded_template(name: &str) -> Result<String> {
-    match name {
-        "proposal.md" => Ok(PROPOSAL_SKELETON.to_string()),
-        "tasks.md" => Ok(TASKS_SKELETON.to_string()),
-        "spec.md" => Ok(SPEC_SKELETON.to_string()),
-        "review.md" => Ok(REVIEW_SKELETON.to_string()),
-        "archive_review.md" => Ok(ARCHIVE_REVIEW_SKELETON.to_string()),
-        _ => anyhow::bail!("Unknown template: {}", name),
-    }
-}
-
-/// Derive project root from change directory
-/// change_dir is typically: <project_root>/agentd/changes/<change_id>
-fn derive_project_root(change_dir: &Path) -> Result<std::path::PathBuf> {
-    // Walk up: change_dir -> changes -> agentd -> project_root
-    change_dir
-        .parent() // changes
-        .and_then(|p| p.parent()) // agentd
-        .and_then(|p| p.parent()) // project_root
-        .map(|p| p.to_path_buf())
-        .ok_or_else(|| anyhow::anyhow!("Could not derive project root from change_dir: {:?}", change_dir))
-}
-
-/// Create proposal skeleton files with structure but no content
-/// This guides Gemini to fill in the right format while reducing token usage
-pub fn create_proposal_skeleton(change_dir: &Path, change_id: &str) -> Result<()> {
-    let project_root = derive_project_root(change_dir)?;
-    let vars = [("change_id", change_id)];
-
-    // Create proposal.md skeleton
-    let proposal_content = load_template("proposal.md", &project_root, &vars)?;
-    std::fs::write(change_dir.join("proposal.md"), proposal_content)?;
-
-    // Create tasks.md skeleton
-    let tasks_content = load_template("tasks.md", &project_root, &[])?;
-    std::fs::write(change_dir.join("tasks.md"), tasks_content)?;
-
-    // Create specs directory with a skeleton file
-    let specs_dir = change_dir.join("specs");
-    std::fs::create_dir_all(&specs_dir)?;
-
-    let spec_content = load_template("spec.md", &project_root, &[])?;
-    std::fs::write(specs_dir.join("_skeleton.md"), spec_content)?;
-
-    Ok(())
-}
+**Next Steps**: [What should be done]
+"#;
 
 
 /// Create REVIEW.md skeleton for code review process
 pub fn create_review_skeleton(change_dir: &Path, change_id: &str, iteration: u32) -> Result<()> {
-    let project_root = derive_project_root(change_dir)?;
-    let iteration_str = iteration.to_string();
-    let vars = [("change_id", change_id), ("iteration", iteration_str.as_str())];
-
-    let review_content = load_template("review.md", &project_root, &vars)?;
-    std::fs::write(change_dir.join("REVIEW.md"), review_content)?;
+    let content = REVIEW_SKELETON
+        .replace("{{change_id}}", change_id)
+        .replace("{{iteration}}", &iteration.to_string());
+    std::fs::write(change_dir.join("REVIEW.md"), content)?;
     Ok(())
 }
 
 /// Create ARCHIVE_REVIEW.md skeleton for archive quality review
 pub fn create_archive_review_skeleton(change_dir: &Path, change_id: &str, iteration: u32) -> Result<()> {
-    let project_root = derive_project_root(change_dir)?;
-    let iteration_str = iteration.to_string();
-    let vars = [("change_id", change_id), ("iteration", iteration_str.as_str())];
-
-    let archive_review_content = load_template("archive_review.md", &project_root, &vars)?;
-    std::fs::write(change_dir.join("ARCHIVE_REVIEW.md"), archive_review_content)?;
+    let content = ARCHIVE_REVIEW_SKELETON
+        .replace("{{change_id}}", change_id)
+        .replace("{{iteration}}", &iteration.to_string());
+    std::fs::write(change_dir.join("ARCHIVE_REVIEW.md"), content)?;
     Ok(())
 }
 
@@ -563,65 +350,26 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn test_load_template_embedded_default() {
+    fn test_create_review_skeleton() {
         let temp_dir = TempDir::new().unwrap();
-        let project_root = temp_dir.path();
+        let change_dir = temp_dir.path();
 
-        // No override exists, should use embedded default
-        let result = load_template("proposal.md", project_root, &[]).unwrap();
-        assert!(result.contains("# Change: {{change_id}}"));
+        create_review_skeleton(change_dir, "test-change", 1).unwrap();
+
+        let content = fs::read_to_string(change_dir.join("REVIEW.md")).unwrap();
+        assert!(content.contains("# Code Review Report: test-change"));
+        assert!(content.contains("**Iteration**: 1"));
     }
 
     #[test]
-    fn test_load_template_with_variable_replacement() {
+    fn test_create_archive_review_skeleton() {
         let temp_dir = TempDir::new().unwrap();
-        let project_root = temp_dir.path();
+        let change_dir = temp_dir.path();
 
-        let vars = [("change_id", "test-change")];
-        let result = load_template("proposal.md", project_root, &vars).unwrap();
-        assert!(result.contains("# Change: test-change"));
-        assert!(!result.contains("{{change_id}}"));
-    }
+        create_archive_review_skeleton(change_dir, "my-change", 2).unwrap();
 
-    #[test]
-    fn test_load_template_override() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_root = temp_dir.path();
-
-        // Create override directory and file
-        let templates_dir = project_root.join("agentd/templates");
-        fs::create_dir_all(&templates_dir).unwrap();
-        fs::write(
-            templates_dir.join("proposal.md"),
-            "# Custom Template\n\nChange: {{change_id}}",
-        )
-        .unwrap();
-
-        let vars = [("change_id", "my-change")];
-        let result = load_template("proposal.md", project_root, &vars).unwrap();
-        assert!(result.contains("# Custom Template"));
-        assert!(result.contains("Change: my-change"));
-    }
-
-    #[test]
-    fn test_load_template_unknown_name() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_root = temp_dir.path();
-
-        let result = load_template("unknown.md", project_root, &[]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_derive_project_root() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_root = temp_dir.path();
-
-        // Create change directory structure
-        let change_dir = project_root.join("agentd/changes/test-change");
-        fs::create_dir_all(&change_dir).unwrap();
-
-        let derived = derive_project_root(&change_dir).unwrap();
-        assert_eq!(derived, project_root);
+        let content = fs::read_to_string(change_dir.join("ARCHIVE_REVIEW.md")).unwrap();
+        assert!(content.contains("# Archive Review Report: my-change"));
+        assert!(content.contains("**Iteration**: 2"));
     }
 }

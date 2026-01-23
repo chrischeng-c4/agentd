@@ -170,20 +170,9 @@ impl<'a> GeminiOrchestrator<'a> {
     }
 
     /// Build common Gemini environment variables
-    fn build_env(&self, change_id: &str) -> HashMap<String, String> {
-        let gemini_system_md = self
-            .project_root
-            .join("agentd")
-            .join("changes")
-            .join(change_id)
-            .join("GEMINI.md");
-
-        let mut env = HashMap::new();
-        env.insert(
-            "GEMINI_SYSTEM_MD".to_string(),
-            gemini_system_md.to_string_lossy().to_string(),
-        );
-        env
+    /// Note: Previously set GEMINI_SYSTEM_MD, now using MCP for context injection
+    fn build_env(&self, _change_id: &str) -> HashMap<String, String> {
+        HashMap::new()
     }
 
     /// Build common Gemini args with resume mode

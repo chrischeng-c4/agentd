@@ -124,9 +124,9 @@ The skill determines the next action based on the `phase` field in `STATE.yaml`:
 | Phase | Action |
 |-------|--------|
 | No STATE.yaml | **Clarify** → write `clarifications.md` → run `agentd plan-change` |
-| `proposed` | Run `agentd plan-change` to continue planning cycle |
-| `challenged` | ✅ Planning complete, suggest `/agentd:impl-change` |
-| `rejected` | ⛔ Rejected, suggest reviewing CHALLENGE.md |
+| `clarifying` / `drafting` / `specs_generated` / `tasks_generated` | Run `agentd plan-change` to continue planning cycle |
+| `planned` | ✅ Planning complete, suggest `/agentd:impl-change` |
+| `rejected` | ⛔ Rejected, suggest reviewing proposal.md |
 | Other phases | ℹ️ Beyond planning phase |
 
 ## After `agentd plan-change` completes

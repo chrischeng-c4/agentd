@@ -59,7 +59,7 @@ pub fn create_clarifications(input: CreateClarificationsInput, project_root: &Pa
     let state_path = change_dir.join("STATE.yaml");
     if !state_path.exists() {
         let mut state_manager = StateManager::load(&change_dir)?;
-        state_manager.set_phase(StatePhase::Proposed);
+        state_manager.set_phase(StatePhase::Clarifying);
         state_manager.set_last_action("clarifications created");
         state_manager.save()?;
     }
@@ -107,7 +107,7 @@ mod tests {
         let state_path = project_root.join("agentd/changes/add-oauth/STATE.yaml");
         assert!(state_path.exists(), "STATE.yaml should be created");
         let state_content = std::fs::read_to_string(&state_path).unwrap();
-        assert!(state_content.contains("phase: proposed"));
+        assert!(state_content.contains("phase: clarifying"));
         assert!(state_content.contains("last_action: clarifications created"));
     }
 

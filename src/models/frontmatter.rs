@@ -435,16 +435,151 @@ fn default_schema_version() -> String {
     "2.0".to_string()
 }
 
-/// State phase values
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
+/// State phase values - 12 granular phases aligned with workflows
+///
+/// ## Plan-change workflow
+/// - Clarifying: 收集需求中 (gathering requirements)
+/// - Drafting: 產生 proposal.md 中 (generating proposal)
+/// - SpecsGenerated: specs 完成 (specs complete)
+/// - TasksGenerated: tasks.md 完成 (tasks complete)
+/// - Planned: ready for implementation
+///
+/// ## Impl-change workflow
+/// - Implementing: 寫程式中 (writing code)
+/// - Testing: 跑測試中 (running tests)
+/// - CodeReviewing: code review 中 (code review in progress)
+/// - Implemented: ready for merge
+///
+/// ## Merge-change workflow
+/// - Merging: 移至 archive 中 (moving to archive)
+/// - Archived: 完成 (complete)
+///
+/// ## Error state
+/// - Rejected: 被拒絕 (rejected)
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StatePhase {
-    Proposed,
-    Challenged,
-    Rejected,
+    // Plan-change workflow
+    Clarifying,
+    Drafting,
+    SpecsGenerated,
+    TasksGenerated,
+    Planned,
+
+    // Impl-change workflow
     Implementing,
-    Complete,
+    Testing,
+    CodeReviewing,
+    Implemented,
+
+    // Merge-change workflow
+    Merging,
     Archived,
+
+    // Error state
+    Rejected,
+}
+
+impl StatePhase {
+    /// Check if this phase is part of the plan-change workflow
+    pub fn is_plan_phase(&self) -> bool {
+        matches!(
+            self,
+            StatePhase::Clarifying
+                | StatePhase::Drafting
+                | StatePhase::SpecsGenerated
+                | StatePhase::TasksGenerated
+                | StatePhase::Planned
+        )
+    }
+
+    /// Check if this phase is part of the impl-change workflow
+    pub fn is_impl_phase(&self) -> bool {
+        matches!(
+            self,
+            StatePhase::Implementing
+                | StatePhase::Testing
+                | StatePhase::CodeReviewing
+                | StatePhase::Implemented
+        )
+    }
+
+    /// Check if this phase is part of the merge-change workflow
+    pub fn is_merge_phase(&self) -> bool {
+        matches!(self, StatePhase::Merging | StatePhase::Archived)
+    }
+
+    /// Check if this is a terminal/complete state
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, StatePhase::Archived | StatePhase::Rejected)
+    }
+
+    /// Get the workflow name for this phase
+    pub fn workflow(&self) -> &'static str {
+        if self.is_plan_phase() {
+            "plan-change"
+        } else if self.is_impl_phase() {
+            "impl-change"
+        } else if self.is_merge_phase() {
+            "merge-change"
+        } else {
+            "error"
+        }
+    }
+}
+
+impl Serialize for StatePhase {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = match self {
+            StatePhase::Clarifying => "clarifying",
+            StatePhase::Drafting => "drafting",
+            StatePhase::SpecsGenerated => "specs_generated",
+            StatePhase::TasksGenerated => "tasks_generated",
+            StatePhase::Planned => "planned",
+            StatePhase::Implementing => "implementing",
+            StatePhase::Testing => "testing",
+            StatePhase::CodeReviewing => "code_reviewing",
+            StatePhase::Implemented => "implemented",
+            StatePhase::Merging => "merging",
+            StatePhase::Archived => "archived",
+            StatePhase::Rejected => "rejected",
+        };
+        serializer.serialize_str(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for StatePhase {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            // New phases
+            "clarifying" => Ok(StatePhase::Clarifying),
+            "drafting" => Ok(StatePhase::Drafting),
+            "specs_generated" => Ok(StatePhase::SpecsGenerated),
+            "tasks_generated" => Ok(StatePhase::TasksGenerated),
+            "planned" => Ok(StatePhase::Planned),
+            "implementing" => Ok(StatePhase::Implementing),
+            "testing" => Ok(StatePhase::Testing),
+            "code_reviewing" => Ok(StatePhase::CodeReviewing),
+            "implemented" => Ok(StatePhase::Implemented),
+            "merging" => Ok(StatePhase::Merging),
+            "archived" => Ok(StatePhase::Archived),
+            "rejected" => Ok(StatePhase::Rejected),
+            // Legacy phase migration (backwards compatibility)
+            "proposed" => Ok(StatePhase::Drafting),      // proposed → Drafting
+            "challenged" => Ok(StatePhase::Planned),     // challenged → Planned
+            "complete" => Ok(StatePhase::Implemented),   // complete → Implemented
+            _ => Err(serde::de::Error::custom(format!(
+                "unknown StatePhase: {}",
+                s
+            ))),
+        }
+    }
 }
 
 /// Checksum entry with validation timestamp
@@ -732,7 +867,7 @@ impl Default for State {
             schema_version: default_schema_version(),
             created_at: None,
             updated_at: None,
-            phase: StatePhase::Proposed,
+            phase: StatePhase::Clarifying,
             iteration: 1,
             last_action: None,
             session_id: None,
@@ -740,5 +875,11 @@ impl Default for State {
             validations: Vec::new(),
             telemetry: None,
         }
+    }
+}
+
+impl Default for StatePhase {
+    fn default() -> Self {
+        StatePhase::Clarifying
     }
 }

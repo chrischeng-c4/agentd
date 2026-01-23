@@ -49,7 +49,7 @@ impl StateManager {
                 schema_version: "2.0".to_string(),
                 created_at: Some(Utc::now()),
                 updated_at: Some(Utc::now()),
-                phase: StatePhase::Proposed,
+                phase: StatePhase::Clarifying,
                 iteration: 1,
                 last_action: None,
                 session_id: None,
@@ -136,15 +136,30 @@ impl StateManager {
         self.state.session_id.as_deref()
     }
 
-    /// Update phase based on challenge verdict
-    /// - APPROVED → challenged
-    /// - NEEDS_REVISION → proposed (stays for auto-reproposal)
-    /// - REJECTED → rejected
+    /// Update phase based on challenge verdict (for plan-change workflow)
+    /// - APPROVED → Planned (ready for implementation)
+    /// - NEEDS_REVISION → Drafting (stays for auto-reproposal)
+    /// - REJECTED → Rejected (terminal state)
     pub fn update_phase_from_verdict(&mut self, verdict: &str) {
         let new_phase = match verdict {
-            "APPROVED" => StatePhase::Challenged,
-            "NEEDS_REVISION" => StatePhase::Proposed,
+            "APPROVED" => StatePhase::Planned,
+            "NEEDS_REVISION" => StatePhase::Drafting,
             "REJECTED" => StatePhase::Rejected,
+            _ => return, // Unknown verdict, don't change phase
+        };
+
+        self.set_phase(new_phase);
+    }
+
+    /// Update phase based on review verdict (for impl-change workflow)
+    /// - APPROVED → Implemented (ready for merge)
+    /// - NEEDS_CHANGES → CodeReviewing (auto-fix loop)
+    /// - MAJOR_ISSUES → Testing (needs manual intervention)
+    pub fn update_phase_from_review(&mut self, verdict: &str) {
+        let new_phase = match verdict {
+            "APPROVED" => StatePhase::Implemented,
+            "NEEDS_CHANGES" => StatePhase::CodeReviewing,
+            "MAJOR_ISSUES" => StatePhase::Testing,
             _ => return, // Unknown verdict, don't change phase
         };
 
@@ -519,7 +534,7 @@ mod tests {
         let manager = StateManager::load(&change_dir).unwrap();
 
         assert_eq!(manager.state().change_id, "test-change");
-        assert_eq!(manager.state().phase, StatePhase::Proposed);
+        assert_eq!(manager.state().phase, StatePhase::Clarifying);
         assert_eq!(manager.state().iteration, 1);
     }
 
@@ -530,7 +545,7 @@ mod tests {
         // Create and save state
         {
             let mut manager = StateManager::load(&change_dir).unwrap();
-            manager.set_phase(StatePhase::Challenged);
+            manager.set_phase(StatePhase::Planned);
             manager.set_last_action("challenge-proposal");
             manager.save().unwrap();
         }
@@ -538,7 +553,7 @@ mod tests {
         // Load and verify
         {
             let manager = StateManager::load(&change_dir).unwrap();
-            assert_eq!(manager.state().phase, StatePhase::Challenged);
+            assert_eq!(manager.state().phase, StatePhase::Planned);
             assert_eq!(
                 manager.state().last_action,
                 Some("challenge-proposal".to_string())
@@ -631,10 +646,10 @@ mod tests {
 
         let mut manager = StateManager::load(&change_dir).unwrap();
 
-        assert_eq!(*manager.phase(), StatePhase::Proposed);
+        assert_eq!(*manager.phase(), StatePhase::Clarifying);
 
-        manager.set_phase(StatePhase::Challenged);
-        assert_eq!(*manager.phase(), StatePhase::Challenged);
+        manager.set_phase(StatePhase::Planned);
+        assert_eq!(*manager.phase(), StatePhase::Planned);
 
         manager.set_phase(StatePhase::Implementing);
         assert_eq!(*manager.phase(), StatePhase::Implementing);
@@ -660,11 +675,11 @@ mod tests {
         let (_temp, change_dir) = setup_test_change();
 
         let mut manager = StateManager::load(&change_dir).unwrap();
-        manager.set_phase(StatePhase::Proposed);
+        manager.set_phase(StatePhase::Drafting);
 
         manager.update_phase_from_verdict("APPROVED");
 
-        assert_eq!(*manager.phase(), StatePhase::Challenged);
+        assert_eq!(*manager.phase(), StatePhase::Planned);
     }
 
     #[test]
@@ -672,12 +687,12 @@ mod tests {
         let (_temp, change_dir) = setup_test_change();
 
         let mut manager = StateManager::load(&change_dir).unwrap();
-        manager.set_phase(StatePhase::Proposed);
+        manager.set_phase(StatePhase::Drafting);
 
         manager.update_phase_from_verdict("NEEDS_REVISION");
 
-        // Should stay in Proposed phase for auto-reproposal
-        assert_eq!(*manager.phase(), StatePhase::Proposed);
+        // Should go to Drafting phase for auto-reproposal
+        assert_eq!(*manager.phase(), StatePhase::Drafting);
     }
 
     #[test]
@@ -685,7 +700,7 @@ mod tests {
         let (_temp, change_dir) = setup_test_change();
 
         let mut manager = StateManager::load(&change_dir).unwrap();
-        manager.set_phase(StatePhase::Proposed);
+        manager.set_phase(StatePhase::Drafting);
 
         manager.update_phase_from_verdict("REJECTED");
 
@@ -697,7 +712,7 @@ mod tests {
         let (_temp, change_dir) = setup_test_change();
 
         let mut manager = StateManager::load(&change_dir).unwrap();
-        let original_phase = StatePhase::Proposed;
+        let original_phase = StatePhase::Drafting;
         manager.set_phase(original_phase.clone());
 
         manager.update_phase_from_verdict("UNKNOWN");
@@ -712,20 +727,24 @@ mod tests {
 
         let mut manager = StateManager::load(&change_dir).unwrap();
 
-        // Initial phase: Proposed
-        assert_eq!(*manager.phase(), StatePhase::Proposed);
+        // Initial phase: Clarifying
+        assert_eq!(*manager.phase(), StatePhase::Clarifying);
 
-        // Challenge approved → Challenged
+        // Move to Drafting
+        manager.set_phase(StatePhase::Drafting);
+        assert_eq!(*manager.phase(), StatePhase::Drafting);
+
+        // Challenge approved → Planned
         manager.update_phase_from_verdict("APPROVED");
-        assert_eq!(*manager.phase(), StatePhase::Challenged);
+        assert_eq!(*manager.phase(), StatePhase::Planned);
 
         // Start implementation → Implementing
         manager.set_phase(StatePhase::Implementing);
         assert_eq!(*manager.phase(), StatePhase::Implementing);
 
-        // Implementation complete → Complete
-        manager.set_phase(StatePhase::Complete);
-        assert_eq!(*manager.phase(), StatePhase::Complete);
+        // Implementation complete → Implemented
+        manager.set_phase(StatePhase::Implemented);
+        assert_eq!(*manager.phase(), StatePhase::Implemented);
 
         // Archive → Archived
         manager.set_phase(StatePhase::Archived);
@@ -738,43 +757,46 @@ mod tests {
 
         let mut manager = StateManager::load(&change_dir).unwrap();
 
-        // Initial phase: Proposed
-        assert_eq!(*manager.phase(), StatePhase::Proposed);
+        // Initial phase: Clarifying
+        assert_eq!(*manager.phase(), StatePhase::Clarifying);
+
+        // Move to Drafting
+        manager.set_phase(StatePhase::Drafting);
 
         // Challenge rejected → Rejected
         manager.update_phase_from_verdict("REJECTED");
         assert_eq!(*manager.phase(), StatePhase::Rejected);
 
-        // Manual fix → back to Proposed
-        manager.set_phase(StatePhase::Proposed);
-        assert_eq!(*manager.phase(), StatePhase::Proposed);
+        // Manual fix → back to Drafting
+        manager.set_phase(StatePhase::Drafting);
+        assert_eq!(*manager.phase(), StatePhase::Drafting);
 
-        // Re-challenge approved → Challenged
+        // Re-challenge approved → Planned
         manager.update_phase_from_verdict("APPROVED");
-        assert_eq!(*manager.phase(), StatePhase::Challenged);
+        assert_eq!(*manager.phase(), StatePhase::Planned);
     }
 
     #[test]
-    fn test_needs_revision_stays_proposed() {
+    fn test_needs_revision_stays_drafting() {
         let (_temp, change_dir) = setup_test_change();
 
         let mut manager = StateManager::load(&change_dir).unwrap();
 
-        // Set to Proposed
-        manager.set_phase(StatePhase::Proposed);
+        // Set to Drafting
+        manager.set_phase(StatePhase::Drafting);
         manager.set_last_action("challenge");
         manager.save().unwrap();
 
         // Challenge needs revision
         manager.update_phase_from_verdict("NEEDS_REVISION");
 
-        // Should stay in Proposed for auto-reproposal
-        assert_eq!(*manager.phase(), StatePhase::Proposed);
+        // Should stay in Drafting for auto-reproposal
+        assert_eq!(*manager.phase(), StatePhase::Drafting);
 
         // Can re-challenge after reproposal
         manager.set_last_action("reproposal");
         manager.update_phase_from_verdict("APPROVED");
-        assert_eq!(*manager.phase(), StatePhase::Challenged);
+        assert_eq!(*manager.phase(), StatePhase::Planned);
     }
 
     #[test]
@@ -792,12 +814,62 @@ mod tests {
         // Load in new instance and verify
         {
             let manager = StateManager::load(&change_dir).unwrap();
-            assert_eq!(*manager.phase(), StatePhase::Challenged);
+            assert_eq!(*manager.phase(), StatePhase::Planned);
             assert_eq!(
                 manager.state().last_action,
                 Some("challenge".to_string())
             );
         }
+    }
+
+    #[test]
+    fn test_phase_helper_methods() {
+        // Test is_plan_phase
+        assert!(StatePhase::Clarifying.is_plan_phase());
+        assert!(StatePhase::Drafting.is_plan_phase());
+        assert!(StatePhase::SpecsGenerated.is_plan_phase());
+        assert!(StatePhase::TasksGenerated.is_plan_phase());
+        assert!(StatePhase::Planned.is_plan_phase());
+        assert!(!StatePhase::Implementing.is_plan_phase());
+
+        // Test is_impl_phase
+        assert!(StatePhase::Implementing.is_impl_phase());
+        assert!(StatePhase::Testing.is_impl_phase());
+        assert!(StatePhase::CodeReviewing.is_impl_phase());
+        assert!(StatePhase::Implemented.is_impl_phase());
+        assert!(!StatePhase::Planned.is_impl_phase());
+
+        // Test is_merge_phase
+        assert!(StatePhase::Merging.is_merge_phase());
+        assert!(StatePhase::Archived.is_merge_phase());
+        assert!(!StatePhase::Implemented.is_merge_phase());
+
+        // Test is_terminal
+        assert!(StatePhase::Archived.is_terminal());
+        assert!(StatePhase::Rejected.is_terminal());
+        assert!(!StatePhase::Implemented.is_terminal());
+    }
+
+    #[test]
+    fn test_update_phase_from_review() {
+        let (_temp, change_dir) = setup_test_change();
+
+        let mut manager = StateManager::load(&change_dir).unwrap();
+        manager.set_phase(StatePhase::Implementing);
+
+        // Test APPROVED verdict
+        manager.update_phase_from_review("APPROVED");
+        assert_eq!(*manager.phase(), StatePhase::Implemented);
+
+        // Test NEEDS_CHANGES verdict
+        manager.set_phase(StatePhase::Implementing);
+        manager.update_phase_from_review("NEEDS_CHANGES");
+        assert_eq!(*manager.phase(), StatePhase::CodeReviewing);
+
+        // Test MAJOR_ISSUES verdict
+        manager.set_phase(StatePhase::Implementing);
+        manager.update_phase_from_review("MAJOR_ISSUES");
+        assert_eq!(*manager.phase(), StatePhase::Testing);
     }
 
     // =========================================================================
