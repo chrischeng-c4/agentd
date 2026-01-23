@@ -17,8 +17,8 @@ use std::process::{Command, Stdio};
 pub enum McpServerCommands {
     /// Start HTTP MCP server and register current project
     Start {
-        /// HTTP server port (default: 3000)
-        #[arg(long, default_value = "3000")]
+        /// HTTP server port (default: 3456)
+        #[arg(long, default_value = "3456")]
         port: u16,
 
         /// Auto-update client configurations (.gemini/settings.json, ~/.codex/config.toml)

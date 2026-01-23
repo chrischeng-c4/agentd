@@ -90,6 +90,12 @@ install_binary() {
 
     chmod +x "$INSTALL_DIR/$BINARY_NAME"
     success "Installed agentd to $INSTALL_DIR/$BINARY_NAME"
+
+    # Create agentd-mcp symlink for MCP server
+    # Claude Code blocks execution of binaries registered as MCP tools by name,
+    # so we use agentd-mcp as the MCP command to avoid this restriction
+    ln -sf "$BINARY_NAME" "$INSTALL_DIR/agentd-mcp"
+    success "Created agentd-mcp symlink for MCP server"
 }
 
 # Check if agentd is already initialized in current directory

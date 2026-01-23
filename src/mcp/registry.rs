@@ -152,6 +152,43 @@ impl Registry {
         }
         Ok(())
     }
+
+    /// Check if the running server is outdated (binary was modified after server started)
+    ///
+    /// Returns true if:
+    /// - Server is running AND
+    /// - Current executable was modified after server start time
+    pub fn is_server_outdated(&self) -> bool {
+        if !self.is_server_running() {
+            return false;
+        }
+
+        // Get current executable's modification time
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Ok(metadata) = fs::metadata(&exe_path) {
+                if let Ok(modified) = metadata.modified() {
+                    let modified_dt: DateTime<Utc> = modified.into();
+                    return modified_dt > self.server.started_at;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Get server uptime in human-readable format
+    pub fn server_uptime(&self) -> String {
+        let duration = Utc::now().signed_duration_since(self.server.started_at);
+        if duration.num_days() > 0 {
+            format!("{} days", duration.num_days())
+        } else if duration.num_hours() > 0 {
+            format!("{} hours", duration.num_hours())
+        } else if duration.num_minutes() > 0 {
+            format!("{} minutes", duration.num_minutes())
+        } else {
+            "just started".to_string()
+        }
+    }
 }
 
 /// Check if a process with given PID exists
@@ -215,5 +252,20 @@ mod tests {
 
         registry.unregister_project("test").unwrap();
         assert_eq!(registry.projects.len(), 0);
+    }
+
+    #[test]
+    fn test_server_uptime_just_started() {
+        let registry = Registry::new(12345, 3456);
+        let uptime = registry.server_uptime();
+        assert_eq!(uptime, "just started");
+    }
+
+    #[test]
+    fn test_is_server_outdated_with_fake_pid() {
+        // Server with non-existent PID should not be considered outdated
+        // (because it's not running)
+        let registry = Registry::new(999999999, 3456);
+        assert!(!registry.is_server_outdated());
     }
 }

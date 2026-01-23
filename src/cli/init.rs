@@ -1,3 +1,5 @@
+use crate::mcp::config::{ensure_claude_mcp_json, ensure_claude_settings, ensure_codex_mcp_config, ensure_gemini_mcp_config};
+use crate::mcp::Registry;
 use crate::{models::AgentdConfig, Result};
 use colored::Colorize;
 use std::env;
@@ -202,9 +204,9 @@ fn run_update(
     Ok(())
 }
 
-/// Install/update all system files (skills)
+/// Install/update all system files (skills, MCP configs)
 fn install_system_files(
-    _project_root: &Path,
+    project_root: &Path,
     _agentd_dir: &Path,
     claude_dir: &Path,
 ) -> Result<()> {
@@ -215,11 +217,95 @@ fn install_system_files(
     println!("{}", "🤖 Updating Claude Code Skills...".cyan());
     install_claude_skills(&skills_dir)?;
 
+    // Configure MCP for all clients
+    println!();
+    println!("{}", "🔌 Configuring MCP servers...".cyan());
+    configure_mcp_clients(project_root)?;
+
     // Install shell completions
     println!();
     println!("{}", "🐚 Installing shell completions...".cyan());
     install_shell_completions()?;
 
+    Ok(())
+}
+
+/// Configure MCP server for all supported clients
+fn configure_mcp_clients(project_root: &Path) -> Result<()> {
+    // Claude Code: .mcp.json + .claude/settings.local.json
+    ensure_claude_mcp_json(project_root)?;
+    println!("   ✓ .mcp.json (Claude Code)");
+
+    ensure_claude_settings(project_root)?;
+    println!("   ✓ .claude/settings.local.json (Claude Code)");
+
+    // Gemini: .gemini/settings.json
+    ensure_gemini_mcp_config(project_root)?;
+    println!("   ✓ .gemini/settings.json (Gemini)");
+
+    // Codex: ~/.codex/config.toml
+    ensure_codex_mcp_config()?;
+    println!("   ✓ ~/.codex/config.toml (Codex)");
+
+    // Check if MCP server needs restart
+    check_and_restart_server_if_outdated()?;
+
+    Ok(())
+}
+
+/// Check if running MCP server is outdated and restart if needed
+fn check_and_restart_server_if_outdated() -> Result<()> {
+    if let Ok(registry) = Registry::load() {
+        if registry.is_server_outdated() {
+            println!();
+            println!(
+                "{}",
+                format!(
+                    "⚠️  MCP server outdated (running for {})",
+                    registry.server_uptime()
+                ).yellow()
+            );
+            println!("   Restarting with updated binary...");
+
+            // Shutdown old server
+            let old_pid = registry.server.pid;
+            #[cfg(unix)]
+            {
+                let _ = Command::new("kill")
+                    .arg(old_pid.to_string())
+                    .output();
+            }
+
+            // Wait a bit for process to exit
+            std::thread::sleep(std::time::Duration::from_millis(500));
+
+            // Clean up registry
+            let _ = Registry::delete();
+
+            // Start new server in daemon mode
+            let current_exe = std::env::current_exe()?;
+            let output = Command::new(&current_exe)
+                .args(["server", "start", "--daemon"])
+                .output();
+
+            match output {
+                Ok(result) if result.status.success() => {
+                    println!("   {} MCP server restarted", "✓".green());
+                }
+                Ok(result) => {
+                    let stderr = String::from_utf8_lossy(&result.stderr);
+                    println!(
+                        "   {} Failed to restart server: {}",
+                        "⚠️".yellow(),
+                        stderr.trim()
+                    );
+                }
+                Err(e) => {
+                    println!("   {} Failed to restart server: {}", "⚠️".yellow(), e);
+                }
+            }
+        }
+    }
     Ok(())
 }
 
@@ -238,7 +324,15 @@ fn print_init_success() {
     println!("   agentd/changes/           - Active changes");
     println!("   agentd/archive/           - Completed changes");
     println!("   agentd/knowledge/         - System documentation");
-    println!("   .claude/skills/           - 3 Skills installed");
+    println!();
+    println!("{}", "🔌 MCP configured for:".cyan());
+    println!("   .mcp.json                 - Claude Code");
+    println!("   .claude/settings.local.json");
+    println!("   .gemini/settings.json     - Gemini");
+    println!("   ~/.codex/config.toml      - Codex");
+    println!();
+    println!("{}", "🤖 Skills installed:".cyan());
+    println!("   .claude/skills/           - 3 Skills");
     println!();
 
     println!(
