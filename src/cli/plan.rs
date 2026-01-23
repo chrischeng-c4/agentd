@@ -13,12 +13,29 @@ pub async fn run(change_id: &str, description: Option<String>, skip_clarify: boo
     println!();
 
     // Determine if this is a new or existing change
-    let state_path = project_root
+    let change_dir = project_root
         .join("agentd/changes")
-        .join(change_id)
-        .join("STATE.yaml");
+        .join(change_id);
+    let state_path = change_dir.join("STATE.yaml");
+    let proposal_path = change_dir.join("proposal.md");
 
     let is_new_change = !state_path.exists();
+
+    // Check for conflict: existing change directory with proposal.md but no STATE.yaml
+    if is_new_change && change_dir.exists() && proposal_path.exists() {
+        println!("{}", "⚠️  Conflict detected".yellow().bold());
+        println!();
+        println!("   Directory '{}' contains proposal.md but no STATE.yaml", change_id);
+        println!();
+        println!("   This suggests an incomplete or corrupted change. Options:");
+        println!("     1. Delete the directory and try again:");
+        println!("        rm -rf agentd/changes/{}", change_id);
+        println!("        agentd plan-change {} \"<description>\"", change_id);
+        println!();
+        println!("     2. Or check if this is a valid existing change:");
+        println!("        ls agentd/changes/{}", change_id);
+        return Ok(());
+    }
 
     // For new changes, require description
     let description = if is_new_change {

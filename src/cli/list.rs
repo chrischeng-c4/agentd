@@ -59,6 +59,12 @@ struct ArchivedChange {
 /// Lists archived changes with detailed information (date, ID, summary).
 pub fn run_archived_detailed() -> Result<()> {
     let project_root = env::current_dir()?;
+    run_archived_detailed_impl(&project_root)
+}
+
+/// Internal implementation that accepts project_root for testability.
+/// This prevents tests from mutating the global CWD.
+fn run_archived_detailed_impl(project_root: &std::path::Path) -> Result<()> {
     let agentd_dir = project_root.join("agentd");
     let archive_dir = agentd_dir.join("archive");
 
@@ -231,31 +237,19 @@ mod tests {
 
     #[test]
     fn test_run_archived_detailed_empty_archive() {
-        // Save original CWD to restore later
-        let original_dir = env::current_dir().unwrap();
-
         // Create a temporary directory structure
         let temp_dir = TempDir::new().unwrap();
         let agentd_dir = temp_dir.path().join("agentd");
         let archive_dir = agentd_dir.join("archive");
         fs::create_dir_all(&archive_dir).unwrap();
 
-        // Set current directory to temp dir
-        env::set_current_dir(temp_dir.path()).unwrap();
-
-        // Run the command - should succeed with empty archive
-        let result = run_archived_detailed();
+        // Run the command with explicit project root - no CWD mutation
+        let result = run_archived_detailed_impl(temp_dir.path());
         assert!(result.is_ok());
-
-        // Restore original CWD
-        env::set_current_dir(original_dir).unwrap();
     }
 
     #[test]
     fn test_run_archived_detailed_malformed_folders() {
-        // Save original CWD to restore later
-        let original_dir = env::current_dir().unwrap();
-
         // Create a temporary directory structure
         let temp_dir = TempDir::new().unwrap();
         let agentd_dir = temp_dir.path().join("agentd");
@@ -268,23 +262,14 @@ mod tests {
         fs::create_dir_all(archive_dir.join("no-date-prefix")).unwrap();
         fs::create_dir_all(archive_dir.join("20260116-")).unwrap(); // Empty change ID
 
-        // Set current directory to temp dir
-        env::set_current_dir(temp_dir.path()).unwrap();
-
         // Run the command - should succeed and skip malformed folders
         // Note: The function prints warnings to stderr for malformed folders
-        let result = run_archived_detailed();
+        let result = run_archived_detailed_impl(temp_dir.path());
         assert!(result.is_ok());
-
-        // Restore original CWD
-        env::set_current_dir(original_dir).unwrap();
     }
 
     #[test]
     fn test_run_archived_detailed_missing_proposal() {
-        // Save original CWD to restore later
-        let original_dir = env::current_dir().unwrap();
-
         // Create a temporary directory structure
         let temp_dir = TempDir::new().unwrap();
         let agentd_dir = temp_dir.path().join("agentd");
@@ -296,22 +281,13 @@ mod tests {
         let change_dir = change_folder.join("test-change");
         fs::create_dir_all(&change_dir).unwrap();
 
-        // Set current directory to temp dir
-        env::set_current_dir(temp_dir.path()).unwrap();
-
         // Run the command - should succeed with empty summary
-        let result = run_archived_detailed();
+        let result = run_archived_detailed_impl(temp_dir.path());
         assert!(result.is_ok());
-
-        // Restore original CWD
-        env::set_current_dir(original_dir).unwrap();
     }
 
     #[test]
     fn test_run_archived_detailed_with_valid_proposal() {
-        // Save original CWD to restore later
-        let original_dir = env::current_dir().unwrap();
-
         // Create a temporary directory structure
         let temp_dir = TempDir::new().unwrap();
         let agentd_dir = temp_dir.path().join("agentd");
@@ -327,35 +303,20 @@ mod tests {
         let mut file = fs::File::create(&proposal_path).unwrap();
         writeln!(file, "## Summary\n\nThis is a test summary.").unwrap();
 
-        // Set current directory to temp dir
-        env::set_current_dir(temp_dir.path()).unwrap();
-
         // Run the command - should succeed and extract summary
-        let result = run_archived_detailed();
+        let result = run_archived_detailed_impl(temp_dir.path());
         assert!(result.is_ok());
-
-        // Restore original CWD
-        env::set_current_dir(original_dir).unwrap();
     }
 
     #[test]
     fn test_run_archived_detailed_no_archive_dir() {
-        // Save original CWD to restore later
-        let original_dir = env::current_dir().unwrap();
-
         // Create a temporary directory structure without archive dir
         let temp_dir = TempDir::new().unwrap();
         let agentd_dir = temp_dir.path().join("agentd");
         fs::create_dir_all(&agentd_dir).unwrap();
 
-        // Set current directory to temp dir
-        env::set_current_dir(temp_dir.path()).unwrap();
-
         // Run the command - should succeed with "no archived changes" message
-        let result = run_archived_detailed();
+        let result = run_archived_detailed_impl(temp_dir.path());
         assert!(result.is_ok());
-
-        // Restore original CWD
-        env::set_current_dir(original_dir).unwrap();
     }
 }

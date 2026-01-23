@@ -262,9 +262,20 @@ impl ScriptRunner {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
-        // Set working directory if provided
+        // Set working directory if provided, ensuring it exists
         if let Some(dir) = cwd {
             cmd.current_dir(dir);
+        } else {
+            // Use a stable directory when cwd is None
+            // This prevents ENOENT errors when the current directory is deleted by tests
+            if let Ok(current) = std::env::current_dir() {
+                if current.exists() {
+                    cmd.current_dir(&current);
+                } else {
+                    // Current dir was deleted (e.g., by another test), use /tmp as fallback
+                    cmd.current_dir("/tmp");
+                }
+            }
         }
 
         // Set environment variables
